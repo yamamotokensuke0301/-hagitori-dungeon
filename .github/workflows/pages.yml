@@ -1,0 +1,74 @@
+name: Deploy GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Check JavaScript syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r -d '' file; do
+            node --check "$file"
+          done < <(find data js -type f -name '*.js' -print0)
+
+      - name: Stage the public site
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p _site
+          cp index.html .nojekyll _site/
+          cp -R css data js _site/
+          mkdir -p _site/assets/audio _site/assets/images
+          cp assets/audio/town-bgm.wav _site/assets/audio/
+          cp assets/audio/dungeon-bgm.wav _site/assets/audio/
+          cp assets/audio/deep-bgm.wav _site/assets/audio/
+          cp assets/audio/abyss-bgm.wav _site/assets/audio/
+          cp assets/audio/battle-bgm.wav _site/assets/audio/
+          cp assets/audio/boss-bgm.wav _site/assets/audio/
+          cp assets/audio/tension-2-bgm.wav _site/assets/audio/
+          cp assets/audio/tension-3-bgm.wav _site/assets/audio/
+          cp assets/audio/tension-4-bgm.wav _site/assets/audio/
+          cp assets/audio/tension-5-bgm.wav _site/assets/audio/
+          cp assets/images/down-stairs.png _site/assets/images/
+          test -f _site/index.html
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+          include-hidden-files: true
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

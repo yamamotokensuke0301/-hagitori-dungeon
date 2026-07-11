@@ -1,0 +1,10 @@
+.DS_Store
+__pycache__/
+*.py[cod]
+
+# Local build output
+/_site/
+/dist/
+
+# Old, incomplete distribution snapshot. The canonical app is at the repository root.
+/publish/

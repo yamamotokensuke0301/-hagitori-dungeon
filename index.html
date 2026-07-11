@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#0b0f0d">
+    <meta name="description" content="倒し方で素材が変わる、スマートフォン向けターン制ローグライクRPG。地下100階の踏破を目指すブラウザゲーム。">
+    <title>剥ぎ取りダンジョン</title>
+    <link rel="stylesheet" href="./css/style.css?v=20260711-harvest2">
+  </head>
+  <body>
+    <section id="titleScreen" class="title-screen" aria-label="ゲーム開始画面">
+      <div class="title-emblem">†</div>
+      <p class="title-kicker">Turn-based Roguelike RPG</p>
+      <h1>剥ぎ取り<br>ダンジョン</h1>
+      <p id="versionText" class="title-version"></p>
+      <button id="titleStartButton" type="button">ゲームを始める</button>
+      <p class="title-hint">倒し方を選び、素材を剥ぎ取り、次の階層へ。</p>
+    </section>
+    <main id="appShell" class="app-shell town-mode" aria-label="剥ぎ取りダンジョン">
+      <header class="status-bar">
+        <div>
+          <span>場所</span>
+          <strong id="placeText">街</strong>
+        </div>
+        <div>
+          <span>職業</span>
+          <strong id="jobText">剣士</strong>
+        </div>
+        <div>
+          <span>種族</span>
+          <strong id="raceText">人間</strong>
+        </div>
+        <div>
+          <span>HP</span>
+          <strong><span id="hpText">0</span>/<span id="maxHpText">0</span></strong>
+          <span class="hp-bar player-hp-bar" aria-hidden="true"><i id="playerHpFill"></i></span>
+        </div>
+        <div>
+          <span>Lv</span>
+          <strong id="levelText">1</strong>
+        </div>
+        <button id="audioButton" class="audio-button" type="button" aria-label="音楽を切り替える">
+          <span id="audioIcon">♪</span>
+          <strong id="audioText">音楽</strong>
+        </button>
+      </header>
+
+      <section class="character-strip" aria-label="能力値">
+        <div><span>力</span><strong id="strengthText">0</strong></div>
+        <div><span>素早さ</span><strong id="speedText">0</strong></div>
+        <div><span>器用さ</span><strong id="dexterityText">0</strong></div>
+        <div><span>耐久力</span><strong id="durabilityText">0</strong></div>
+        <div><span>運</span><strong id="luckText">0</strong></div>
+        <div><span>加速</span><strong id="accelerationText">0</strong></div>
+        <div><span>所持金</span><strong><span id="goldText">0</span>G</strong></div>
+      </section>
+
+      <section class="equipment-strip" aria-label="装備">
+        <div><span>武器</span><strong id="weaponText">-</strong></div>
+        <div><span>上半身</span><strong id="upperText">-</strong></div>
+        <div><span>下半身</span><strong id="lowerText">-</strong></div>
+        <div><span>足回り</span><strong id="feetText">-</strong></div>
+        <div><span>装飾1</span><strong id="accessory1Text">-</strong></div>
+        <div><span>装飾2</span><strong id="accessory2Text">-</strong></div>
+      </section>
+
+      <nav class="tabs" aria-label="画面切り替え">
+        <button type="button" data-view="town">街</button>
+        <button type="button" data-view="dungeon">ダンジョン</button>
+        <button type="button" data-view="research">調査</button>
+        <button type="button" data-view="guild">ギルド</button>
+        <button type="button" data-view="arena">修練連武闘技場</button>
+      </nav>
+
+      <section id="townView" class="view"></section>
+      <section id="dungeonView" class="view hidden">
+        <div class="floor-line">
+          <div>
+            <span id="floorNameText">B1F</span>
+            <strong id="floorText">浅い横穴</strong>
+            <small id="actionPaceText">連続行動 1/1</small>
+          </div>
+          <button id="returnTownButton" type="button">帰還</button>
+        </div>
+        <div id="map" class="map" role="grid" aria-label="ダンジョンマップ"></div>
+        <div class="controls" aria-label="仮想8方向移動キー">
+          <button type="button" data-move="up-left" aria-label="左上へ移動">↖</button>
+          <button type="button" data-move="up">▲</button>
+          <button type="button" data-move="up-right" aria-label="右上へ移動">↗</button>
+          <button type="button" data-move="left">◀</button>
+          <button type="button" id="waitButton">待</button>
+          <button type="button" data-move="right">▶</button>
+          <button type="button" data-move="down-left" aria-label="左下へ移動">↙</button>
+          <button type="button" data-move="down">▼</button>
+          <button type="button" data-move="down-right" aria-label="右下へ移動">↘</button>
+        </div>
+        <div id="magicMoveControls" class="magic-move-controls hidden" aria-label="職業能力">
+          <button id="jobSkillButton" type="button">職業技</button>
+          <button id="shortTeleportButton" type="button">短距離転移</button>
+          <button id="teleportButton" type="button">テレポート</button>
+          <button id="timeStopButton" class="hidden" type="button">時間停止</button>
+          <button id="activeSpellButton" class="hidden" type="button">習得魔法</button>
+        </div>
+      </section>
+      <section id="homeView" class="view hidden"></section>
+      <section id="researchView" class="view hidden"></section>
+      <div id="researchResultCount" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+      <section id="shopView" class="view hidden"></section>
+      <section id="guildView" class="view hidden"></section>
+      <section id="arenaView" class="view hidden"></section>
+
+      <section class="materials-panel" aria-label="素材">
+        <div class="panel-title">素材</div>
+        <div id="materialsList" class="materials-list"></div>
+      </section>
+
+      <section class="log-panel" role="log" aria-live="off" aria-label="戦闘ログ">
+        <div id="logList"></div>
+        <div id="liveLogAnnouncer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+      </section>
+
+      <section id="confirmPanel" class="modal hidden" aria-label="確認">
+        <div class="modal-card">
+          <h2 id="confirmTitle">確認</h2>
+          <p id="confirmText"></p>
+          <div class="inline-actions">
+            <button id="confirmOk" type="button">実行</button>
+            <button id="confirmCancel" type="button">戻る</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="setupPanel" class="modal hidden" aria-label="キャラクター作成">
+        <div class="modal-card setup-card">
+          <h2>冒険者を作成</h2>
+          <p>種族と性格は途中変更できない。職業は街で切り替えられる。</p>
+          <label class="name-entry">名前<input id="adventurerNameInput" type="text" maxlength="12" placeholder="たかし" autocomplete="off"></label>
+          <div class="setup-selectors">
+            <button id="openPersonalityPicker" class="setup-selector" type="button"></button>
+            <button id="openJobPicker" class="setup-selector" type="button"></button>
+            <button id="openRacePicker" class="setup-selector" type="button"></button>
+          </div>
+          <div id="setupSummary" class="setup-summary"></div>
+          <div class="inline-actions">
+            <button id="setupOk" type="button">この設定で開始</button>
+            <button id="setupCancel" type="button">やめる</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="setupPickerPanel" class="modal setup-picker-modal hidden" aria-label="選択肢">
+        <div class="modal-card setup-picker-card">
+          <h2 id="setupPickerTitle">選択</h2>
+          <div id="setupPickerList" class="choice-grid setup-picker-list"></div>
+          <button id="setupPickerClose" type="button">戻る</button>
+        </div>
+      </section>
+
+      <section id="monsterInfoPanel" class="modal monster-info-modal hidden" aria-label="モンスター情報">
+        <div class="modal-card monster-info-card">
+          <div id="monsterInfoContent"></div>
+          <button id="monsterInfoClose" type="button">閉じる</button>
+        </div>
+      </section>
+
+      <section id="levelUpEffect" class="level-up-effect" aria-live="polite" aria-hidden="true">
+        <strong>LEVEL UP</strong>
+        <h2 id="levelUpTitle">Lv2</h2>
+        <p id="levelUpGrowth"></p>
+      </section>
+
+      <section id="deathEffect" class="death-effect" aria-live="assertive" aria-hidden="true">
+        <div class="death-mark">†</div>
+        <strong>YOU DIED</strong>
+        <p id="deathReasonText"></p>
+      </section>
+    </main>
+
+    <script src="./data/materials.js"></script>
+    <script src="./data/races.js?v=20260711-tactical4"></script>
+    <script src="./data/jobs.js?v=20260711-cleanup2"></script>
+    <script src="./data/personalities.js?v=20260710-personalities10"></script>
+    <script src="./data/equipment.js?v=20260711-harvest2"></script>
+    <script src="./data/treasures.js?v=20260711-harvest2"></script>
+    <script src="./data/monsters.js?v=20260711-harvest2"></script>
+    <script src="./data/floors.js?v=20260711-roster4"></script>
+    <script src="./js/unique-dialogue.js?v=20260711-voices4"></script>
+    <script src="./js/utils.js?v=20260711-cleanup2"></script>
+    <script src="./js/threat-system.js?v=20260711-tension2"></script>
+    <script src="./js/dungeon-generator.js?v=20260710-floor100-speed"></script>
+    <script src="./js/economy.js?v=20260711-harvest2"></script>
+    <script src="./js/character-system.js?v=20260711-tactical4"></script>
+    <script src="./js/bounty-system.js?v=20260711-bounty-module"></script>
+    <script src="./js/audio-effects.js?v=20260711-studio3"></script>
+    <script src="./js/main.js?v=20260711-harvest2"></script>
+  </body>
+</html>
