@@ -771,12 +771,12 @@
   const monsterSpecies = [
     { id: "slime", name: "粘体族", glyph: "粘", rank: 0, pattern: /スライム|粘|ゼリー|泥雫|酸液|黒油/ },
     { id: "vermin", name: "小獣族", glyph: "獣", rank: 1, pattern: /鼠|ネズミ|兎|ウサギ|鼬|狐|犬|狼|獣|ガルム/ },
-    { id: "insect", name: "蟲族", glyph: "蟲", rank: 2, pattern: /虫|蟲|蟹|百足|蠍|蜘蛛|蛾|甲|殻|コガネ/ },
-    { id: "winged", name: "翼獣族", glyph: "翼", rank: 3, pattern: /蝙蝠|翼|羽|烏|梟|鳥|ハネ/ },
-    { id: "reptile", name: "鱗族", glyph: "鱗", rank: 4, pattern: /蜥蜴|蛇|竜|龍|ヤモリ|蛙|亀/ },
+    { id: "insect", name: "蟲族", glyph: "虫", rank: 2, pattern: /虫|蟲|蟹|百足|蠍|蜘蛛|蛾|甲|殻|コガネ/ },
+    { id: "winged", name: "翼獣族", glyph: "鳥", rank: 3, pattern: /蝙蝠|翼|羽|烏|梟|鳥|ハネ/ },
+    { id: "reptile", name: "鱗族", glyph: "蛇", rank: 4, pattern: /蜥蜴|蛇|竜|龍|ヤモリ|蛙|亀/ },
     { id: "spirit", name: "霊族", glyph: "霊", rank: 5, pattern: /霊|魂|火花精|雫精|砂塵精|風切精|氷晶精|雷雲精|迷い火|チビヒカリ/ },
     { id: "construct", name: "造魔族", glyph: "造", rank: 6, pattern: /像|土偶|歯車|番人|巨像|鎧|騎士|鋼匠|時計/ },
-    { id: "plant", name: "妖植族", glyph: "植", rank: 7, pattern: /花|華|茸|キノコ|苔|庭|樹|根|ワタボコリ/ },
+    { id: "plant", name: "妖植族", glyph: "花", rank: 7, pattern: /花|華|茸|キノコ|苔|庭|樹|根|ワタボコリ/ },
     { id: "fiend", name: "魔族", glyph: "魔", rank: 8, pattern: /魔|鬼|妃|王子|道化|魔女|悪魔|アザゼル/ },
     { id: "giant", name: "巨人族", glyph: "巨", rank: 9, pattern: /巨|翁|山|城|壁|神|主/ },
     { id: "aberration", name: "異形族", glyph: "異", rank: 10, pattern: /眼|面|影|夢|深淵|奈落|心臓|合唱|冥府/ },
@@ -821,7 +821,7 @@
     const withinStratum = (nativeFloor - 1) % 10;
     const colorIndex = Number.isInteger(monster.forcedColorTierIndex)
       ? Math.max(0, Math.min(6, monster.forcedColorTierIndex))
-      : Math.min(6, Math.round((withinStratum / 9) * 6) + (monster.unique ? 1 : 0));
+      : Math.min(6, Math.round((withinStratum / 9) * 6) + (monster.unique && !monster.arenaOnly ? 1 : 0));
     const color = monsterColorTiers[colorIndex];
     monster.speciesId = species.id;
     monster.speciesName = `${stratumNames[stratum]}${species.name}`;

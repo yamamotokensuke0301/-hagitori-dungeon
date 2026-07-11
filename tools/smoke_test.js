@@ -44,11 +44,26 @@ const mainSource = read("js/main.js");
 const dungeonGeneratorSource = read("js/dungeon-generator.js");
 const indexSource = read("index.html");
 assert(!/\.enemy-fire\s*\{[^}]*background/.test(styleSource), "monster attribute color still changes the background");
+assert(mainSource.includes("RESEARCH_EVIDENCE_THRESHOLDS = [0, 1, 35, 100, 220, 400]") && mainSource.includes("RESEARCH_EVENT_EVIDENCE = [0, 1, 1, 2, 3, 5]"), "research progression is no longer using the harsh evidence curve");
+assert(mainSource.includes("function colorizeResearchAttributes") && mainSource.includes("function embellishedResearchNote") && styleSource.includes(".research-note-label"), "colored theatrical research notes are missing");
+assert(mainSource.includes("弱点属性") && mainSource.includes("耐性属性") && mainSource.includes("monster.weaknesses.map(attrHtml)"), "explicit colored research affinities are missing");
+assert(indexSource.includes('id="deathCryText"') && mainSource.includes("function chooseDeathCry") && mainSource.includes("DEATH_CRY_PERSONALITY"), "player death-cry variation is missing");
+assert(mainSource.includes('log(`${adventurerName}の断末魔') && !mainSource.includes('playSfx("death");\n    playSfx(deathVoice)'), "death cry is not logged or is still masked by the old death jingle");
+assert(/\.research-card-details \.attr\s*\{[^}]*font-size:\s*1\.15em;/.test(styleSource), "colored research attributes are not enlarged");
 const arenaFoeRule = styleSource.match(/\.arena-foe\s*\{[^}]*\}/)?.[0] || "";
 assert(arenaFoeRule.includes("color: hsl(var(--arena-marker-hue)"), "arena marker text color is missing");
 assert(arenaFoeRule.includes("background: rgba(94, 70, 52, 0.18)"), "arena monster background is not shared");
+assert(arenaFoeRule.includes("-webkit-text-stroke: 0") && arenaFoeRule.includes("text-shadow: 0 1px 2px rgba(0, 0, 0, 0.92)"), "arena monster lettering still uses excessive glow");
 assert(!styleSource.includes(".arena-actions"), "arena floating action panel still exists");
 assert(styleSource.includes("grid-template-columns: repeat(13, var(--tile))"), "dungeon viewport is not 13 columns");
+assert(/\.map\s*\{[^}]*gap:\s*0;/.test(styleSource), "dungeon floor tiles are still separated by grid gaps");
+assert(/\.map\s*\{[^}]*background:\s*#1b241c;/.test(styleSource), "dungeon map underlay can expose black subpixel seams");
+assert(styleSource.includes("width: calc(var(--tile) + 0.6px)") && styleSource.includes("height: calc(var(--tile) + 0.6px)"), "dungeon cells do not overlap fractional-pixel seams");
+assert(/\.tile-floor\s*\{[^}]*border:\s*0;/.test(styleSource), "dungeon floor tiles still draw individual borders");
+const playerTileRule = styleSource.match(/\.tile-player\s*\{[^}]*\}/)?.[0] || "";
+assert(playerTileRule.includes("box-shadow: none") && !playerTileRule.includes("radial-gradient"), "player marker still has a surrounding tile frame");
+assert(playerTileRule.includes("font-size: calc(var(--tile) * 0.62)") && playerTileRule.includes("font-weight: 400"), "player marker is not using the enlarged lighter style");
+assert(/\.cell\.light-room\.tile-floor\s*\{[^}]*box-shadow:\s*none;/.test(styleSource), "always-lit floor still draws per-tile lighting frames");
 assert(styleSource.includes(".map::after") && styleSource.includes("pointer-events: none"), "dungeon light-source overlay is missing");
 const dungeonOverlayRule = styleSource.match(/\.dungeon-stats-overlay\s*\{[^}]*\}/)?.[0] || "";
 assert(indexSource.includes('class="dungeon-projection"') && indexSource.includes('id="dungeonStatsOverlay"'), "in-projection dungeon stat overlay is missing");
@@ -65,6 +80,11 @@ assert(indexSource.includes('id="logHistoryPanel"') && indexSource.includes('ari
 assert(indexSource.includes('id="logHistoryList"') && indexSource.includes('aria-live="off"') && indexSource.includes('tabindex="0"'), "log-history focus target can announce the whole history live");
 assert(styleSource.includes(".log-history-card") && styleSource.includes(".log-history-list") && styleSource.includes("overscroll-behavior: contain"), "log-history dialog cannot scroll safely on short screens");
 assert(mainSource.includes("LOG_HISTORY_LIMIT = 60") && mainSource.includes("function openLogHistory") && mainSource.includes("function closeLogHistory"), "bounded log-history behavior is missing");
+assert(mainSource.includes('id="shopCompatibilitySelect"') && mainSource.includes("!shopCompatibleOnly || item.jobs.includes(adv.jobId)"), "shop current-job compatibility filter is missing");
+assert(mainSource.includes('playSfx("levelStatUp")') && mainSource.includes("data-level-stat"), "sequential level-up stat presentation is missing");
+assert(mainSource.includes("const growthStepDelay = 750") && mainSource.includes("const unchangedStepDelay = 480") && mainSource.includes('entry.difference > 0 ? "will-rise" : "unchanged"'), "level-up stat presentation is not using growth-aware cadence");
+assert(mainSource.includes('class="stat-gain">+${entry.difference}') && styleSource.includes(".level-up-stat.will-rise.revealed .stat-gain"), "level-up stat point gains are not visually exposed");
+assert(mainSource.includes('luck: "運", acceleration: "加速度"') && !mainSource.includes('defense: "防御", attackMin: "最低攻撃"'), "level-up presentation includes stats that cannot grow directly");
 assert(mainSource.includes("els.deathReviewPanel, els.depthPickerPanel, els.logHistoryPanel") && mainSource.includes('event.key === "Escape"'), "log-history focus trapping or Escape close is missing");
 assert(mainSource.includes('id="arenaSkillButton"'), "arena job skill control is missing");
 assert(mainSource.includes("enemy.unique ? [3, 5]") && mainSource.includes(": [1, 2]"), "harvest count ranges are missing");
@@ -216,7 +236,10 @@ const expansionUniques = dungeonUniques.filter((monster) => monster.dungeonExpan
 const summoningUniques = dungeonUniques.filter((monster) => monster.summon);
 assert(uniqueMonsters.length === 580, "unique monster count changed");
 assert(arenaMonsters.length === 192, "arena roster must contain 192 uniques");
+assert(arenaMonsters.filter((monster) => monster.colorTier === "rainbow").length <= 24, "rainbow arena monsters are too common");
 assert(arenaMonsters.every((monster) => typeof monster.speciesGlyph === "string" && [...monster.speciesGlyph].length === 1), "arena species marker is not one character");
+assert(window.HD_DATA.monsters.every((monster) => /^[\u3400-\u9fff]$/u.test(monster.speciesGlyph)), "monster species marker is not kanji");
+assert(window.HD_DATA.monsters.every((monster) => !/[蟲鱗]/u.test(monster.speciesGlyph)), "monster species marker uses an overly intricate kanji");
 assert(window.HD_DATA.monsters.every((monster) => window.HD_DATA.monsters.filter((peer) => peer.speciesId === monster.speciesId).every((peer) => peer.speciesGlyph === monster.speciesGlyph)), "species marker is not consistent");
 assert(arenaMonsters.every((monster) => Number.isFinite(monster.arenaMarkerHue) && Number.isFinite(monster.arenaMarkerAccentHue)), "arena marker color is missing");
 assert(dungeonUniques.length === 388, "dungeon roster must contain 388 uniques");
@@ -520,11 +543,12 @@ FakeAudioContext.prototype.createBuffer = function (channels, length) {
 
 const fakeAudioContext = new FakeAudioContext();
 const sfxPlayer = window.HD_SFX.create(fakeAudioContext, new FakeAudioNode());
-assert(sfxPlayer.types.length === 57, "sound effect recipe count changed");
+assert(sfxPlayer.types.length === 61, "sound effect recipe count changed");
 const voicesBeforeLevelUp = audioVoiceStarts;
 sfxPlayer.play("levelUp");
 assert(audioVoiceStarts - voicesBeforeLevelUp >= 18, "level-up fanfare is not sufficiently layered");
 sfxPlayer.types.filter((type) => type !== "levelUp").forEach((type) => sfxPlayer.play(type));
+assert(["deathCrySharp", "deathCryFading", "deathCryLow"].every((type) => sfxPlayer.types.includes(type)), "death-cry sound variants are missing");
 
 function FakeClassList() {
   this.values = new Set();

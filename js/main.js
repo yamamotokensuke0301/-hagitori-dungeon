@@ -3,7 +3,7 @@
 
   const SAVE_KEY = "hagitori-dungeon-save-v1";
   const AUDIO_KEY = "hagitori-audio-enabled-v4";
-  const APP_VERSION = "Prototype 3.0.0";
+  const APP_VERSION = "Prototype 3.1.0";
   const MAP_SIZE_RANGE = Object.freeze([36, 60]);
   const VIEW_SIZE = 13;
   const MAX_FLOOR = 100;
@@ -118,6 +118,16 @@
   ]);
   let recentInnAdviceIndexes = [];
   const DATA = window.HD_DATA;
+  const ATTRIBUTE_IDS_BY_LABEL = Object.freeze(Object.fromEntries(
+    Object.entries(DATA.attributeLabels).map(([id, label]) => [label, id]),
+  ));
+  const ATTRIBUTE_LABEL_PATTERN = new RegExp(
+    Object.keys(ATTRIBUTE_IDS_BY_LABEL)
+      .sort((left, right) => right.length - left.length)
+      .map((label) => label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+      .join("|"),
+    "g",
+  );
   const ECONOMY = window.HD_ECONOMY;
   const CHARACTER = window.HD_CHARACTER;
   const BOUNTY = window.HD_BOUNTY;
@@ -304,6 +314,7 @@
     audioIcon: document.querySelector("#audioIcon"),
     audioText: document.querySelector("#audioText"),
     deathEffect: document.querySelector("#deathEffect"),
+    deathCry: document.querySelector("#deathCryText"),
     deathReason: document.querySelector("#deathReasonText"),
     deathReviewPanel: document.querySelector("#deathReviewPanel"),
     deathReviewReason: document.querySelector("#deathReviewReason"),
@@ -330,6 +341,7 @@
   let audio = null;
   let sfxPlayer = null;
   let levelUpEffectTimer = null;
+  let levelUpStatTimers = [];
   let shortTeleportArmed = false;
   let spellTargetArmed = false;
   let jobSkillTargetArmed = false;
@@ -342,6 +354,7 @@
   let shopPage = 0;
   let shopSort = "price";
   let shopSlot = "all";
+  let shopCompatibleOnly = false;
   let depthPickerReturnFocus = null;
   let logHistoryReturnFocus = null;
 
@@ -916,13 +929,42 @@
     return monster?.speciesName || "種族不明";
   }
 
+  function colorizeResearchAttributes(text) {
+    return String(text || "").replace(ATTRIBUTE_LABEL_PATTERN, (label) => attrHtml(ATTRIBUTE_IDS_BY_LABEL[label]));
+  }
+
+  const RESEARCH_NOTE_FLAVOR = Object.freeze({
+    1: [
+      ["遭遇報告《第一鐘》", "記録官注：これをただの目撃談として棚へ戻した者は、次の報告書で行方不明になった。"],
+      ["迷宮観測録・赤印", "観測紙が震えているが、筆者の手は震えていないことになっている。"],
+      ["生還者の走り書き", "文字の乱れは誤記ではない。書き手が背後を確認しながら記したためである。"],
+    ],
+    2: [
+      ["解剖不能報告《能力篇》", "数字は嘘をつかない。魔物は数字ごと冒険者を殴ってくる。"],
+      ["対魔解析・第二封印", "弱点を知ることは勝利ではない。ようやく敗北に言い訳ができなくなっただけだ。"],
+      ["禁足標本室の注釈", "この頁だけ妙に新しい。古い頁を読んだ者が残っていないからだ。"],
+    ],
+    3: [
+      ["剥ぎ取り秘録《刃を入れる前に》", "仕留め方ひとつで戦利品は宝にも残飯にもなる。迷宮は雑な仕事を忘れない。"],
+      ["猟師組合・黒札情報", "知識は命より軽い。だからこそ、生きて持ち帰るのが難しい。"],
+      ["回収班の最終勧告", "素材名を読めたなら幸運だ。回収班の名簿は、たいてい途中で読めなくなる。"],
+    ],
+  });
+
+  function embellishedResearchNote(monster, level, note) {
+    const pool = RESEARCH_NOTE_FLAVOR[level] || RESEARCH_NOTE_FLAVOR[3];
+    const hash = [...`${monster.id}:${level}`].reduce((sum, character) => sum + character.charCodeAt(0), 0);
+    const [heading, aside] = pool[hash % pool.length];
+    return `<span class="research-note-label">${heading}</span>${colorizeResearchAttributes(note)} <em class="research-note-aside">${aside}</em>`;
+  }
+
   function monsterAttackFeatureDescription(monster) {
     const pool = enemyAttackAttributePool(monster);
     const intelligence = enemyTacticalIntelligence(monster);
     const parts = [];
-    if (pool.length >= 5) parts.push(`${pool.map(attr).join("・")}など${pool.length}属性を頻繁に切り替える多属性型`);
-    else if (pool.length >= 2) parts.push(`${pool.map(attr).join("・")}を使い分ける複合属性型`);
-    else parts.push(`${attr(pool[0] || monster.attackAttribute)}属性を軸に押す単属性型`);
+    if (pool.length >= 5) parts.push(`${pool.map(attrHtml).join("・")}など${pool.length}属性を次々と抜刀する万華属性型`);
+    else if (pool.length >= 2) parts.push(`${pool.map(attrHtml).join("・")}を戦況に応じて着替える複合属性型`);
+    else parts.push(`${attrHtml(pool[0] || monster.attackAttribute)}属性だけを磨き上げた一本槍型`);
     if (intelligence >= 0.7) parts.push(`極めて高い戦術知性を持ち、約${Math.round(intelligence * 100)}%で最も薄い耐性を正確に狙う`);
     else if (intelligence >= 0.35) parts.push(`装備耐性を読み、約${Math.round(intelligence * 100)}%で防御の穴を狙う`);
     else if (intelligence > 0) parts.push(`時折こちらの耐性構成を読んで攻撃属性を選ぶ`);
@@ -934,7 +976,7 @@
     if (acceleration >= 20) parts.push("非常に素早く、連続行動へ入りやすい");
     else if (acceleration >= 8) parts.push("行動速度が高い");
     else if (acceleration <= 0) parts.push("動きは遅いが一撃を重視する");
-    return `戦闘傾向：${parts.join("。")}。`;
+    return `<span class="research-note-label">交戦予報《命を賭ける前に》</span>${parts.join("。")}。`;
   }
 
   const MONSTER_TRIVIA = Object.freeze({
@@ -965,7 +1007,7 @@
       : Number(monster.colorTierIndex || 0) === 0
         ? "白階級の時期は好奇心が強く、縄張りの外へ出やすい"
         : "成長に伴う色の変化は、同族同士の合図としても使われる";
-    return `豆知識：${fact}。${colorNote}。`;
+    return `<span class="research-note-label">迷宮余聞《役に立つとは限らない》</span>${colorizeResearchAttributes(fact)}。${colorizeResearchAttributes(colorNote)}。`;
   }
 
   const THREAT_HYPE_OPENINGS = Object.freeze([
@@ -1005,7 +1047,7 @@
       : monster.unique
         ? "固有災害指定"
         : "深層脅威指定";
-    return `脅威煽り・${rankTitle}：${opening}。${ending}。`;
+    return `<span class="research-note-label threat">${rankTitle}《閲覧後の正気は保証外》</span>${colorizeResearchAttributes(opening)}。${colorizeResearchAttributes(ending)}。`;
   }
 
   const CHARACTERFUL_MONSTER_NOTES = Object.freeze({
@@ -1031,7 +1073,7 @@
     if (researchLevel >= 4 && monster.dialogueKeepsake) parts.push(`大切にしているものは${monster.dialogueKeepsake}`);
     if (researchLevel >= 5 && monster.dialogueSecret) parts.push(`秘された記録には「${monster.dialogueSecret}」とある`);
     if (!monster.dialogueDesire) parts.push(pool[(hash + 1) % pool.length]);
-    return `怪物評：${parts.join("。")}。`;
+    return `<span class="research-note-label">怪物評《強さ以外の厄介事》</span>${colorizeResearchAttributes(parts.join("。"))}。`;
   }
 
   function lootCandidateNames(monster) {
@@ -1437,7 +1479,7 @@
         const rec = getResearch(monster.id);
         const lines = [];
         for (let level = 1; level <= rec.level; level += 1) {
-          if (monster.research[level]) lines.push(`<p>${monster.research[level]}</p>`);
+          if (monster.research[level]) lines.push(`<p>${embellishedResearchNote(monster, level, monster.research[level])}</p>`);
         }
         if (rec.level >= 1 && isHypeThreat(monster)) lines.push(`<p>${monsterThreatHypeDescription(monster)}</p>`);
         if (rec.level >= 2 && monsterCanPhaseWalls(monster)) lines.push("<p>特性記録：実体を薄め、迷宮の内壁を通過する。</p>");
@@ -1455,7 +1497,7 @@
           : "research-monster-graphic unknown";
         return `<details class="research-card" data-research-card="${monster.id}"${open}>
           <summary><span class="${graphicClasses}" aria-hidden="true">${rec.seen ? monsterMarker(monster) : "?"}</span><span class="monster-research-title"><strong>${rec.seen ? monster.name : "未確認の魔物"}</strong><small>${rec.seen ? `${monsterSpeciesDisplay(monster, rec.level)} / ${monster.colorTierName}階級 / ` : ""}${rec.seen && monster.unique ? "ユニーク / " : ""}${rec.seen ? floorText : "出現階不明"}</small></span><span class="research-level-dots" aria-label="${researchStatusText(rec.level)}">${dots}</span><span>${rec.level}/5</span></summary>
-          <div class="research-card-details"><p><strong>${researchStatusText(rec.level)}</strong> ${rewardTag}</p>${rec.level >= 1 ? `<p class="research-stat-line"><span>基礎最大HP</span><strong>${monster.hp}</strong></p>` : ""}${lines.length ? lines.join("") : "<p>まだ詳細不明。遭遇、戦闘、調査で記録が進む。</p>"}${rec.level >= 4 ? `<p>剥ぎ取り候補：${lootCandidateNames(monster).join("・") || "なし"}</p>` : ""}</div>
+          <div class="research-card-details"><p><strong>${researchStatusText(rec.level)}</strong> ${rewardTag}</p>${rec.level >= 1 ? `<p class="research-stat-line"><span>基礎最大HP</span><strong>${monster.hp}</strong></p>` : ""}${rec.level >= 3 ? `<p class="research-stat-line"><span>弱点属性</span><strong>${monster.weaknesses?.length ? monster.weaknesses.map(attrHtml).join("・") : "なし"}</strong></p><p class="research-stat-line"><span>耐性属性</span><strong>${Object.keys(monster.resistances || {}).length ? formatResistances(monster.resistances) : "なし"}</strong></p>` : ""}${lines.length ? lines.join("") : "<p>まだ詳細不明。遭遇、戦闘、調査で記録が進む。</p>"}${rec.level >= 4 ? `<p>剥ぎ取り候補：${lootCandidateNames(monster).join("・") || "なし"}</p>` : ""}</div>
         </details>`;
       })
       .join("");
@@ -1586,7 +1628,10 @@
     };
     const stock = state.meta.shop.inventory
       .map((id) => equipment[id])
-      .filter((item) => item && !item.artifact && (shopSlot === "all" || item.slot === shopSlot))
+      .filter((item) => item
+        && !item.artifact
+        && (shopSlot === "all" || item.slot === shopSlot)
+        && (!shopCompatibleOnly || item.jobs.includes(adv.jobId)))
       .sort(shopSorters[shopSort] || shopSorters.price);
     const pageCount = Math.max(1, Math.ceil(stock.length / 24));
     shopPage = clamp(shopPage, 0, pageCount - 1);
@@ -1617,6 +1662,7 @@
         <h2>流通装備品</h2>
         <div class="equipment-sortbar">
           <label>装備品<select id="shopSlotSelect"><option value="all" ${shopSlot === "all" ? "selected" : ""}>すべて</option><option value="weapon" ${shopSlot === "weapon" ? "selected" : ""}>武器</option><option value="upper" ${shopSlot === "upper" ? "selected" : ""}>上半身</option><option value="lower" ${shopSlot === "lower" ? "selected" : ""}>下半身</option><option value="feet" ${shopSlot === "feet" ? "selected" : ""}>足回り</option><option value="accessory" ${shopSlot === "accessory" ? "selected" : ""}>装飾品</option></select></label>
+          <label>装備条件<select id="shopCompatibilitySelect"><option value="all" ${!shopCompatibleOnly ? "selected" : ""}>全職業を表示</option><option value="current" ${shopCompatibleOnly ? "selected" : ""}>${jobs[adv.jobId].name}で装備可能のみ</option></select></label>
           <label>並び順<select id="shopSortSelect"><option value="price" ${shopSort === "price" ? "selected" : ""}>価格が安い順</option><option value="priceDesc" ${shopSort === "priceDesc" ? "selected" : ""}>価格が高い順</option><option value="attack" ${shopSort === "attack" ? "selected" : ""}>攻撃力順</option><option value="defense" ${shopSort === "defense" ? "selected" : ""}>防御力順</option><option value="acceleration" ${shopSort === "acceleration" ? "selected" : ""}>加速度順</option><option value="regen" ${shopSort === "regen" ? "selected" : ""}>再生効果順</option><option value="name" ${shopSort === "name" ? "selected" : ""}>名前順</option></select></label>
         </div>
         <div class="list-pager"><button type="button" data-shop-page="prev" ${shopPage === 0 ? "disabled" : ""}>前へ</button><strong>${shopPage + 1}/${pageCount}</strong><span>全${stock.length}件</span><button type="button" data-shop-page="next" ${shopPage >= pageCount - 1 ? "disabled" : ""}>次へ</button></div>
@@ -1624,7 +1670,7 @@
           const price = shopItemPrice(item);
           const owned = ownsEquipment(item.id);
           return `<article class="recipe-card"><h2>${equipmentDisplayName(item)}</h2><p>${item.description}</p><div class="stat-row"><span>性能</span><div>${ECONOMY.equipmentStats(item)}</div></div><div class="stat-row"><span>攻撃属性</span><div>${formatAttackAttributes(equipmentAttackAttributes(item)) || "なし"}</div></div><div class="stat-row"><span>耐性</span><div>${formatResistances(item.resistances) || "なし"}</div></div><div class="stat-row"><span>装備可能</span><div>${equipmentJobNames(item)}</div></div><button type="button" data-buy="${item.id}" ${owned || adv.gold < price ? "disabled" : ""}>${owned ? "購入済み" : `${price}Gで購入`}</button></article>`;
-        }).join("") : "<p>素材を売ると装備が入荷する。</p>"}</div>
+        }).join("") : `<p>${shopCompatibleOnly ? `現在の職業「${jobs[adv.jobId].name}」で装備できる流通品がない。` : "素材を売ると装備が入荷する。"}</p>`}</div>
       </section>`;
     document.querySelectorAll("[data-sell-one]").forEach((button) => button.addEventListener("click", () => sellMaterial(button.dataset.sellOne, 1)));
     document.querySelectorAll("[data-sell-all]").forEach((button) => button.addEventListener("click", () => sellMaterial(button.dataset.sellAll, getMaterialCount(button.dataset.sellAll))));
@@ -1639,6 +1685,11 @@
     }));
     document.querySelector("#shopSlotSelect").addEventListener("change", (event) => {
       shopSlot = event.target.value;
+      shopPage = 0;
+      renderShop();
+    });
+    document.querySelector("#shopCompatibilitySelect").addEventListener("change", (event) => {
+      shopCompatibleOnly = event.target.value === "current";
       shopPage = 0;
       renderShop();
     });
@@ -3693,7 +3744,7 @@
   function observeEnemy(enemy, amount) {
     ensureUniqueEncounterSpeech(enemy);
     const before = getResearch(enemy.id).level;
-    markResearch(enemy.id, 1, { evidence: Math.max(8, Number(amount || 1) * 8) });
+    markResearch(enemy.id, 1, { evidence: Math.max(5, Number(amount || 1) * 5) });
     const after = getResearch(enemy.id).level;
     const rec = getResearch(enemy.id);
     log(after > before
@@ -4154,36 +4205,72 @@
     const newStats = { ...getPlayerStats() };
     adv.hp = Math.min(newStats.maxHp, adv.hp + (newStats.maxHp - oldStats.maxHp) + Math.max(2, Math.floor(newStats.maxHp * 0.15)));
     log(levelsGained > 1 ? `${levelsGained}レベル上昇し、Lv${adv.level}になった！` : `レベルアップ！ Lv${adv.level}になった！`);
+    const growthEntries = levelGrowthEntries(oldStats, newStats);
     const growth = formatLevelGrowth(oldStats, newStats);
     if (growth) log(`成長: ${growth}`);
-    showLevelUpEffect(adv.level, growth);
+    showLevelUpEffect(adv.level, growthEntries);
     playSfx("levelUp");
   }
 
-  function showLevelUpEffect(level, growth) {
+  function showLevelUpEffect(level, growthEntries) {
     window.clearTimeout(levelUpEffectTimer);
+    levelUpStatTimers.forEach((timer) => window.clearTimeout(timer));
+    levelUpStatTimers = [];
     els.levelUpTitle.textContent = `Lv${level}`;
-    els.levelUpGrowth.textContent = growth || "能力が上昇した";
+    const entries = growthEntries;
+    els.levelUpGrowth.innerHTML = entries.map((entry) => `
+      <div class="level-up-stat ${entry.difference > 0 ? "will-rise" : "unchanged"}" data-level-stat="${entry.key}">
+        <span>${entry.label}</span><span class="stat-before">${entry.before}</span><span class="stat-arrow">→</span><span class="stat-after">${entry.before}</span><strong class="stat-gain">+${entry.difference}</strong>
+      </div>`).join("");
+    const growthStepDelay = 750;
+    const unchangedStepDelay = 480;
+    const openingDelay = 800;
+    let elapsed = openingDelay;
+    const revealDelays = entries.map((entry) => {
+      const delay = elapsed;
+      elapsed += entry.difference > 0 ? growthStepDelay : unchangedStepDelay;
+      return delay;
+    });
+    const duration = elapsed + 1500;
+    els.levelUpEffect.style.setProperty("--level-up-duration", `${duration}ms`);
     els.levelUpEffect.classList.remove("active");
     void els.levelUpEffect.offsetWidth;
     els.levelUpEffect.setAttribute("aria-hidden", "false");
     els.levelUpEffect.classList.add("active");
-    levelUpEffectTimer = window.setTimeout(hideLevelUpEffect, 3200);
+    const rows = els.levelUpGrowth.querySelectorAll(".level-up-stat");
+    entries.forEach((entry, index) => {
+      levelUpStatTimers.push(window.setTimeout(() => {
+        const row = rows[index];
+        if (!row) return;
+        row.querySelector(".stat-after").textContent = entry.after;
+        row.classList.add("revealed");
+        if (entry.difference > 0) playSfx("levelStatUp");
+      }, revealDelays[index]));
+    });
+    levelUpEffectTimer = window.setTimeout(hideLevelUpEffect, duration);
   }
 
   function hideLevelUpEffect() {
     window.clearTimeout(levelUpEffectTimer);
+    levelUpStatTimers.forEach((timer) => window.clearTimeout(timer));
+    levelUpStatTimers = [];
     levelUpEffectTimer = null;
     els.levelUpEffect.classList.remove("active");
     els.levelUpEffect.setAttribute("aria-hidden", "true");
   }
 
   function formatLevelGrowth(before, after) {
-    const labels = { maxHp: "最大HP", strength: "力", speed: "素早さ", dexterity: "器用さ", durability: "耐久力", luck: "運", defense: "防御", attackMin: "最低攻撃", attackMax: "最大攻撃" };
+    return levelGrowthEntries(before, after)
+      .filter((entry) => entry.difference > 0)
+      .map((entry) => `${entry.label}${entry.difference}上昇`).join("、");
+  }
+
+  function levelGrowthEntries(before, after) {
+    const labels = { maxHp: "最大HP", strength: "力", speed: "素早さ", dexterity: "器用さ", durability: "耐久力", luck: "運", acceleration: "加速度" };
     return Object.keys(labels).map((key) => {
       const difference = Math.round((after[key] || 0) - (before[key] || 0));
-      return difference > 0 ? `${labels[key]}${difference}上昇` : null;
-    }).filter(Boolean).join("、");
+      return { key, label: labels[key], before: Math.round(before[key] || 0), after: Math.round(after[key] || 0), difference };
+    });
   }
 
   function initializeCorpseHarvests(enemy) {
@@ -4351,6 +4438,9 @@
     const raceId = state.adventurer.raceId;
     const personalityId = state.adventurer.personalityId || "gentle";
     const adventurerName = state.adventurer.name || "たかし";
+    const deathCry = chooseDeathCry(state.adventurer, reason);
+    const deathVoice = DEATH_CRY_VOICE_TYPES[Math.floor(Math.random() * DEATH_CRY_VOICE_TYPES.length)];
+    log(`${adventurerName}の断末魔：「${deathCry}」`);
     resetAdventurerProgressionMeta();
     state.adventurer = createAdventurer(raceId, jobId, personalityId, adventurerName);
     state.meta.awaitingCreation = true;
@@ -4359,19 +4449,54 @@
     log("冒険者は失われた。調査・街の流通・称号・賞金情報は残るが、資産・深度標・賞金精算回数は失われた。");
     state.meta.pendingDeathReview = {
       reason: String(reason || "不明").slice(0, 160),
+      cry: deathCry,
       log: state.log.slice(0, 20),
     };
     audio.musicBlocked = true;
     stopMusic();
-    playSfx("death");
+    playSfx(deathVoice);
     currentView = "town";
     initialSetupPending = true;
     pendingSetup = { raceId, jobId, personalityId, name: adventurerName, preserveMeta: true };
     saveGame();
-    showDeathEffect(reason);
+    showDeathEffect(reason, deathCry);
   }
 
-  function showDeathEffect(reason) {
+  const DEATH_CRY_COMMON = Object.freeze([
+    "まだだ……まだ、百階の闇を見ていない……！",
+    "こんなところで、剥ぎ取られる側になるなんてな……",
+    "地上の空気を……もう一度だけ……！",
+    "待て、今のは練習だ……本番は、次の命で……",
+    "迷宮よ……俺の名前まで喰うんじゃないぞ……",
+    "誰か、この記録だけは……持ち帰ってくれ……",
+    "くそっ……あと一歩が、こんなに遠いのか……！",
+    "聞こえるか……次の冒険者。ここから先は、頼んだ……",
+  ]);
+
+  const DEATH_CRY_VOICE_TYPES = Object.freeze(["deathCrySharp", "deathCryFading", "deathCryLow"]);
+
+  const DEATH_CRY_PERSONALITY = Object.freeze({
+    brave: ["退くものか……最期くらい、前を向いてやる！", "勝負はまだ……俺が倒れただけだ……！"],
+    careful: ["計算は合っていた……死だけが、勘定の外だった……", "確認が……あと一つ、足りなかったか……"],
+    lazy: ["ああ……もう、ここで寝ても……いいよな……", "次は……もっと楽な迷宮にしてくれ……"],
+    lewd: ["未練なら……山ほどあるに決まってるだろ……！", "せめて最期に……夢くらい、見せろよ……"],
+    gentle: ["泣くな……次の誰かが、生きて帰ればいい……", "魔物も……こんな気持ちで倒れていたのかな……"],
+    lucky: ["運が尽きた？　違う……次の命へ前借りしただけだ……", "最後の幸運は……次の誰かに譲るよ……"],
+  });
+
+  function chooseDeathCry(adventurer, reason) {
+    const personal = DEATH_CRY_PERSONALITY[adventurer.personalityId] || [];
+    const situational = String(reason || "").includes("罠")
+      ? ["床に殺されるとは……これは、誰にも言うな……", "罠師め……墓碑にまで仕掛ける気か……"]
+      : String(reason || "").includes("呪")
+        ? ["この声は……本当に、俺のものか……？", "名前が……ほどけて、消えていく……"]
+        : [];
+    const pool = [...situational, ...personal, ...DEATH_CRY_COMMON];
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+
+  function showDeathEffect(reason, deathCry) {
+    els.deathCry.textContent = deathCry;
     els.deathReason.textContent = `死因：${reason}`;
     els.deathEffect.classList.remove("active");
     void els.deathEffect.offsetWidth;
@@ -4636,8 +4761,8 @@
     }));
   }
 
-  const RESEARCH_EVIDENCE_THRESHOLDS = [0, 1, 12, 32, 65, 110];
-  const RESEARCH_EVENT_EVIDENCE = [0, 1, 2, 4, 7, 10];
+  const RESEARCH_EVIDENCE_THRESHOLDS = [0, 1, 35, 100, 220, 400];
+  const RESEARCH_EVENT_EVIDENCE = [0, 1, 1, 2, 3, 5];
 
   function markResearch(monsterId, level, options = {}) {
     const rec = getResearch(monsterId);

@@ -19,7 +19,8 @@
       timeStop: [0.64, 1.28], eat: [0.74, 0.3], feast: [0.6, 0.72], bountyCarry: [0.7, 0.78],
       anomaly: [0.6, 1.22], chaos: [0.42, 0.98], invisibleReveal: [0.66, 1.18], heal: [0.6, 1.4],
       corpse: [0.7, 0.32], harvest: [0.45, 0.72], craft: [0.74, 0.88], equip: [0.78, 0.72],
-      rest: [0.68, 1.2], victory: [0.66, 1.18], levelUp: [0.58, 1.48], death: [0.42, 1.15], flee: [0.8, 0.38],
+      rest: [0.68, 1.2], victory: [0.66, 1.18], levelUp: [0.58, 1.48], levelStatUp: [0.7, 1.1], death: [0.42, 1.15],
+      deathCrySharp: [0.5, 0.82], deathCryFading: [0.46, 1.05], deathCryLow: [0.48, 0.72], flee: [0.8, 0.38],
     });
 
     let activeLevel = 1;
@@ -297,17 +298,21 @@
         playArp([261.63, 329.63, 392, 523.25, 659.25], now + 0.006, 0.08, 0.062, out, { spread: 0.42, lastTail: 1.5 });
       }
       if (type === "levelUp") {
-        // 上昇する風圧、二段のアルペジオ、明るい終止和音で成長を強く印象づける。
-        playSweep(110, 880, now, 0.62, 0.038, "sine", out, { pan: -0.38, panEnd: 0.38, reverb: 0.26 });
-        playNoiseBand(now, 0.42, 0.026, out, 4200, 0.68, -0.42, { attack: 0.025, panEnd: 0.42, reverb: 0.14 });
-        playArp([261.63, 329.63, 392, 523.25, 659.25, 783.99], now + 0.025, 0.085, 0.058, out, { spread: 0.52, lastTail: 1.4, reverb: 0.24 });
-        playArp([523.25, 659.25, 783.99, 1046.5, 1318.51], now + 0.34, 0.072, 0.044, out, { spread: 0.58, lastTail: 1.65, reverb: 0.3 });
-        playMetal(1567.98, now + 0.67, 0.58, 0.032, out, -0.2);
-        playMetal(2093, now + 0.72, 0.54, 0.025, out, 0.24);
-        playTone(523.25, now + 0.69, 0.92, 0.028, "sine", out, { attack: 0.018, sustain: 0.78, pan: -0.28, reverb: 0.34 });
-        playTone(659.25, now + 0.69, 0.92, 0.026, "sine", out, { attack: 0.018, sustain: 0.78, pan: 0, reverb: 0.34 });
-        playTone(783.99, now + 0.69, 0.92, 0.024, "sine", out, { attack: 0.018, sustain: 0.78, pan: 0.28, reverb: 0.34 });
-        playTone(1567.98, now + 0.76, 0.78, 0.018, "triangle", out, { sustain: 0.7, pan: 0.1, reverb: 0.38 });
+        // 約3秒かけて二度上昇し、能力表示の開始へ余韻を渡すファンファーレ。
+        playSweep(110, 880, now, 1.15, 0.038, "sine", out, { pan: -0.38, panEnd: 0.38, reverb: 0.26 });
+        playNoiseBand(now, 0.82, 0.026, out, 4200, 0.68, -0.42, { attack: 0.025, panEnd: 0.42, reverb: 0.14 });
+        playArp([261.63, 329.63, 392, 523.25, 659.25, 783.99], now + 0.025, 0.15, 0.058, out, { spread: 0.52, lastTail: 1.55, reverb: 0.24 });
+        playArp([392, 523.25, 659.25, 783.99, 1046.5, 1318.51], now + 0.88, 0.14, 0.048, out, { spread: 0.58, lastTail: 1.7, reverb: 0.3 });
+        playMetal(1567.98, now + 1.72, 0.82, 0.032, out, -0.2);
+        playMetal(2093, now + 1.82, 0.76, 0.025, out, 0.24);
+        playTone(523.25, now + 1.74, 1.32, 0.028, "sine", out, { attack: 0.018, sustain: 0.78, pan: -0.28, reverb: 0.34 });
+        playTone(659.25, now + 1.74, 1.32, 0.026, "sine", out, { attack: 0.018, sustain: 0.78, pan: 0, reverb: 0.34 });
+        playTone(783.99, now + 1.74, 1.32, 0.024, "sine", out, { attack: 0.018, sustain: 0.78, pan: 0.28, reverb: 0.34 });
+        playTone(1567.98, now + 1.88, 1.08, 0.018, "triangle", out, { sustain: 0.7, pan: 0.1, reverb: 0.38 });
+      }
+      if (type === "levelStatUp") {
+        playMetal(1567.98, now, 0.3, 0.032, out, -0.08);
+        playTone(2093, now + 0.018, 0.34, 0.025, "sine", out, { attack: 0.003, sustain: 0.62, pan: 0.12, reverb: 0.3 });
       }
       if (type === "death") {
         playTone(55, now, 0.34, 0.14, "sine", out);
@@ -315,6 +320,30 @@
         playNoise(now + 0.08, 0.8, 0.095, out, 380);
         playArp([220, 185, 146.83, 110, 73.42], now + 0.15, 0.16, 0.085, out);
         playSweep(120, 32, now + 0.28, 1.25, 0.09, "sawtooth", out);
+      }
+      if (type === "deathCrySharp") {
+        // 「アァッ！」に聞こえる急な声帯降下と、口腔・喉の共鳴帯。
+        playSweep(560, 185, now, 0.82, 0.075, "sawtooth", out, { pan: -0.05, panEnd: 0.04, reverb: 0.09 });
+        playSweep(980, 690, now + 0.018, 0.72, 0.038, "triangle", out, { pan: 0.04, panEnd: -0.03, reverb: 0.12 });
+        playSweep(2380, 1680, now + 0.025, 0.58, 0.022, "sine", out, { pan: -0.08, panEnd: 0.07, reverb: 0.14 });
+        playNoiseBand(now + 0.03, 0.48, 0.045, out, 1650, 0.9, 0, { attack: 0.004, reverb: 0.06 });
+        playImpact(54, now + 0.68, 0.48, 0.085, out, { click: 160, pan: 0 });
+      }
+      if (type === "deathCryFading") {
+        // 長い「アァァ……」が息と一緒に細く消える型。
+        playSweep(390, 105, now, 1.62, 0.066, "sawtooth", out, { pan: -0.06, panEnd: 0.05, reverb: 0.18 });
+        playSweep(860, 540, now + 0.035, 1.42, 0.034, "triangle", out, { pan: 0.05, panEnd: -0.04, reverb: 0.22 });
+        playSweep(2180, 1420, now + 0.05, 1.08, 0.018, "sine", out, { pan: -0.08, panEnd: 0.08, reverb: 0.24 });
+        playNoiseBand(now + 0.08, 1.28, 0.032, out, 1250, 0.72, 0, { attack: 0.025, reverb: 0.13 });
+        playTone(49, now + 1.1, 0.72, 0.082, "sine", out, { attack: 0.03, sustain: 0.55, pan: 0, reverb: 0.08 });
+      }
+      if (type === "deathCryLow") {
+        // 胸から絞り出す「ぐ、あぁ……」型。二段の声帯破綻を作る。
+        playSweep(245, 118, now, 0.52, 0.078, "sawtooth", out, { pan: 0.04, panEnd: -0.03, reverb: 0.08 });
+        playSweep(310, 72, now + 0.34, 1.02, 0.07, "sawtooth", out, { pan: -0.04, panEnd: 0.03, reverb: 0.12 });
+        playSweep(720, 430, now + 0.05, 0.94, 0.034, "triangle", out, { pan: 0.05, panEnd: -0.04, reverb: 0.14 });
+        playNoiseBand(now, 0.92, 0.052, out, 760, 0.66, 0, { attack: 0.012, reverb: 0.05 });
+        playImpact(46, now + 0.9, 0.62, 0.1, out, { click: 115, pan: 0 });
       }
       if (type === "flee") {
         playNoise(now, 0.11, 0.045, out, 1200, { attack: 0.001, pan: -0.28, reverb: 0.018 });

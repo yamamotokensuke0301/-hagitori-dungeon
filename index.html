@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#0b0f0d">
     <meta name="description" content="倒し方で素材が変わる、スマートフォン向けターン制ローグライクRPG。地下100階の踏破を目指すブラウザゲーム。">
     <title>剥ぎ取りダンジョン</title>
-    <link rel="stylesheet" href="./css/style.css?v=20260711-cleanup3">
+    <link rel="stylesheet" href="./css/style.css?v=20260711-cleanup4">
   </head>
   <body>
     <section id="titleScreen" class="title-screen" aria-label="ゲーム開始画面">
@@ -204,12 +204,13 @@
       <section id="levelUpEffect" class="level-up-effect" aria-live="polite" aria-hidden="true">
         <strong>LEVEL UP</strong>
         <h2 id="levelUpTitle">Lv2</h2>
-        <p id="levelUpGrowth"></p>
+        <div id="levelUpGrowth" class="level-up-growth"></div>
       </section>
 
       <section id="deathEffect" class="death-effect" aria-live="assertive" aria-hidden="true">
         <div class="death-mark">†</div>
         <strong>YOU DIED</strong>
+        <blockquote id="deathCryText" class="death-cry-text"></blockquote>
         <p id="deathReasonText"></p>
       </section>
 
@@ -236,23 +237,23 @@
       </section>
     </main>
 
-    <script src="./data/materials.js?v=20260711-cleanup3"></script>
-    <script src="./data/races.js?v=20260711-cleanup3"></script>
-    <script src="./data/jobs.js?v=20260711-cleanup3"></script>
-    <script src="./data/personalities.js?v=20260711-cleanup3"></script>
-    <script src="./data/equipment.js?v=20260711-cleanup3"></script>
-    <script src="./data/treasures.js?v=20260711-cleanup3"></script>
-    <script src="./data/monsters.js?v=20260711-cleanup3"></script>
-    <script src="./data/floors.js?v=20260711-cleanup3"></script>
-    <script src="./js/unique-dialogue.js?v=20260711-cleanup3"></script>
-    <script src="./js/utils.js?v=20260711-cleanup3"></script>
-    <script src="./js/threat-system.js?v=20260711-cleanup3"></script>
-    <script src="./js/dungeon-generator.js?v=20260711-cleanup3"></script>
-    <script src="./js/artifact-generator.js?v=20260711-cleanup3"></script>
-    <script src="./js/economy.js?v=20260711-cleanup3"></script>
-    <script src="./js/character-system.js?v=20260711-cleanup3"></script>
-    <script src="./js/bounty-system.js?v=20260711-cleanup3"></script>
-    <script src="./js/audio-effects.js?v=20260711-cleanup3"></script>
-    <script src="./js/main.js?v=20260711-cleanup3"></script>
+    <script src="./data/materials.js?v=20260711-cleanup4"></script>
+    <script src="./data/races.js?v=20260711-cleanup4"></script>
+    <script src="./data/jobs.js?v=20260711-cleanup4"></script>
+    <script src="./data/personalities.js?v=20260711-cleanup4"></script>
+    <script src="./data/equipment.js?v=20260711-cleanup4"></script>
+    <script src="./data/treasures.js?v=20260711-cleanup4"></script>
+    <script src="./data/monsters.js?v=20260711-cleanup4"></script>
+    <script src="./data/floors.js?v=20260711-cleanup4"></script>
+    <script src="./js/unique-dialogue.js?v=20260711-cleanup4"></script>
+    <script src="./js/utils.js?v=20260711-cleanup4"></script>
+    <script src="./js/threat-system.js?v=20260711-cleanup4"></script>
+    <script src="./js/dungeon-generator.js?v=20260711-cleanup4"></script>
+    <script src="./js/artifact-generator.js?v=20260711-cleanup4"></script>
+    <script src="./js/economy.js?v=20260711-cleanup4"></script>
+    <script src="./js/character-system.js?v=20260711-cleanup4"></script>
+    <script src="./js/bounty-system.js?v=20260711-cleanup4"></script>
+    <script src="./js/audio-effects.js?v=20260711-cleanup4"></script>
+    <script src="./js/main.js?v=20260711-cleanup4"></script>
   </body>
 </html>
