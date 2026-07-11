@@ -22,6 +22,10 @@
   window.HD_DATA.attributes = Object.keys(window.HD_DATA.attributeLabels);
 
   window.HD_DATA.resistanceMultipliers = {
+    "-4": 2.25,
+    "-3": 2,
+    "-2": 1.65,
+    "-1": 1.3,
     0: 1,
     1: 0.75,
     2: 0.5,
