@@ -51,7 +51,7 @@
       stats: { strength: -1, speed: 1, dexterity: 3, durability: -1, luck: 2 },
       combat: { attackTrials: 3, attackMin: 5, attackMax: 13, accuracy: 0.78, evasion: 0.05, crit: 0.15 },
       skill: { id: "flare", name: "火球術", attribute: "fire", power: 1.5, tag: "flare" },
-      description: "射程5の魔法攻撃と、短距離転移・テレポートを扱う後衛職。",
+      description: "射程5の魔法攻撃と、長距離テレポートを扱う後衛職。",
     },
     {
       id: "spellblade",
@@ -64,7 +64,7 @@
       stats: { strength: 2, speed: 1, dexterity: 2, durability: 1, luck: 1 },
       combat: { attackTrials: 4, attackMin: 4, attackMax: 11, accuracy: 0.79, evasion: 0.06, crit: 0.1 },
       skill: { id: "arcslash", name: "魔刃連撃", attribute: "slash", power: 1.35, tag: "arcslash" },
-      description: "射程3の魔刃と、短距離転移・テレポートを扱う万能前衛職。",
+      description: "射程3の魔刃と、長距離テレポートを扱う万能前衛職。",
     },
     {
       id: "researcher",

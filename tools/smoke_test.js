@@ -34,6 +34,7 @@ const scriptFiles = [
   "js/character-system.js",
   "js/bounty-system.js",
   "js/audio-effects.js",
+  "js/surreal-text.js",
   "js/main.js",
 ];
 
@@ -41,6 +42,7 @@ scriptFiles.forEach((path) => new Function(read(path)));
 
 const styleSource = read("css/style.css");
 const mainSource = read("js/main.js");
+const jobsSource = read("data/jobs.js");
 const dungeonGeneratorSource = read("js/dungeon-generator.js");
 const indexSource = read("index.html");
 assert(!/\.enemy-fire\s*\{[^}]*background/.test(styleSource), "monster attribute color still changes the background");
@@ -55,6 +57,9 @@ assert(arenaFoeRule.includes("color: hsl(var(--arena-marker-hue)"), "arena marke
 assert(arenaFoeRule.includes("background: rgba(94, 70, 52, 0.18)"), "arena monster background is not shared");
 assert(arenaFoeRule.includes("-webkit-text-stroke: 0") && arenaFoeRule.includes("text-shadow: 0 1px 2px rgba(0, 0, 0, 0.92)"), "arena monster lettering still uses excessive glow");
 assert(!styleSource.includes(".arena-actions"), "arena floating action panel still exists");
+assert(!mainSource.includes("shortTeleport") && !indexSource.includes("shortTeleportButton"), "removed short teleport still leaves dead UI or runtime code");
+assert((jobsSource.match(/長距離テレポートを扱う/g) || []).length >= 2 && !jobsSource.includes("短距離転移・テレポート"), "mage job descriptions still advertise short teleport");
+assert(indexSource.includes('class="dungeon-action-dock"') && /\.dungeon-action-dock\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\) auto/.test(styleSource) && /\.controls\s*\{[^}]*position:\s*static/.test(styleSource), "shared dungeon action dock does not place abilities and keypad side by side");
 assert(styleSource.includes("grid-template-columns: repeat(13, var(--tile))"), "dungeon viewport is not 13 columns");
 assert(/\.map\s*\{[^}]*gap:\s*0;/.test(styleSource), "dungeon floor tiles are still separated by grid gaps");
 assert(/\.map\s*\{[^}]*background:\s*#1b241c;/.test(styleSource), "dungeon map underlay can expose black subpixel seams");
@@ -64,12 +69,19 @@ const playerTileRule = styleSource.match(/\.tile-player\s*\{[^}]*\}/)?.[0] || ""
 assert(playerTileRule.includes("box-shadow: none") && !playerTileRule.includes("radial-gradient"), "player marker still has a surrounding tile frame");
 assert(playerTileRule.includes("font-size: calc(var(--tile) * 0.62)") && playerTileRule.includes("font-weight: 400"), "player marker is not using the enlarged lighter style");
 assert(/\.cell\.light-room\.tile-floor\s*\{[^}]*box-shadow:\s*none;/.test(styleSource), "always-lit floor still draws per-tile lighting frames");
+assert(/\.cell\.light-near\s*\{[^}]*brightness\(1\.18\)[^}]*saturate\(1\.08\)/.test(styleSource) && /\.cell\.light-room\s*\{[^}]*brightness\(1\.18\)[^}]*saturate\(1\.08\)/.test(styleSource), "always-lit rooms no longer match player-light brightness");
+assert(/\.cell\.light-room\.tile-floor\s*\{[^}]*background:\s*#1b241c;/.test(styleSource), "always-lit floor color differs from player-lit floor");
 assert(styleSource.includes(".map::after") && styleSource.includes("pointer-events: none"), "dungeon light-source overlay is missing");
 const dungeonOverlayRule = styleSource.match(/\.dungeon-stats-overlay\s*\{[^}]*\}/)?.[0] || "";
 assert(indexSource.includes('class="dungeon-projection"') && indexSource.includes('id="dungeonStatsOverlay"'), "in-projection dungeon stat overlay is missing");
+assert(indexSource.includes('id="dungeonHpText"') && indexSource.includes('id="dungeonMaxHpText"') && indexSource.includes('id="dungeonHpFill"'), "dungeon HP is not inside the projection overlay");
+assert(styleSource.includes(".app-shell.dungeon-mode .status-hp") && styleSource.includes("display: none") && styleSource.includes(".dungeon-hp-stat"), "top HP remains visible in dungeon mode or projected HP lacks styling");
 assert(dungeonOverlayRule.includes("position: absolute") && dungeonOverlayRule.includes("pointer-events: none"), "dungeon stat overlay does not float safely over the projection");
 assert(dungeonOverlayRule.includes("border: 0") && dungeonOverlayRule.includes("background: transparent") && dungeonOverlayRule.includes("box-shadow: none"), "dungeon stat overlay frame is still visible");
 assert(!indexSource.includes('id="dungeonGoldText"') && !mainSource.includes("dungeonGold"), "gold is still shown inside the dungeon projection");
+assert((indexSource.match(/data-view=/g) || []).length === 10 && indexSource.includes('data-view="inn"') && indexSource.includes('data-view="jobCenter"') && indexSource.includes('data-view="junkDealer"'), "town facilities are not distributed across ten tabs");
+assert(styleSource.includes("grid-template-rows: repeat(2, minmax(32px, auto))") && styleSource.includes("grid-template-rows: repeat(2, minmax(38px, auto))"), "navigation is not fixed to two rows on desktop and mobile");
+assert(mainSource.includes("function renderInn") && mainSource.includes("function renderJobCenter") && mainSource.includes('施設は上の二段タブへ分散した'), "town facility rendering remains concentrated in the town view");
 assert(styleSource.includes(".app-shell.dungeon-mode > .character-strip") && styleSource.includes(".app-shell.dungeon-mode .equipment-strip"), "old dungeon HUD strips were not hidden");
 assert(styleSource.includes(".research-monster-graphic"), "research monster graphic style is missing");
 assert(styleSource.includes("#dungeonView") && styleSource.includes("overflow-y: auto"), "narrow dungeon view cannot scroll");
@@ -94,6 +106,13 @@ assert(mainSource.includes("enemy.unique ? [3, 5]") && mainSource.includes(": [1
 assert(!mainSource.includes("残り${corpse.harvestsRemaining}回"), "harvest count is exposed to the player");
 assert(mainSource.includes("TRAP_FLOOR_CHANCE = 0.42") && mainSource.includes("Math.random() < TRAP_FLOOR_CHANCE"), "trap floor chance was not doubled to 42%");
 assert(mainSource.includes("TRAP_COUNT_MULTIPLIER = 4") && mainSource.includes("* TRAP_COUNT_MULTIPLIER"), "trap count was not increased to four times the original");
+assert(mainSource.includes('bear: "トラバサミ"') && mainSource.includes('teleport: "強制転移罠"') && mainSource.includes('summon: "召喚罠"'), "new trap type labels are missing");
+assert(mainSource.includes('pick(["damage", "slow", "drain", "bear", "teleport", "summon", "scatter"])'), "new trap types are not generated");
+assert(mainSource.includes("function summonTrapEncirclement") && mainSource.includes("positions.length * effectMultiplier") && mainSource.includes('state.dungeon.map[y][x] = "floor"'), "summon trap does not form a complete surrounding ring");
+assert(mainSource.includes("immobilizedTurns") && mainSource.includes("トラバサミが脚を噛み、移動できない"), "bear trap immobilization is missing");
+assert(mainSource.includes("強制転移罠が空間を裏返し") && mainSource.includes("spawnPosition(state.dungeon, distance)"), "forced teleport trap behavior is missing");
+assert(mainSource.includes('scatter: "罠バラまき罠"') && mainSource.includes("function scatterTrapField") && mainSource.includes("8 + danger * 5"), "trap-scatter trap is missing");
+assert(mainSource.includes('const scatteredTypes = ["damage", "slow", "drain", "bear", "teleport", "summon"]'), "trap-scatter trap can recurse or lacks mixed trap types");
 assert(mainSource.includes("Math.hypot(x - state.dungeon.player.x, y - state.dungeon.player.y)"), "dungeon light distance is not circular");
 assert(mainSource.includes("DUNGEON_LIGHT_RADIUS") && mainSource.includes("near: 2.25, mid: 4.6"), "dungeon light radius is not using the reduced range");
 assert(mainSource.includes('jobId === "ninja") return { near: 0, mid: 0 }') && mainSource.includes('jobId === "handyman" ? 1 : 0'), "job-specific dungeon light ranges are missing");
@@ -106,7 +125,8 @@ assert(mainSource.includes("TAVERN_SNACK_INGREDIENTS") && mainSource.includes("T
 assert(mainSource.includes("TAVERN_SNACKS.find") && mainSource.includes("SNACK_PERSONALITY_COMMENTS[adv.personalityId]"), "snacks do not use personality-specific comments");
 assert(mainSource.includes('adv.personalityId === "glutton"') && mainSource.includes("function tickSnackBuff") && mainSource.includes("grownStats[adv.snackBuff.stat]"), "glutton snack stat buff is missing");
 assert(indexSource.includes('id="junkDealerView"') && mainSource.includes("function renderJunkDealer") && mainSource.includes("function appraiseJunk") && mainSource.includes("function exchangeJunkMaterial"), "junk dealer store is missing");
-assert(mainSource.includes('material?.rarity === "ultra" ? 600 : 120') && mainSource.includes('item?.junkTier === "legend" ? 2') && mainSource.includes('item?.junkTier === "ultra_luxury" ? 1.5'), "junk dealer rarity exchange rates are invalid");
+assert(mainSource.includes('material?.junkDealerTier === "ultra" ? 600') && mainSource.includes('material?.junkDealerTier === "super" ? 120 : 45') && mainSource.includes('item?.junkTier === "legend" ? 2'), "junk dealer rarity exchange rates are invalid");
+assert(mainSource.includes("function refreshJunkDealerStock") && mainSource.includes("refined: 6, super: 4, ultra: 2") && mainSource.includes("enteringJunkDealer"), "junk dealer does not randomly stock materials on each visit");
 assert(styleSource.includes(".tavern-snack-menu"), "tavern snack menu styling is missing");
 assert(mainSource.includes("MAP_SIZE_RANGE = Object.freeze([36, 60])") && mainSource.includes("rand(minimumSize, MAP_SIZE_RANGE[1])"), "dungeon map size does not vary from 36 to 60");
 assert(styleSource.includes(".cell.light-room") && mainSource.includes("alwaysLitTiles") && dungeonGeneratorSource.includes("alwaysLitTileKeys"), "always-lit rooms and their first corridor tile are not rendered above dungeon darkness");
@@ -125,7 +145,15 @@ assert(styleSource.includes(".tile-sleeping") && styleSource.includes(".sleep-in
 assert(indexSource.includes('id="deathReviewPanel"') && indexSource.includes('id="continueAfterDeathButton"'), "manual death-log review UI is missing");
 assert(indexSource.includes('id="deathReviewLog"') && indexSource.includes('tabindex="0"'), "death-log review focus target is missing");
 assert(indexSource.includes('id="depthPickerPanel"') && indexSource.includes('aria-labelledby="depthPickerTitle"'), "accessible boss-floor departure picker is missing");
-assert(styleSource.includes("scroll-padding-bottom: 60px") && styleSource.includes(".death-review-card"), "fixed controls or short-screen death review can obscure content");
+assert(indexSource.indexOf('id="magicMoveControls"') < indexSource.indexOf('class="controls"') && styleSource.includes(".death-review-card"), "action-dock control order or short-screen death review layout is missing");
+assert(/\.controls\s*\{[^}]*border:\s*0;[^}]*background:[^}]*rgba\([^)]*,\s*0\.(?:42|5)\)[^}]*box-shadow:\s*none;/.test(styleSource), "keypad outer frame is not transparently blended into the map");
+assert(styleSource.includes("grid-template-columns: repeat(3, 54px)") && styleSource.includes("grid-template-rows: repeat(3, 50px)"), "keypad did not receive the requested six-pixel size increase");
+assert(/\.controls\s*\{[^}]*transform:\s*translateY\(-3px\)/.test(styleSource), "keypad does not include the additional one-pixel upward offset");
+assert(/\.magic-move-controls\s*\{[^}]*transform:\s*translateY\(-4px\) scale\(0\.9\)[^}]*transform-origin:\s*right center/.test(styleSource), "purple ability box size or four-pixel upward offset is missing");
+assert(styleSource.includes("clamp(105px, 15svh, 132px)") && styleSource.includes("calc((100svh - 328px) / 13)"), "removed dungeon status space was not assigned to the log");
+assert(/\.app-shell\.dungeon-mode \.status-bar\s*\{[^}]*display:\s*none/.test(styleSource), "dungeon still shows the top place/job/race status bar");
+assert(mainSource.includes('localStorage.setItem(AUDIO_KEY, "0")') && mainSource.includes('currentView === "arena"') && styleSource.includes('.app-shell:not(.town-mode) .audio-button') && indexSource.includes("街で音楽を切り替える"), "music switching is not restricted to town screens");
+assert(styleSource.includes("min(32px, calc((100vw - 42px) / 13)") && styleSource.includes("min(29px, calc((100vw - 42px) / 13)"), "dungeon map tiles do not use the reclaimed phone viewport space");
 assert(mainSource.includes("const overlayOpen") && mainSource.includes("const dungeonMovement"), "global movement keys are not gated to active combat");
 assert(mainSource.includes("function trapModalFocus") && mainSource.includes("focusEscapesForward"), "modal keyboard focus can escape into the background");
 assert(indexSource.includes("js/artifact-generator.js"), "random artifact generator is not loaded before the game");
@@ -162,12 +190,20 @@ var window = {};
   "js/character-system.js",
   "js/bounty-system.js",
   "js/audio-effects.js",
+  "js/surreal-text.js",
 ].forEach((path) => eval(read(path)));
+
+const surrealSampleCount = Array.from({ length: 1000 }, (_, index) => window.HD_SURREAL.decorate("基準文", `sample:${index}`)).filter((text) => text !== "基準文").length;
+assert(surrealSampleCount >= 85 && surrealSampleCount <= 115, "surreal text seasoning is not approximately ten percent");
+assert(window.HD_SURREAL.fragments.length >= 30 && indexSource.includes("js/surreal-text.js"), "surreal text variety or script loading is missing");
+assert(mainSource.includes("SURREAL?.decorateData(DATA)") && mainSource.includes("SURREAL?.decorateLog"), "surreal seasoning does not cover data prose and runtime logs");
 
 assert(window.HD_UTILS.chebyshevDistance({ x: 0, y: 0 }, { x: -3, y: 2 }) === 3, "shared grid distance is invalid");
 assert(!window.HD_UTILS.hasLineOfSight({ x: 0, y: 0 }, { x: 4, y: 0 }, (x) => x === 2), "shared line of sight ignored an intermediate blocker");
 assert(window.HD_UTILS.hasLineOfSight({ x: 0, y: 0 }, { x: 2, y: 0 }, (x) => x === 2), "shared line of sight treated the target as an intermediate blocker");
 assert(window.HD_DATA.races.length === 30, "race roster must contain 30 races");
+assert(window.HD_DATA.materials.filter((material) => material.junkDealerTier).length === 48, "junk dealer material candidate variety must be forty-eight");
+assert(window.HD_DATA.materials.filter((material) => material.junkDealerTier === "refined").length === 16, "junk dealer refined material pool is incomplete");
 assert(window.HD_DATA.races.every((race) => Number.isFinite(race.powerRating) && race.experienceMultiplier >= 0.75 && race.experienceMultiplier <= 1.8), "race growth difficulty is missing or out of range");
 const highElfRace = window.HD_DATA.races.find((race) => race.id === "high_elf" && race.name === "ハイエルフ");
 const superhumanRace = window.HD_DATA.races.find((race) => race.id === "superhuman" && race.name === "超人");
@@ -195,8 +231,12 @@ assert(lazyBackstory === window.HD_CHARACTER.generateBackstory({
 }), "backstory generation is not deterministic");
 assert(lazyBackstory.includes("ねむり丸") && lazyBackstory.includes("昼寝と遠回り"), "lazy backstory traits were lost during extraction");
 
-assert(window.HD_DATA.monsters.length === 985, "monster count changed");
-assert(window.HD_DATA.equipment.length === 2707, "equipment count changed");
+assert(window.HD_DATA.monsters.length === 793, "monster count changed");
+assert(window.HD_DATA.equipment.length === 2722, "equipment count changed");
+const starterBuildEquipment = window.HD_DATA.equipment.filter((item) => item.starterOnly);
+assert(starterBuildEquipment.length === 15 && window.HD_DATA.jobs.every((job) => starterBuildEquipment.some((item) => item.jobs.includes(job.id))), "job-specific starter equipment is incomplete");
+assert(starterBuildEquipment.every((item) => item.attackAttributes.length >= 1 && item.description), "starter equipment lacks build identity");
+assert(mainSource.includes("function starterBuildLoadout") && mainSource.includes('capoeirista: null') && mainSource.includes('job.id === "capoeirista" ? "starter_capoeira_wraps"'), "character-aware starter loadout selection is missing");
 assert(window.HD_DATA.equipment.every((item) => Array.isArray(item.attackAttributes)), "equipment attackAttributes were not normalized");
 assert(window.HD_DATA.equipment.some((item) => item.attackAttributes.length >= 2), "multi-attribute equipment is missing");
 const puzzleEquipment = window.HD_DATA.equipment.filter((item) => item.puzzleEffects?.length);
@@ -237,6 +277,11 @@ assert(window.HD_DATA.equipmentSets.every((set) => set.itemIds.every((id) => win
 assert(mainSource.includes("function applyEquipmentSetBonuses") && mainSource.includes("stats.activeEquipmentSets"), "equipment set bonuses are not applied to player stats");
 assert(styleSource.includes(".equipment-set-card") && styleSource.includes(".equipment-set-label"), "equipment set UI styling is missing");
 assert(mainSource.includes("BEGINNER_COURSE_LESSONS") && mainSource.includes("function offerBeginnerCourse") && mainSource.includes("function showBeginnerCourseLesson"), "optional first-guild beginner course is missing");
+assert(mainSource.includes("モンスターの心") && mainSource.includes("function grantMonsterHeart") && mainSource.includes("function enhanceEquipmentWithHeart"), "monster-heart research reward or home enhancement is missing");
+assert(mainSource.includes("equipmentEnhancement(itemId).level > 0") && mainSource.includes("この装備は心強化済み") && mainSource.includes("record.level = 1"), "equipment can receive more than one monster-heart enhancement");
+assert(mainSource.includes("monsterHeartPower") && mainSource.includes("threatScore") && mainSource.includes("attackAttributeValues"), "monster hearts do not scale with threat or grant attribute values");
+assert(mainSource.includes("state.adventurer.guildPoints += 1") && mainSource.includes("修了報酬として1GP"), "beginner course completion does not award exactly one guild point");
+assert(mainSource.includes('const START_GUIDANCE = "まずはギルドにいけ。') && mainSource.includes("saved.log.unshift(START_GUIDANCE)") && mainSource.includes("log(START_GUIDANCE)"), "new and migrated games do not direct the player to the guild");
 assert(window.HD_DATA.jobs.some((job) => job.id === "flower_tamer" && job.skill.tag === "flower_command"), "flower tamer job is missing");
 assert(window.HD_DATA.jobs.some((job) => job.id === "capoeirista" && job.skill.tag === "capoeira_stance" && job.skill.power >= 1.8), "capoeira job is missing or its kick is too weak");
 const ninjaJob = window.HD_DATA.jobs.find((job) => job.id === "ninja" && job.name === "忍者");
@@ -244,6 +289,11 @@ assert(ninjaJob?.acceleration === 30 && ninjaJob.accelerationGrowthEvery === 3 &
 assert(window.HD_DATA.equipment.find((item) => item.id === "rusty_knife").jobs.includes("ninja") && window.HD_DATA.equipment.find((item) => item.id === "cloth").jobs.includes("ninja"), "ninja cannot use starter equipment");
 assert(["iron_sword", "crafted_beast_tool", "carapace_armor", "ward_fire_stride"].every((id) => window.HD_DATA.equipment.find((item) => item.id === id)?.jobs.includes("ninja")), "ninja regular blade/tool/leg/foot equipment compatibility is incomplete");
 assert(window.HD_DATA.floors.slice(0, 99).every((floor) => floor.stairRange[0] === 4 && floor.stairRange[1] === 6), "normal stair count was not increased to 4-6");
+assert(window.HD_DATA.floors.find((floor) => floor.floor === 50).uniqueChance >= 0.52
+  && window.HD_DATA.floors.find((floor) => floor.floor === 80).uniqueChance >= 0.83
+  && window.HD_DATA.floors.find((floor) => floor.floor === 99).uniqueChance === 0.93, "deep unique monster appearance curve is not harsh enough");
+assert(mainSource.includes("deepUniqueReinforcementChance") && mainSource.includes("Math.min(0.42"), "deep unique reinforcement chance is missing");
+assert(styleSource.includes("clamp(105px, 15svh, 132px)") && styleSource.includes("min-height: 105px") && styleSource.includes("padding: 6px 8px"), "expanded dungeon log balance is missing");
 assert(window.HD_DATA.junkItems.length === 170, "junk catalog count changed");
 assert(window.HD_DATA.junkItems.filter((item) => !item.junkTier).length === 135, "normal junk catalog must be tripled to 135");
 assert(window.HD_DATA.junkItems.filter((item) => item.junkTier === "luxury").length === 15, "luxury junk catalog must be tripled to 15");
@@ -251,7 +301,7 @@ assert(window.HD_DATA.junkItems.filter((item) => item.junkTier === "ultra_luxury
 assert(window.HD_DATA.junkItems.filter((item) => item.junkTier === "legend").length === 5, "legend junk tier is missing");
 assert(new Set(window.HD_DATA.junkItems.map((item) => item.name)).size === window.HD_DATA.junkItems.length, "junk names are duplicated");
 assert(new Set(window.HD_DATA.monsters.map((monster) => monster.id)).size === window.HD_DATA.monsters.length, "monster id collision");
-assert(new Set(window.HD_DATA.monsters.filter((monster) => monster.unique).map((monster) => monster.name)).size === 580, "unique monster name collision");
+assert(new Set(window.HD_DATA.monsters.filter((monster) => monster.unique).map((monster) => monster.name)).size === 488, "unique monster name collision");
 assert(window.HD_DATA.monsters.every((monster) => window.HD_DATA.attributes.includes(monster.attackAttribute)), "monster has an invalid attack attribute");
 assert(window.HD_DATA.monsters.every((monster) => !monster.dangerous || window.HD_DATA.attributes.includes(monster.dangerous.attribute)), "monster has an invalid dangerous attribute");
 const materialIds = new Set(window.HD_DATA.materials.map((material) => material.id));
@@ -263,6 +313,7 @@ assert(window.HD_DATA.monsters.every((monster) => (
   [1, 2, 3, 4, 5].every((level) => typeof monster.research[level] === "string")
 )), "a monster is missing a research stage");
 const uniqueMonsters = window.HD_DATA.monsters.filter((monster) => monster.unique);
+const generalMonsters = window.HD_DATA.monsters.filter((monster) => !monster.unique);
 const rapidlyRegeneratingUniques = uniqueMonsters.filter((monster) => monster.rapidRegeneration);
 assert(rapidlyRegeneratingUniques.length >= 100 && rapidlyRegeneratingUniques.every((monster) => monster.rapidRegeneration.amount > 0 && monster.rapidRegeneration.rate <= 0.14), "strong unique rapid regeneration is missing or invalid");
 const trueDragons = window.HD_DATA.monsters.filter((monster) => monster.speciesId === "dragon");
@@ -285,8 +336,37 @@ const dungeonUniques = uniqueMonsters.filter((monster) => !monster.arenaOnly);
 const transferredUniques = dungeonUniques.filter((monster) => Number.isFinite(monster.migratedFromArenaRank));
 const expansionUniques = dungeonUniques.filter((monster) => monster.dungeonExpansion);
 const summoningUniques = dungeonUniques.filter((monster) => monster.summon);
-assert(uniqueMonsters.length === 580, "unique monster count changed");
-assert(arenaMonsters.length === 192, "arena roster must contain 192 uniques");
+const peakyDungeonUniques = dungeonUniques.filter((monster) => monster.peakyProfile);
+const singularDungeonUniques = dungeonUniques.filter((monster) => monster.singularTrait);
+assert(uniqueMonsters.length === 488, "unique monster count changed");
+assert(generalMonsters.length === 305, "curated general monster count changed");
+const curatedAbyssGenerals = generalMonsters.filter((monster) => /^abyss_f\d+_v\d+$/.test(monster.id));
+assert(curatedAbyssGenerals.length === 170, "deep general-monster curation did not remove exactly one hundred redundant variants");
+for (let floor = 11; floor <= 100; floor += 1) {
+  const expected = floor % 10 === 5 || floor === 100 ? 1 : 2;
+  assert(curatedAbyssGenerals.filter((monster) => monster.floors[0] === floor).length === expected, `curated general-monster floor coverage mismatch: B${floor}F`);
+}
+assert(arenaMonsters.length === 100, "curated arena roster must contain 100 uniques");
+assert(peakyDungeonUniques.length === 100 && peakyDungeonUniques.every((monster) => Number.isFinite(monster.migratedFromArenaRank)), "one hundred bland transferred uniques were not rewritten as peaky dungeon monsters");
+assert(singularDungeonUniques.length === 50 && singularDungeonUniques.every((monster) => Number.isFinite(monster.migratedFromArenaRank)), "fifty remaining bland dungeon uniques did not receive singular mechanics");
+assert(peakyDungeonUniques.length + singularDungeonUniques.length === transferredUniques.length, "a transferred dungeon unique remains mechanically generic");
+assert(new Set(singularDungeonUniques.map((monster) => monster.singularTrait.name)).size === 50, "singular dungeon-unique trait names collide");
+const singularFingerprints = singularDungeonUniques.map((monster) => {
+  const trait = monster.singularTrait;
+  return JSON.stringify([trait.specialAttack, trait.dangerEvery, trait.regenerationRate, trait.summonEvery, trait.shieldEvery, trait.shieldCharges, trait.addedWeakness, trait.resistanceAttribute, trait.resistanceTier, trait.hpScale, trait.attackScale, trait.accelerationDelta]);
+});
+assert(new Set(singularFingerprints).size === 50, "two singular dungeon uniques share the same mechanical fingerprint");
+assert(new Set(singularDungeonUniques.map((monster) => monster.specialAttack)).size === 7, "singular dungeon uniques do not cover all supported special actions");
+assert(singularDungeonUniques.every((monster) => monster.research[1].includes(monster.singularTrait.name) && monster.weaknesses.includes(monster.singularTrait.addedWeakness)), "singular mechanic is missing from research or weaknesses");
+assert(new Set(peakyDungeonUniques.map((monster) => Math.min(9, Math.floor((monster.floors[0] - 11) / 9)))).size === 10, "peaky dungeon-unique rewrites do not span all depth bands");
+const expectedPeakyProfiles = ["glass_cannon", "immovable_fortress", "blink_assassin", "elemental_bastion", "doomsday_engine"];
+expectedPeakyProfiles.forEach((profile) => assert(peakyDungeonUniques.filter((monster) => monster.peakyProfile === profile).length === 20, `peaky profile count mismatch: ${profile}`));
+assert(peakyDungeonUniques.filter((monster) => monster.peakyProfile === "glass_cannon").every((monster) => monster.attack >= monster.peakyBaseline.attack * 1.65 && monster.hp <= monster.peakyBaseline.hp * 0.7), "glass-cannon uniques are not sufficiently extreme");
+assert(peakyDungeonUniques.filter((monster) => monster.peakyProfile === "immovable_fortress").every((monster) => monster.hp >= monster.peakyBaseline.hp * 1.55 && monster.defense >= monster.peakyBaseline.defense * 2.2), "fortress uniques are not sufficiently extreme");
+assert(peakyDungeonUniques.filter((monster) => monster.peakyProfile === "blink_assassin").every((monster) => monster.acceleration >= monster.peakyBaseline.acceleration + 16 && monster.defense <= monster.peakyBaseline.defense * 0.75), "assassin uniques are not sufficiently extreme");
+assert(peakyDungeonUniques.filter((monster) => monster.peakyProfile === "elemental_bastion").every((monster) => monster.resistances[monster.attackAttribute] === 5 || monster.weaknesses.includes(monster.attackAttribute)), "elemental bastion uniques lack extreme elemental protection");
+assert(peakyDungeonUniques.filter((monster) => monster.peakyProfile === "doomsday_engine").every((monster) => monster.dangerous.power >= monster.peakyBaseline.danger * 2.2), "doomsday uniques lack extreme telegraphed attacks");
+assert(mainSource.includes("currentMonsterIds") && mainSource.includes("delete records[monsterId]"), "removed arena monsters remain in migrated research or heart records");
 assert(arenaMonsters.filter((monster) => monster.colorTier === "rainbow").length <= 24, "rainbow arena monsters are too common");
 assert(arenaMonsters.every((monster) => typeof monster.speciesGlyph === "string" && [...monster.speciesGlyph].length === 1), "arena species marker is not one character");
 assert(window.HD_DATA.monsters.every((monster) => /^[\u3400-\u9fff]$/u.test(monster.speciesGlyph)), "monster species marker is not kanji");
@@ -296,9 +376,11 @@ assert(arenaMonsters.every((monster) => Number.isFinite(monster.arenaMarkerHue) 
 assert(dungeonUniques.length === 388, "dungeon roster must contain 388 uniques");
 assert(transferredUniques.length === 150, "150 arena uniques were not transferred");
 assert(expansionUniques.length === 200, "200 dungeon uniques were not added");
-assert(summoningUniques.length >= 20 && summoningUniques.length <= 32, "summoning unique population is outside the intended range");
-assert(summoningUniques.every((monster) => monster.summon.every === 6 && monster.summon.maxAlive === 2 && monster.summon.maxTotal === 4), "summoning limits are invalid");
+assert(summoningUniques.length >= 30 && summoningUniques.length <= 42, "summoning unique population is outside the intended range after singular-trait additions");
+assert(summoningUniques.filter((monster) => !monster.singularTrait).every((monster) => monster.summon.every === 6 && monster.summon.maxAlive === 2 && monster.summon.maxTotal === 4), "standard summoning limits are invalid");
+assert(summoningUniques.filter((monster) => monster.singularTrait).every((monster) => monster.summon.every >= 4 && monster.summon.maxAlive >= 1 && monster.summon.maxTotal >= monster.summon.maxAlive), "singular summoning limits are invalid");
 assert(arenaMonsters.map((monster) => monster.arenaRank).sort((a, b) => a - b).every((rank, index) => rank === index + 1), "arena ranks are not continuous");
+assert(new Set(arenaMonsters.map((monster) => Math.floor((monster.formerArenaRank - 1) * 10 / 192))).size === 10, "arena curation did not preserve all ten strength bands");
 assert(transferredUniques.every((monster) => monster.migratedFromArenaRank >= 193 && monster.migratedFromArenaRank <= 342), "transferred arena rank is invalid");
 assert(dungeonUniques.every((monster) => monster.floors?.length && monster.floors.every((floor) => floor >= 1 && floor <= 100)), "dungeon unique has no valid floor");
 assert(window.HD_DATA.floors.every((floor) => floor.uniques.every((id) => dungeonUniques.some((monster) => monster.id === id))), "floor contains a non-dungeon unique");
@@ -641,7 +723,7 @@ FakeElement.prototype.closest = function () { return null; };
 FakeElement.prototype.focus = function () { document.activeElement = this; };
 
 const elements = new Map();
-const viewTabs = ["town", "dungeon", "research", "guild", "arena"].map((view) => {
+const viewTabs = ["town", "dungeon", "research", "guild", "arena", "inn", "shop", "home", "jobCenter", "junkDealer"].map((view) => {
   const tab = new FakeElement();
   tab.dataset.view = view;
   return tab;
@@ -701,7 +783,7 @@ var document = {
       });
     }
     if (selector === "[data-tavern-snack]") {
-      const html = elements.get("#townView")?.innerHTML || "";
+      const html = elements.get("#innView")?.innerHTML || "";
       const ids = [];
       const pattern = /data-tavern-snack="([^"]+)"/g;
       let match;
@@ -766,6 +848,7 @@ const legacySave = {
     activeSpellId: "ember_shot",
   },
   meta: {
+    startGuidanceShown: true,
     guildClaims: [{ id: "red_garm", name: "赤熱のガルム", reward: 400 }],
     research: {
       cave_rat: { seen: true, level: 1 },
@@ -813,7 +896,7 @@ const equipmentRoleCounts = window.HD_DATA.equipment.reduce((counts, item) => {
 assert(["basic", "specialized", "conditional", "core", "novelty", "final"].every((id) => equipmentRoleCounts[id] > 0), "equipment role classification left an empty category");
 
 const compactLogHtml = elements.get("#logList").innerHTML;
-assert((compactLogHtml.match(/<p\b/g) || []).length === 8, "town log no longer keeps its compact eight-entry view");
+assert((compactLogHtml.match(/<p\b/g) || []).length === 10, "town log no longer uses its expanded ten-entry view");
 assert(compactLogHtml.includes("&lt;strong&gt;最新の記録&lt;/strong&gt;") && !compactLogHtml.includes("<strong>最新の記録</strong>"), "compact log did not escape saved HTML");
 const logHistoryOpenButton = elements.get("#openLogHistoryButton");
 logHistoryOpenButton.focus();
@@ -847,9 +930,9 @@ assert(researchHtml.includes("調査度 1/5"), "legacy level 1 migration failed"
 assert(researchHtml.includes("調査度 3/5"), "legacy level 2 migration failed");
 assert(researchHtml.includes("調査度 5/5 MAX"), "legacy level 3 migration failed");
 
-elements.get("#openHomeButton").listeners.click();
-assert(viewTabs.find((tab) => tab.dataset.view === "town").classList.contains("active"), "town tab is not active inside home");
-assert(!viewTabs.some((tab) => tab.dataset.view === "home"), "duplicate home tab remains");
+viewTabs.find((tab) => tab.dataset.view === "home").listeners.click();
+assert(viewTabs.find((tab) => tab.dataset.view === "home").classList.contains("active"), "home facility tab is not active");
+assert(viewTabs.length === 10, "facility navigation is not a two-row ten-tab layout");
 assert(!elements.get("#homeView").classList.contains("hidden"), "home view did not open from town");
 assert(elements.get("#townView").classList.contains("hidden"), "town view remained visible over home");
 const homeHtml = elements.get("#homeView").innerHTML;
@@ -875,19 +958,20 @@ assert(elements.get("#goldText").textContent === 400, "guild reward claim did no
 assert(elements.get("#guildView").innerHTML.includes("受取可能な報酬はない"), "claimed guild reward remained pending");
 
 viewTabs.find((tab) => tab.dataset.view === "town").listeners.click();
-elements.get("#openJunkDealerButton").listeners.click();
-assert(elements.get("#junkDealerView").innerHTML.includes("珍品偏愛堂") && elements.get("#junkDealerView").innerHTML.includes("珍素材との交換"), "junk dealer view did not open");
+viewTabs.find((tab) => tab.dataset.view === "junkDealer").listeners.click();
+assert(elements.get("#junkDealerView").innerHTML.includes("珍品偏愛堂") && elements.get("#junkDealerView").innerHTML.includes("本日の珍素材・12枠"), "junk dealer view did not open");
+assert((elements.get("#junkDealerView").innerHTML.match(/data-junk-material=/g) || []).length === 12, "junk dealer did not display exactly twelve random materials");
 elements.get("#closeJunkDealerButton").listeners.click();
 elements.get("#restInnButton").listeners.click();
 assert(elements.get("#goldText").textContent === 390, "inn did not charge exactly 10G");
 assert(elements.get("#logList").innerHTML.includes("宿の主人"), "inn advice was not added to the log");
-assert((elements.get("#townView").innerHTML.match(/data-tavern-snack=/g) || []).length === 5, "inn does not show exactly five random snacks");
+assert((elements.get("#innView").innerHTML.match(/data-tavern-snack=/g) || []).length === 5, "inn does not show exactly five random snacks");
 const goldBeforeSnack = Number(elements.get("#goldText").textContent);
 document.querySelectorAll("[data-tavern-snack]")[0].listeners.click();
 assert(Number(elements.get("#goldText").textContent) < goldBeforeSnack, "eating a tavern snack did not charge gold");
 assert(elements.get("#logList").innerHTML.includes("を食べた。たかし「"), "tavern snack did not produce an in-character comment");
-assert((elements.get("#townView").innerHTML.match(/data-tavern-snack=/g) || []).length === 5, "tavern snacks were not replenished after eating");
-elements.get("#openShopButton").listeners.click();
+assert((elements.get("#innView").innerHTML.match(/data-tavern-snack=/g) || []).length === 5, "tavern snacks were not replenished after eating");
+viewTabs.find((tab) => tab.dataset.view === "shop").listeners.click();
 assert(elements.get("#shopView").innerHTML.includes("宝箱の品を売る"), "treasure selling section is missing");
 assert(elements.get("#shopView").innerHTML.includes("装備品<select"), "shop equipment label was not changed");
 assert(elements.get("#shopView").innerHTML.includes("未装備の装備品を売る"), "equipment selling section is missing");
@@ -935,7 +1019,7 @@ localStorage.setItem = function () {};
 eval(read("js/main.js"));
 viewTabs.find((tab) => tab.dataset.view === "guild").listeners.click();
 assert(!elements.get("#guildView").innerHTML.includes('data-guild-donate="iron_sword"'), "same normal equipment ID could be donated for GP twice");
-elements.get("#openShopButton").listeners.click();
+viewTabs.find((tab) => tab.dataset.view === "shop").listeners.click();
 assert(elements.get("#shopView").innerHTML.includes('data-sell-equipment="iron_sword"'), "prior GP donation incorrectly blocked a later normal shop sale");
 
 const shallowShopGateSave = clone(legacySave);
@@ -998,7 +1082,7 @@ assert(appShell.classList.contains("arena-mode"), "arena mode was not activated"
 assert(!appShell.classList.contains("town-mode"), "town mode remained active during arena battle");
 assert(arenaHtml.includes("arena-floor-line"), "compact arena header is missing");
 assert(arenaHtml.includes("arena-move-pad"), "arena movement pad is missing");
-assert(arenaHtml.includes("第1戦 / 192"), "reduced arena battle count is not shown");
+assert(arenaHtml.includes("第1戦 / 100"), "curated arena battle count is not shown");
 assert(arenaHtml.includes(`>${arenaMonsters[0].speciesGlyph}</button>`), "arena species marker is not rendered");
 assert(arenaHtml.includes("--arena-marker-hue:"), "arena marker attribute color is not rendered");
 assert(arenaHtml.includes("--arena-marker-family-hue:"), "arena marker title color is not rendered");
@@ -1032,7 +1116,7 @@ eval(read("js/main.js"));
 assert(appShell.classList.contains("arena-mode"), "active arena save reloaded into town mode");
 assert(!elements.get("#arenaView").classList.contains("hidden"), "active arena save did not reopen the arena view");
 assert(elements.get("#townView").classList.contains("hidden"), "town view remained accessible after active arena reload");
-assert(elements.get("#arenaView").innerHTML.includes("第1戦 / 192"), "reloaded arena round was not rendered");
+assert(elements.get("#arenaView").innerHTML.includes("第1戦 / 100"), "reloaded arena round was not rendered");
 
 const arenaWorldTurnSave = clone(arenaReloadSave);
 arenaWorldTurnSave.adventurer.jobId = "ninja";
@@ -1967,8 +2051,12 @@ deathClaimSave.meta.bounties = { red_garm: { intel: true, claimed: 3 } };
 deathClaimSave.meta.shop = { soldMaterials: { small_beast_meat: 9 }, inventory: ["iron_sword"] };
 deathClaimSave.meta.titles = ["引継ぎ称号"];
 deathClaimSave.meta.guildDonatedEquipmentIds = ["iron_sword"];
+deathClaimSave.meta.research = { red_garm: { seen: true, level: 5, evidence: 320 } };
+deathClaimSave.meta.monsterHearts = {};
+deathClaimSave.meta.monsterHeartClaims = { red_garm: true };
 deathClaimSave.adventurer.gold = 321;
 deathClaimSave.adventurer.guildPoints = 12;
+deathClaimSave.adventurer.equipmentEnhancements = { rusty_knife: { level: 3, total: 9, attributes: { fire: 3 } } };
 deathClaimSave.adventurer.hp = 1;
 deathClaimSave.dungeon.enemies = [];
 deathClaimSave.dungeon.chests = [];
@@ -1985,10 +2073,14 @@ elements.get("#titleScreen").classList.add("hidden");
 document.listeners.keydown({ key: "ArrowRight", preventDefault() {} });
 assert(persistedDeathClaimSave.meta.guildClaims.length === 0, "death carried guild claims into the next adventurer");
 assert(persistedDeathClaimSave.meta.clearedBossFloors.length === 0, "death retained cleared boss-floor departure points");
-assert(persistedDeathClaimSave.meta.bounties.red_garm.intel && persistedDeathClaimSave.meta.bounties.red_garm.claimed === 0, "death did not preserve bounty intel while resetting claims");
-assert(persistedDeathClaimSave.meta.shop.soldMaterials.small_beast_meat === 9 && persistedDeathClaimSave.meta.titles.includes("引継ぎ称号"), "death lost inherited town circulation or titles");
-assert(persistedDeathClaimSave.meta.guildDonatedEquipmentIds.includes("iron_sword"), "death allowed a normal equipment ID to earn GP again");
+assert(Object.keys(persistedDeathClaimSave.meta.bounties).length === 0, "death retained bounty information");
+assert(Object.keys(persistedDeathClaimSave.meta.shop.soldMaterials).length === 0 && persistedDeathClaimSave.meta.titles.length === 0, "death retained town circulation or titles");
+assert(persistedDeathClaimSave.meta.guildDonatedEquipmentIds.length === 0, "death retained equipment donation history");
+assert(persistedDeathClaimSave.meta.research.red_garm.level === 5, "death erased inherited monster research");
+assert(persistedDeathClaimSave.meta.monsterHearts.red_garm === 1 && persistedDeathClaimSave.meta.monsterHeartClaims.red_garm, "death did not restore a consumed heart for fully researched monster");
+assert(Object.keys(persistedDeathClaimSave.adventurer.equipmentEnhancements).length === 0, "death retained equipment heart enhancements");
 assert(persistedDeathClaimSave.adventurer.gold === 0 && persistedDeathClaimSave.adventurer.guildPoints === 0, "death retained adventurer currency");
+assert(persistedDeathClaimSave.meta.deaths > 0 && persistedDeathClaimSave.meta.deathLog.length > 0, "death erased its own history record");
 assert(persistedDeathClaimSave.meta.awaitingCreation, "death did not return to adventurer creation");
 assert(persistedDeathClaimSave.meta.pendingDeathReview?.reason, "death review was not persisted");
 assert(persistedDeathClaimSave.meta.pendingDeathReview.log.some((line) => line.includes("冒険者は失われた")), "persisted death review is missing the final log");
@@ -2295,7 +2387,7 @@ localStorage.getItem = function (key) {
 };
 localStorage.setItem = function () {};
 eval(read("js/main.js"));
-elements.get("#openHomeButton").listeners.click();
+viewTabs.find((tab) => tab.dataset.view === "home").listeners.click();
 assert(elements.get("#homeView").innerHTML.includes("<span>光</span><strong>4</strong>"), "resistance stacking was clamped before all positive and negative sources were summed");
 
 const drainingCurseSave = clone(corpseSave);
@@ -2323,7 +2415,7 @@ localStorage.getItem = function (key) {
   return key === "hagitori-dungeon-save-v1" ? JSON.stringify(lewdSynergySave) : null;
 };
 eval(read("js/main.js"));
-elements.get("#openHomeButton").listeners.click();
+viewTabs.find((tab) => tab.dataset.view === "home").listeners.click();
 assert(elements.get("#homeView").innerHTML.includes("すけべ共鳴：艶装備1個"), "lewd/risque equipment synergy is not shown at home");
 
 const gokuSave = clone(lowCurseSave);
@@ -2334,7 +2426,7 @@ localStorage.getItem = function (key) {
   return key === "hagitori-dungeon-save-v1" ? JSON.stringify(gokuSave) : null;
 };
 eval(read("js/main.js"));
-elements.get("#openHomeButton").listeners.click();
+viewTabs.find((tab) => tab.dataset.view === "home").listeners.click();
 assert(Number(elements.get("#maxHpText").textContent) > 300, "Son Goku/Power Pole max HP awakening is too small");
 assert(elements.get("#homeView").innerHTML.includes("★如意棒：真価解放中"), "Son Goku/Power Pole awakening is not shown at home");
 
@@ -2352,7 +2444,7 @@ localStorage.getItem = function (key) {
   return key === "hagitori-dungeon-save-v1" ? JSON.stringify(rimuruSlimeSave) : null;
 };
 eval(read("js/main.js"));
-elements.get("#openHomeButton").listeners.click();
+viewTabs.find((tab) => tab.dataset.view === "home").listeners.click();
 assert(Number(elements.get("#strengthText").textContent) >= weakSlimeStrength + 150, "Rimuru slime did not receive the strongest stat awakening");
 assert(Number(elements.get("#maxHpText").textContent) > 1000 && Number(elements.get("#accelerationText").textContent) > 100, "Rimuru slime HP/acceleration awakening is too small");
 assert(elements.get("#homeView").innerHTML.includes("魔王覚醒・最強化中"), "Rimuru slime awakening is not shown at home");
@@ -2392,7 +2484,7 @@ assert(persistedCompleteSave?.meta?.compendiumEquipmentUnlocked, "complete compe
 assert(persistedCompleteSave.meta.titles.includes("万象の記録者"), "complete compendium title was not awarded");
 assert(persistedCompleteSave.adventurer.ownedEquipment.includes("omniscient_archive"), "complete compendium equipment was not awarded");
 viewTabs.find((tab) => tab.dataset.view === "research").listeners.click();
-assert(elements.get("#researchView").innerHTML.includes("985 / 985"), "complete compendium progress is not shown");
+assert(elements.get("#researchView").innerHTML.includes("793 / 793"), "complete compendium progress is not shown");
 assert(elements.get("#researchView").innerHTML.includes("報酬受領済み"), "complete compendium reward status is not shown");
 viewTabs.find((tab) => tab.dataset.view === "guild").listeners.click();
 assert(!elements.get("#guildView").innerHTML.includes('data-guild-donate="omniscient_archive"'), "complete compendium reward can be donated");

@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#0b0f0d">
     <meta name="description" content="倒し方で素材が変わる、スマートフォン向けターン制ローグライクRPG。地下100階の踏破を目指すブラウザゲーム。">
     <title>剥ぎ取りダンジョン</title>
-    <link rel="stylesheet" href="./css/style.css?v=20260712-sets1">
+    <link rel="stylesheet" href="./css/style.css?v=20260712-townmusic1">
   </head>
   <body>
     <section id="titleScreen" class="title-screen" aria-label="ゲーム開始画面">
@@ -31,7 +31,7 @@
           <span>種族</span>
           <strong id="raceText">人間</strong>
         </div>
-        <div>
+        <div class="status-hp">
           <span>HP</span>
           <strong><span id="hpText">0</span>/<span id="maxHpText">0</span></strong>
           <span class="hp-bar player-hp-bar" aria-hidden="true"><i id="playerHpFill"></i></span>
@@ -40,7 +40,7 @@
           <span>Lv</span>
           <strong id="levelText">1</strong>
         </div>
-        <button id="audioButton" class="audio-button" type="button" aria-label="音楽を切り替える" aria-pressed="false">
+        <button id="audioButton" class="audio-button" type="button" aria-label="街で音楽を切り替える" aria-pressed="false">
           <span id="audioIcon">♪</span>
           <strong id="audioText">音楽</strong>
         </button>
@@ -70,10 +70,17 @@
         <button type="button" data-view="dungeon">ダンジョン</button>
         <button type="button" data-view="research">調査</button>
         <button type="button" data-view="guild">ギルド</button>
-        <button type="button" data-view="arena">修練連武闘技場</button>
+        <button type="button" data-view="arena">闘技場</button>
+        <button type="button" data-view="inn">宿屋</button>
+        <button type="button" data-view="shop">商店</button>
+        <button type="button" data-view="home">自宅</button>
+        <button type="button" data-view="jobCenter">転職所</button>
+        <button type="button" data-view="junkDealer">珍品店</button>
       </nav>
 
       <section id="townView" class="view"></section>
+      <section id="innView" class="view hidden"></section>
+      <section id="jobCenterView" class="view hidden"></section>
       <section id="dungeonView" class="view hidden">
         <div class="floor-line">
           <div>
@@ -85,6 +92,7 @@
         </div>
         <div class="dungeon-projection">
           <aside id="dungeonStatsOverlay" class="dungeon-stats-overlay" aria-label="探索中の能力値">
+            <div class="dungeon-hp-stat"><span>HP</span><strong><span id="dungeonHpText">0</span>/<span id="dungeonMaxHpText">0</span></strong><span class="hp-bar" aria-hidden="true"><i id="dungeonHpFill"></i></span></div>
             <div><span>力</span><strong id="dungeonStrengthText">0</strong></div>
             <div><span>素早</span><strong id="dungeonSpeedText">0</strong></div>
             <div><span>器用</span><strong id="dungeonDexterityText">0</strong></div>
@@ -94,23 +102,24 @@
           </aside>
           <div id="map" class="map" role="grid" aria-label="ダンジョンマップ"></div>
         </div>
-        <div class="controls" aria-label="仮想8方向移動キー">
-          <button type="button" data-move="up-left" aria-label="左上へ移動">↖</button>
-          <button type="button" data-move="up" aria-label="上へ移動">▲</button>
-          <button type="button" data-move="up-right" aria-label="右上へ移動">↗</button>
-          <button type="button" data-move="left" aria-label="左へ移動">◀</button>
-          <button type="button" id="waitButton" aria-label="待機・探索・剥ぎ取り">待</button>
-          <button type="button" data-move="right" aria-label="右へ移動">▶</button>
-          <button type="button" data-move="down-left" aria-label="左下へ移動">↙</button>
-          <button type="button" data-move="down" aria-label="下へ移動">▼</button>
-          <button type="button" data-move="down-right" aria-label="右下へ移動">↘</button>
-        </div>
-        <div id="magicMoveControls" class="magic-move-controls hidden" aria-label="職業能力">
-          <button id="jobSkillButton" type="button">職業技</button>
-          <button id="shortTeleportButton" type="button">短距離転移</button>
-          <button id="teleportButton" type="button">テレポート</button>
-          <button id="timeStopButton" class="hidden" type="button">時間停止</button>
-          <button id="activeSpellButton" class="hidden" type="button">習得魔法</button>
+        <div class="dungeon-action-dock" aria-label="ダンジョン操作">
+          <div id="magicMoveControls" class="magic-move-controls hidden" aria-label="職業能力">
+            <button id="jobSkillButton" type="button">職業技</button>
+            <button id="teleportButton" type="button">テレポート</button>
+            <button id="timeStopButton" class="hidden" type="button">時間停止</button>
+            <button id="activeSpellButton" class="hidden" type="button">習得魔法</button>
+          </div>
+          <div class="controls" aria-label="仮想8方向移動キー">
+            <button type="button" data-move="up-left" aria-label="左上へ移動">↖</button>
+            <button type="button" data-move="up" aria-label="上へ移動">▲</button>
+            <button type="button" data-move="up-right" aria-label="右上へ移動">↗</button>
+            <button type="button" data-move="left" aria-label="左へ移動">◀</button>
+            <button type="button" id="waitButton" aria-label="待機・探索・剥ぎ取り">待</button>
+            <button type="button" data-move="right" aria-label="右へ移動">▶</button>
+            <button type="button" data-move="down-left" aria-label="左下へ移動">↙</button>
+            <button type="button" data-move="down" aria-label="下へ移動">▼</button>
+            <button type="button" data-move="down-right" aria-label="右下へ移動">↘</button>
+          </div>
         </div>
       </section>
       <section id="homeView" class="view hidden"></section>
@@ -120,11 +129,6 @@
       <section id="junkDealerView" class="view hidden"></section>
       <section id="guildView" class="view hidden"></section>
       <section id="arenaView" class="view hidden"></section>
-
-      <section class="materials-panel" aria-label="素材">
-        <div class="panel-title">素材</div>
-        <div id="materialsList" class="materials-list"></div>
-      </section>
 
       <section class="log-panel" aria-labelledby="logPanelTitle">
         <div class="log-panel-toolbar">
@@ -238,14 +242,14 @@
       </section>
     </main>
 
-    <script src="./data/materials.js?v=20260711-cleanup4"></script>
+    <script src="./data/materials.js?v=20260712-junkstock1"></script>
     <script src="./data/races.js?v=20260712-growth1"></script>
-    <script src="./data/jobs.js?v=20260712-capoeira1"></script>
+    <script src="./data/jobs.js?v=20260712-magickeypad1"></script>
     <script src="./data/personalities.js?v=20260712-glutton1"></script>
-    <script src="./data/equipment.js?v=20260712-sets1"></script>
+    <script src="./data/equipment.js?v=20260712-layoutstarter1"></script>
     <script src="./data/treasures.js?v=20260712-junklegend1"></script>
-    <script src="./data/monsters.js?v=20260712-growth1"></script>
-    <script src="./data/floors.js?v=20260711-cleanup4"></script>
+    <script src="./data/monsters.js?v=20260712-cleanup5"></script>
+    <script src="./data/floors.js?v=20260712-deepunique1"></script>
     <script src="./js/unique-dialogue.js?v=20260711-cleanup4"></script>
     <script src="./js/utils.js?v=20260711-cleanup4"></script>
     <script src="./js/threat-system.js?v=20260711-cleanup4"></script>
@@ -255,6 +259,7 @@
     <script src="./js/character-system.js?v=20260711-cleanup4"></script>
     <script src="./js/bounty-system.js?v=20260711-cleanup4"></script>
     <script src="./js/audio-effects.js?v=20260711-cleanup4"></script>
-    <script src="./js/main.js?v=20260712-tutorial1"></script>
+    <script src="./js/surreal-text.js?v=20260712-surreal1"></script>
+    <script src="./js/main.js?v=20260712-cleanup5"></script>
   </body>
 </html>

@@ -110,4 +110,15 @@
       { id: `${id}_ultra`, name: `✦${ultraName}`, rarity: "ultra", description: `${id}系種族から奇跡的な確率で得られるウルトラレア素材。` },
     );
   });
+  const junkDealerRefinedMaterialIds = [
+    "slime_crystal", "vermin_fang", "insect_core", "winged_pinion",
+    "reptile_heart", "spirit_gem", "construct_core", "plant_seed",
+    "fiend_blood", "giant_marrow", "aberrant_eye", "warrior_relic",
+    "elf_dewdrop", "dragon_heart", "demon_seal", "angel_halo",
+  ];
+  window.HD_DATA.materials.forEach((material) => {
+    if (junkDealerRefinedMaterialIds.includes(material.id)) material.junkDealerTier = "refined";
+    else if (material.rarity === "super") material.junkDealerTier = "super";
+    else if (material.rarity === "ultra") material.junkDealerTier = "ultra";
+  });
 })();

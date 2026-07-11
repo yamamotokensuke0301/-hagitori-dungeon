@@ -377,6 +377,7 @@
         ...JSON.parse(JSON.stringify(source)),
         id: `abyss_f${floor}_v${variant + 1}`,
         name: `第${floor}層${source.name}${["アルファ", "ベータ", "ガンマ"][variant]}`,
+        abyssSourceId: source.id,
         mapMarker: ["ア", "ベ", "ガ"][variant],
         floors: [floor],
         hp: 45 + floor * 7 + variant * 13,
@@ -532,6 +533,59 @@
     };
     delete monster.arenaRank;
   });
+
+  // 残留192体を強さ帯ごとに監査し、属性・称号・個体核の重複が薄い100体へ収斂する。
+  // 各帯から10体ずつ残すため、序盤だけ／終盤だけが痩せることはない。
+  const arenaCandidates = window.HD_DATA.monsters
+    .filter((monster) => monster.arenaOnly)
+    .sort((left, right) => left.arenaRank - right.arenaRank);
+  const curatedArena = [];
+  const arenaFeatureUsage = new Map();
+  const featureUse = (key) => Number(arenaFeatureUsage.get(key) || 0);
+  const recordArenaFeatures = (monster) => {
+    [
+      `primary:${monster.attackAttribute}`,
+      `danger:${monster.dangerous.attribute}`,
+      `weak:${monster.weaknesses[0]}`,
+      `title:${monster.arenaTitle}`,
+      `core:${monster.coreName}`,
+    ].forEach((key) => arenaFeatureUsage.set(key, featureUse(key) + 1));
+  };
+  for (let band = 0; band < 10; band += 1) {
+    const firstRank = 1 + Math.floor((band * arenaCandidates.length) / 10);
+    const lastRank = Math.floor(((band + 1) * arenaCandidates.length) / 10);
+    const pool = arenaCandidates.filter((monster) => monster.arenaRank >= firstRank && monster.arenaRank <= lastRank);
+    let selectedInBand = 0;
+    while (pool.length && selectedInBand < 10) {
+      pool.sort((left, right) => {
+        const score = (monster) => {
+          const primary = monster.attackAttribute;
+          const danger = monster.dangerous.attribute;
+          const weakness = monster.weaknesses[0];
+          const collisionPenalty = new Set([primary, danger, weakness]).size < 3 ? 30 : 0;
+          return 60 / (1 + featureUse(`primary:${primary}`))
+            + 42 / (1 + featureUse(`danger:${danger}`))
+            + 34 / (1 + featureUse(`weak:${weakness}`))
+            + 24 / (1 + featureUse(`title:${monster.arenaTitle}`))
+            + 18 / (1 + featureUse(`core:${monster.coreName}`))
+            - collisionPenalty;
+        };
+        return score(right) - score(left) || left.arenaRank - right.arenaRank;
+      });
+      const chosen = pool.shift();
+      curatedArena.push(chosen);
+      recordArenaFeatures(chosen);
+      selectedInBand += 1;
+    }
+  }
+  const curatedArenaIds = new Set(curatedArena.map((monster) => monster.id));
+  window.HD_DATA.monsters = window.HD_DATA.monsters.filter((monster) => !monster.arenaOnly || curatedArenaIds.has(monster.id));
+  curatedArena.sort((left, right) => left.arenaRank - right.arenaRank).forEach((monster, index) => {
+    monster.formerArenaRank = monster.arenaRank;
+    monster.arenaRank = index + 1;
+    monster.research[1] = monster.research[1].replace(/第\d+戦/, `第${monster.arenaRank}戦`);
+  });
+  const finalArenaRankMax = curatedArena.length;
 
   // 20の生態系×10の個体核で、名前・動機・戦闘特性が重ならない迷宮ユニークを200体追加する。
   const dungeonUniqueLineages = [
@@ -754,6 +808,173 @@
     });
   });
 
+  // 毎階3体いた深層適応種を、属性役割と原種の重複が薄い170体へ選抜する。
+  // 通常階は2体、別枠ユニークが配置される節目の階は1体を残し、全階の生態系を維持する。
+  const abyssGeneralCandidates = window.HD_DATA.monsters.filter((monster) => /^abyss_f\d+_v\d+$/.test(monster.id));
+  const curatedAbyssGenerals = [];
+  const abyssFeatureUsage = new Map();
+  const abyssFeatureUse = (key) => Number(abyssFeatureUsage.get(key) || 0);
+  const recordAbyssFeatures = (monster) => {
+    [
+      `source:${monster.abyssSourceId}`,
+      `primary:${monster.attackAttribute}`,
+      `danger:${monster.dangerous.attribute}`,
+      `weak:${monster.weaknesses[0]}`,
+    ].forEach((key) => abyssFeatureUsage.set(key, abyssFeatureUse(key) + 1));
+  };
+  for (let floor = 11; floor <= 100; floor += 1) {
+    const pool = abyssGeneralCandidates.filter((monster) => monster.floors[0] === floor);
+    const keepCount = floor % 10 === 5 || floor === 100 ? 1 : 2;
+    let selectedForFloor = 0;
+    while (pool.length && selectedForFloor < keepCount) {
+      pool.sort((left, right) => {
+        const score = (monster) => {
+          const primary = monster.attackAttribute;
+          const danger = monster.dangerous.attribute;
+          const weakness = monster.weaknesses[0];
+          const collisionPenalty = new Set([primary, danger, weakness]).size < 3 ? 36 : 0;
+          return 70 / (1 + abyssFeatureUse(`source:${monster.abyssSourceId}`))
+            + 48 / (1 + abyssFeatureUse(`primary:${primary}`))
+            + 38 / (1 + abyssFeatureUse(`danger:${danger}`))
+            + 30 / (1 + abyssFeatureUse(`weak:${weakness}`))
+            - collisionPenalty;
+        };
+        return score(right) - score(left) || left.id.localeCompare(right.id);
+      });
+      const chosen = pool.shift();
+      curatedAbyssGenerals.push(chosen);
+      recordAbyssFeatures(chosen);
+      selectedForFloor += 1;
+    }
+  }
+  const curatedAbyssGeneralIds = new Set(curatedAbyssGenerals.map((monster) => monster.id));
+  window.HD_DATA.monsters = window.HD_DATA.monsters.filter((monster) => !/^abyss_f\d+_v\d+$/.test(monster.id) || curatedAbyssGeneralIds.has(monster.id));
+  curatedAbyssGenerals.forEach((monster) => { delete monster.abyssSourceId; });
+
+  // 元闘技場系150体のうち、戦闘構造が均質な100体を五つの極端な型へ再設計する。
+  // 10の深度帯から各10体を選び、残る50体を標準型の比較対象にする。
+  const transferredDungeonUniques = window.HD_DATA.monsters
+    .filter((monster) => Number.isFinite(monster.migratedFromArenaRank))
+    .sort((left, right) => left.floors[0] - right.floors[0] || left.migratedFromArenaRank - right.migratedFromArenaRank);
+  const peakyDungeonUniques = [];
+  const peakyFeatureUsage = new Map();
+  const peakyFeatureUse = (key) => Number(peakyFeatureUsage.get(key) || 0);
+  const recordPeakyFeatures = (monster) => {
+    [`primary:${monster.attackAttribute}`, `danger:${monster.dangerous.attribute}`, `weak:${monster.weaknesses[0]}`, `core:${monster.coreName}`]
+      .forEach((key) => peakyFeatureUsage.set(key, peakyFeatureUse(key) + 1));
+  };
+  for (let band = 0; band < 10; band += 1) {
+    const first = Math.floor((band * transferredDungeonUniques.length) / 10);
+    const last = Math.floor(((band + 1) * transferredDungeonUniques.length) / 10);
+    const pool = transferredDungeonUniques.slice(first, last);
+    let selectedInBand = 0;
+    while (pool.length && selectedInBand < 10) {
+      pool.sort((left, right) => {
+        const score = (monster) => {
+          const primary = monster.attackAttribute;
+          const danger = monster.dangerous.attribute;
+          const weakness = monster.weaknesses[0];
+          const collisionPenalty = new Set([primary, danger, weakness]).size < 3 ? 28 : 0;
+          return 52 / (1 + peakyFeatureUse(`primary:${primary}`))
+            + 42 / (1 + peakyFeatureUse(`danger:${danger}`))
+            + 34 / (1 + peakyFeatureUse(`weak:${weakness}`))
+            + 20 / (1 + peakyFeatureUse(`core:${monster.coreName}`))
+            - collisionPenalty;
+        };
+        return score(right) - score(left) || left.migratedFromArenaRank - right.migratedFromArenaRank;
+      });
+      const chosen = pool.shift();
+      peakyDungeonUniques.push(chosen);
+      recordPeakyFeatures(chosen);
+      selectedInBand += 1;
+    }
+  }
+  const peakyProfiles = [
+    { id: "glass_cannon", name: "一撃必殺型", summary: "紙のように脆いが、通常攻撃も奥義も致死級", weakness: "blunt", hp: 0.55, attack: 1.75, defense: 0.25, acceleration: 8, danger: 1.7, every: 2 },
+    { id: "immovable_fortress", name: "不動要塞型", summary: "異常な生命力と防御を持つが、遅く火力も低い", weakness: "acid", hp: 1.65, attack: 0.62, defense: 2.4, acceleration: -8, danger: 0.82, every: 3 },
+    { id: "blink_assassin", name: "瞬殺機動型", summary: "目で追えない速さと高火力を持つが、耐久は皆無", weakness: "earth", hp: 0.68, attack: 1.38, defense: 0.45, acceleration: 16, danger: 1.28, every: 2 },
+    { id: "elemental_bastion", name: "属性城塞型", summary: "属性攻撃をほぼ遮断するが、物理打撃には極端に弱い", weakness: "blunt", hp: 0.92, attack: 0.78, defense: 1.05, acceleration: 1, danger: 0.95, every: 3 },
+    { id: "doomsday_engine", name: "終末砲撃型", summary: "普段は鈍重で脆いが、構えた奥義だけが規格外", weakness: "slash", hp: 0.82, attack: 1.02, defense: 0.6, acceleration: -2, danger: 2.35, every: 3 },
+  ];
+  peakyDungeonUniques.sort((left, right) => left.floors[0] - right.floors[0] || left.migratedFromArenaRank - right.migratedFromArenaRank)
+    .forEach((monster, index) => {
+      const profile = peakyProfiles[index % peakyProfiles.length];
+      monster.peakyBaseline = { hp: monster.hp, attack: monster.attack, defense: monster.defense, acceleration: monster.acceleration, danger: monster.dangerous.power };
+      monster.peakyProfile = profile.id;
+      monster.peakyProfileName = profile.name;
+      monster.hp = Math.max(28, Math.round(monster.hp * profile.hp));
+      monster.attack = Math.max(5, Math.round(monster.attack * profile.attack));
+      monster.defense = Math.max(0, Math.round(monster.defense * profile.defense));
+      monster.acceleration = Math.max(0, monster.acceleration + profile.acceleration);
+      monster.dangerous.power = Math.max(10, Math.round(monster.dangerous.power * profile.danger));
+      monster.dangerous.every = profile.every;
+      monster.dangerous.name = `${profile.name}・${monster.dangerous.name}`;
+      monster.dangerous.telegraph = `${monster.name}が${profile.summary}という歪な戦型を露わにした。`;
+      if (!monster.weaknesses.includes(profile.weakness)) monster.weaknesses.push(profile.weakness);
+      if (profile.id === "immovable_fortress") {
+        monster.resistances.slash = Math.max(4, Number(monster.resistances.slash || 0));
+        monster.resistances.blunt = Math.max(4, Number(monster.resistances.blunt || 0));
+      }
+      if (profile.id === "elemental_bastion") {
+        monster.resistances[monster.attackAttribute] = 5;
+        monster.resistances[monster.dangerous.attribute] = 5;
+      }
+      delete monster.resistances[profile.weakness];
+      monster.research[1] = `${monster.research[1]} 再設計分類は「${profile.name}」。${profile.summary}。`;
+      monster.research[2] = `${monster.research[2]} 戦型の綻びとして${window.HD_DATA.attributeLabels[profile.weakness]}属性が追加弱点。`;
+      monster.research[3] = `${monster.research[3]} 平均的な強敵として扱わず、長所を正面から受けない装備構成が必要。`;
+    });
+
+  // ピーキー化しなかった元闘士50体には、一体ごとに異なる異能則を与える。
+  const singularTraitNames = [
+    "逆拍心臓", "七歩忘却", "傷写しの鏡", "午睡する雷", "骨笛の徴税", "影の替え玉", "昨日喰らい", "無音の拍手", "錆びない血", "空席の王冠",
+    "三秒先の墓", "涙を数える剣", "月曜日の呪い", "片翼の迷路", "負け犬の凱旋", "呼吸する鎧", "名前のない追撃", "百年早い鐘", "毒見する星", "帰路封じ",
+    "夢からの利息", "骨董品の怒り", "逆さ虹の牙", "沈黙を産む喉", "十二番目の影", "勝敗保留", "空腹の方位磁針", "死者だけの近道", "燃える雪解け", "敗北収集家",
+    "拍子抜けの神罰", "右手だけの嵐", "未提出の死因", "二度目の初対面", "床下の太陽", "出口を忘れる鍵", "心音の密輸", "明日を質に入れる", "傷口の選挙", "透明な大行列",
+    "最期だけ早口", "墓石の予備校", "血潮の砂時計", "敵意の盆栽", "反省する雷雲", "半額の終末", "眠れない棺", "勝者不在の決闘", "余命の切り売り", "世界の留守番",
+  ];
+  const singularSpecials = ["drain", "knockback", "self_destruct", "debuff", "time_stop", "devour", "ranged"];
+  const singularDungeonUniques = transferredDungeonUniques.filter((monster) => !monster.peakyProfile);
+  singularDungeonUniques.forEach((monster, index) => {
+    const specialAttack = singularSpecials[index % singularSpecials.length];
+    const addedWeakness = deepAttributes[(index * 7 + 3) % deepAttributes.length];
+    const resistanceAttribute = deepAttributes[(index * 11 + 5) % deepAttributes.length];
+    const trait = {
+      id: `singular_trait_${String(index + 1).padStart(2, "0")}`,
+      name: singularTraitNames[index],
+      specialAttack,
+      dangerEvery: 2 + (index % 3),
+      regenerationRate: index % 4 === 0 ? Number((0.025 + (index % 9) * 0.007).toFixed(3)) : 0,
+      summonEvery: index % 5 === 0 ? 4 + (index % 4) : 0,
+      shieldEvery: index % 6 === 0 ? 3 + (index % 5) : 0,
+      shieldCharges: index % 12 === 0 ? 2 : 1,
+      addedWeakness,
+      resistanceAttribute,
+      resistanceTier: 3 + (index % 3),
+      hpScale: Number((0.82 + (index % 7) * 0.07).toFixed(2)),
+      attackScale: Number((0.86 + (index % 6) * 0.09).toFixed(2)),
+      accelerationDelta: (index % 9) - 4,
+    };
+    monster.singularTrait = trait;
+    monster.suppressAutomaticRegeneration = true;
+    monster.specialAttack = specialAttack;
+    monster.hp = Math.max(32, Math.round(monster.hp * trait.hpScale));
+    monster.attack = Math.max(6, Math.round(monster.attack * trait.attackScale));
+    monster.acceleration = Math.max(0, monster.acceleration + trait.accelerationDelta);
+    monster.dangerous.every = trait.dangerEvery;
+    monster.dangerous.power = Math.max(12, Math.round(monster.dangerous.power * (1 + (index % 5) * 0.12)));
+    monster.dangerous.name = `${trait.name}・${monster.dangerous.name}`;
+    monster.dangerous.telegraph = `${monster.name}の固有異能「${trait.name}」が作動する。規則を知らない者だけが正しく犠牲になる。`;
+    if (!monster.weaknesses.includes(addedWeakness)) monster.weaknesses.push(addedWeakness);
+    monster.resistances[resistanceAttribute] = Math.max(trait.resistanceTier, Number(monster.resistances[resistanceAttribute] || 0));
+    delete monster.resistances[addedWeakness];
+    if (trait.summonEvery) monster.summon = { every: trait.summonEvery, count: 1 + (index % 2), maxAlive: 1 + (index % 3), maxTotal: 3 + (index % 5) };
+    if (trait.shieldEvery) monster.divineInvulnerability = { every: trait.shieldEvery, charges: trait.shieldCharges, name: trait.name };
+    monster.research[1] = `${monster.research[1]} この個体だけの異能則「${trait.name}」を持つ。`;
+    monster.research[2] = `${monster.research[2]} ${window.HD_DATA.attributeLabels[addedWeakness]}が追加弱点で、${window.HD_DATA.attributeLabels[resistanceAttribute]}耐性${trait.resistanceTier}。特殊行動は${specialAttack}。`;
+    monster.research[3] = `${monster.research[3]} 発動周期、再生、召喚、不可侵回数の組合せは他のどの個体とも一致しない。`;
+  });
+
   const uniqueEpithetTails = ["異境の王", "帰らずの災禍", "迷宮の古き傷", "屍山の覇者", "忘れられた神敵", "深層の凶兆", "黄泉路の番人"];
 
   // 全モンスターを「種族の基礎格＋色階級」で読める共通則へ載せる。
@@ -815,7 +1036,7 @@
       || monsterSpecies.find((entry) => entry.pattern.test(text))
       || fallbackSpecies[(index + window.HD_DATA.attributes.indexOf(monster.attackAttribute)) % fallbackSpecies.length];
     const nativeFloor = monster.arenaOnly
-      ? 1 + Math.floor((Number(monster.arenaRank || 1) - 1) * 99 / 191)
+      ? 1 + Math.floor((Number(monster.arenaRank || 1) - 1) * 99 / Math.max(1, finalArenaRankMax - 1))
       : Math.max(1, Math.min(...(monster.floors?.length ? monster.floors : [1])));
     const stratum = Math.min(9, Math.floor((nativeFloor - 1) / 10));
     const withinStratum = (nativeFloor - 1) % 10;
@@ -876,7 +1097,7 @@
       });
       monster.demonicWard = { attributes: [...new Set(fortified)], tier: resistanceFloor };
     }
-    const rapidRegenerationEligible = monster.unique
+    const rapidRegenerationEligible = monster.unique && !monster.suppressAutomaticRegeneration
       && (nativeFloor >= 45 || colorIndex >= 5 || species.rank >= 12);
     if (rapidRegenerationEligible) {
       const rate = Math.min(0.14, 0.035 + nativeFloor * 0.00065 + colorIndex * 0.006 + Math.max(0, species.rank - 10) * 0.004);
@@ -888,6 +1109,15 @@
   }
 
   window.HD_DATA.monsters.forEach(classifyMonster);
+  window.HD_DATA.monsters.filter((monster) => monster.singularTrait?.regenerationRate > 0).forEach((monster) => {
+    monster.rapidRegeneration = {
+      rate: monster.singularTrait.regenerationRate,
+      amount: Math.max(1, Math.ceil(monster.hp * monster.singularTrait.regenerationRate)),
+    };
+  });
+  window.HD_DATA.monsters.filter((monster) => monster.suppressAutomaticRegeneration).forEach((monster) => {
+    delete monster.suppressAutomaticRegeneration;
+  });
   const threatColorPoints = [0, 25, 50, 75, 100, 125, 150];
   const threatGroups = new Map();
   window.HD_DATA.monsters.forEach((monster) => {

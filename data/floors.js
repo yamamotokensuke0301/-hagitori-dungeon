@@ -42,6 +42,7 @@
   ];
 
   const regionNames = ["燐光坑道", "水没王墓", "雷鳴断崖", "毒晶庭園", "氷結書庫", "呪詛聖堂", "酸蝕工廠", "無明星界", "終焉迷宮"];
+  const deepUniqueChance = (floor) => Math.min(0.93, 0.24 + floor * 0.0024 + Math.max(0, floor - 30) * 0.008);
   for (let floor = 11; floor <= 100; floor += 1) {
     const regionIndex = Math.min(regionNames.length - 1, Math.floor((floor - 11) / 10));
     const finalFloor = floor === 100;
@@ -50,7 +51,7 @@
       name: finalFloor ? "キキルクルスの蛇宮" : `${regionNames[regionIndex]}・${floor}`,
       monsterPool: pool(floor),
       uniques: finalFloor ? ["dungeon_lord_nox"] : uniquePool(floor),
-      uniqueChance: finalFloor ? 1 : Math.min(0.48, 0.24 + floor * 0.0024),
+      uniqueChance: finalFloor ? 1 : deepUniqueChance(floor),
       enemyCount: Math.min(70, 48 + Math.floor(floor / 4)),
       spawnCap: Math.min(84, 62 + Math.floor(floor / 4)),
       roomRange: [40, 48],

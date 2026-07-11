@@ -1033,6 +1033,27 @@
     item.description = `${item.description} 免疫調律：${window.HD_DATA.attributeLabels[coverageAttribute]}免疫。`;
   });
 
+  const starterBuildEquipment = [
+    { id: "starter_swordsman_blade", name: "新鋭の半月剣", slot: "weapon", jobs: ["swordsman"], attack: 5, defense: 1, acceleration: 0, attributeAttack: "slash", resistances: { slash: 1 }, description: "攻防を崩さず正面戦闘を覚える戦士の支給剣。" },
+    { id: "starter_hunter_knife", name: "路地裏仕込みの追剥刀", slot: "weapon", jobs: ["hunter"], attack: 3, defense: 0, acceleration: 4, attributeAttack: "slash", resistances: { poison: 1 }, description: "先手と急所狙いへ寄せた盗賊の短刀。" },
+    { id: "starter_archer_bow", name: "風読みの短弓", slot: "weapon", jobs: ["archer"], attack: 4, defense: 0, acceleration: 2, attributeAttack: "wind", resistances: { wind: 1 }, description: "射線と機動力を重視する軽い短弓。" },
+    { id: "starter_mage_wand", name: "火花を飼う初心杖", slot: "weapon", jobs: ["mage"], attack: 4, defense: -1, acceleration: 1, attributeAttack: "fire", resistances: { fire: 2, water: -1 }, description: "火術を強める代わりに水へ隙を作る入門杖。" },
+    { id: "starter_spellblade", name: "火線刻みの魔刃", slot: "weapon", jobs: ["spellblade"], attack: 5, defense: 0, acceleration: 1, attributeAttack: "slash", attackAttributes: ["slash", "fire"], resistances: { fire: 1 }, description: "斬撃と火術を一振りへ重ねる魔法戦士の試作剣。" },
+    { id: "starter_researcher_probe", name: "打診式生態測杖", slot: "weapon", jobs: ["researcher"], attack: 2, defense: 2, acceleration: 0, attributeAttack: "blunt", resistances: { illusion: 2 }, description: "殴った反響から魔物の構造を読む調査器具。" },
+    { id: "starter_heavy_maul", name: "飲み代担保の鉄塊", slot: "weapon", jobs: ["heavy"], attack: 8, defense: -2, acceleration: -2, attributeAttack: "blunt", resistances: { blunt: 1 }, description: "振り切れば強い。酒場へ行くなら外す理由もある大鉄塊。" },
+    { id: "starter_tourist_camera", name: "迷宮記念の箱型カメラ", slot: "weapon", jobs: ["tourist"], attack: 1, defense: 0, acceleration: 1, attributeAttack: "light", resistances: { illusion: 1 }, description: "戦闘より記録を優先した観光客の私物。" },
+    { id: "starter_psychic_focus", name: "念波増幅の曲がり匙", slot: "weapon", jobs: ["psychic"], attack: 4, defense: 0, acceleration: 3, attributeAttack: "illusion", resistances: { illusion: 2, steel: -1 }, description: "精神波は増えるが金属干渉に弱い超能力媒体。" },
+    { id: "starter_scavenger_gauntlet", name: "骨まで掬う貪食手甲", slot: "weapon", jobs: ["scavenger"], attack: 5, defense: 1, acceleration: 0, attributeAttack: "acid", resistances: { acid: 1, poison: 1 }, description: "倒した獲物をそのまま食らうための手甲。" },
+    { id: "starter_handyman_tool", name: "七役折畳み工具", slot: "weapon", jobs: ["handyman"], attack: 3, defense: 2, acceleration: 3, attributeAttack: "blunt", resistances: { steel: 1, earth: 1 }, description: "戦闘、採取、補修を一丁でこなす便利屋の商売道具。" },
+    { id: "starter_priest_censer", name: "朝祷の白煙香炉", slot: "weapon", jobs: ["priest"], attack: 3, defense: 1, acceleration: 0, attributeAttack: "light", resistances: { light: 2, curse: 1 }, description: "癒やしと祓いの白煙を絶やさない携帯香炉。" },
+    { id: "starter_ninja_kunai", name: "無銘・影走り苦無", slot: "weapon", jobs: ["ninja"], attack: 7, defense: 0, acceleration: 6, attributeAttack: "dark", attackAttributes: ["dark", "slash"], resistances: { dark: 2, light: -1 }, description: "忍者の初速をさらに尖らせる危険な高速忍具。" },
+    { id: "starter_flower_scepter", name: "眠り花の蕾笏", slot: "weapon", jobs: ["flower_tamer"], attack: 2, defense: 0, acceleration: 2, attributeAttack: "poison", resistances: { poison: 2, fire: -1 }, description: "花印を根付きやすくする、お花使いの生きた笏。" },
+    { id: "starter_capoeira_wraps", name: "逆立ち踵の革帯", slot: "feet", jobs: ["capoeirista"], attack: 4, defense: 0, acceleration: 6, attributeAttack: "blunt", resistances: { blunt: 1, steel: -1 }, description: "素手を保ったまま足技と逆立ちを支えるカポエラ用革帯。" },
+  ];
+  window.HD_DATA.equipment.push(...starterBuildEquipment.map((item) => ({
+    hpRegen: 0, recipe: null, starterOnly: true, ...item, attackAttributes: item.attackAttributes || (item.attributeAttack ? [item.attributeAttack] : []),
+  })));
+
   // 4部位から組む段階式セット。2部位から実用になり、4部位で戦法が完成する。
   const equipmentSets = [];
   window.HD_DATA.attributes.forEach((attribute) => {

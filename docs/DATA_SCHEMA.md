@@ -177,7 +177,9 @@ dangerous: {
 
 `slot` は `weapon`、`upper`、`lower`、`feet`、`accessory` のいずれか。`attackAttributes` は0個以上の攻撃属性を持てる配列で、複数ある場合は攻撃対象へ最も有効な属性のダメージを採用する。全装備に配列形式を正規化し、旧 `attributeAttack` は先頭属性として互換維持する。
 
-流通装備の任意フィールド `shopMinFloor` は、その装備が素材売却によって入荷できる最小到達階層を示す。派生等級1・2は1、等級3〜9は順に15、25、35、45、55、70、85を持つ。条件を満たした入荷済みIDと素材売却履歴は `meta.shop` に保存し、冒険者死亡後も維持する。
+流通装備の任意フィールド `shopMinFloor` は、その装備が素材売却によって入荷できる最小到達階層を示す。派生等級1・2は1、等級3〜9は順に15、25、35、45、55、70、85を持つ。条件を満たした入荷済みIDと素材売却履歴は `meta.shop` に保存するが、冒険者死亡時には初期化する。
+
+新規冒険者の初期装備は `starterBuildLoadout()` が職業・種族・性格から選ぶ。15職にはそれぞれ `starterOnly` の専用品があり、上着は種族の耐久傾向と火弱点、アクセサリは性格傾向で変わる。カポエラ使いだけは武器欄を空け、専用足装備から開始する。既存セーブの旧初期装備IDは互換のため残す。
 
 生成系列装備は任意の `equipmentArchetype` で猛攻・城塞・疾風・再生・多相・背水の強偏差原型を示す。セット構成品は `setId` を持ち、`equipmentSets` の `itemIds` と対応する。各セットの `bonuses` は `{ pieces, attack?, defense?, acceleration?, hpRegen?, attackAttributes?, resistances?, text }` 形式で、必要部位数を満たした段階まで累積適用する。装備監査では `setId` も用途の一部として完全一致判定へ含める。
 
@@ -263,6 +265,7 @@ localStorageキーは `hagitori-dungeon-save-v1`。
     inDungeon: false,
     equipment: { weapon: "rusty_knife", upper: "cloth", lower: null, feet: null, accessory1: null, accessory2: null },
     ownedEquipment: ["rusty_knife", "cloth"],
+    equipmentEnhancements: { rusty_knife: { level: 1, total: 3, attributes: { fire: 1 } } },
     materials: {},
     items: { spellbook_ember_shot: 1, junk_bent_spoon: 2 },
     learnedSpells: ["ember_shot"],
@@ -296,4 +299,4 @@ localStorageキーは `hagitori-dungeon-save-v1`。
 }
 ```
 
-死亡時は調査・死因・商店流通・称号・賞金情報・`guildDonatedEquipmentIds` を残し、`adventurer` を初期化する。例外として `meta.guildClaims`、`meta.clearedBossFloors`、各 `meta.bounties[id].claimed` はリセットする。購入済み情報を表す `intel` は維持する。死亡直前ログは `pendingDeathReview` にスナップショット保存し、リロード後もプレイヤーが閉じるまで復元する。
+死亡時は `meta.deaths`、`meta.deathLog`、死亡確認用の `pendingDeathReview` に加えて、`meta.research` を引き継ぐ。完全調査済みのモンスターは `meta.monsterHeartClaims[id] = true`、`meta.monsterHearts[id] = 1` に再構成し、生前に消費した心も各1個へ復活させる。装備と `equipmentEnhancements`、商店流通、称号、賞金情報などは新規開始状態へ戻す。死亡直前ログはリロード後もプレイヤーが閉じるまで復元する。

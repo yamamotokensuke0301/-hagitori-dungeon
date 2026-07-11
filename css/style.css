@@ -58,7 +58,7 @@ button:active:not(:disabled) {
   height: 100svh;
   padding: max(6px, env(safe-area-inset-top)) 8px max(8px, env(safe-area-inset-bottom));
   display: grid;
-  grid-template-rows: auto auto auto auto minmax(0, 1fr) auto auto;
+  grid-template-rows: auto auto auto auto minmax(0, 1fr) clamp(140px, 20svh, 190px);
   gap: 6px;
   position: relative;
   overflow: hidden;
@@ -72,17 +72,20 @@ button:active:not(:disabled) {
 }
 
 .app-shell.dungeon-mode {
-  --tile: clamp(15px, min(30px, calc((100vw - 56px) / 13), calc((100svh - 296px) / 13)), 30px);
+  --tile: clamp(15px, min(32px, calc((100vw - 42px) / 13), calc((100svh - 328px) / 13)), 32px);
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto minmax(0, 1fr) clamp(104px, 17svh, 144px);
+  grid-template-rows: minmax(0, 1fr) clamp(105px, 15svh, 132px);
   background:
     radial-gradient(circle at 50% 26%, rgba(74, 101, 84, 0.2), transparent 48%),
     linear-gradient(180deg, rgba(15, 22, 18, 0.94), rgba(8, 12, 10, 0.98));
 }
 
 .app-shell.dungeon-mode .status-bar {
-  grid-column: 1 / -1;
-  grid-row: 1;
+  display: none;
+}
+
+.app-shell.dungeon-mode .status-hp {
+  display: none;
 }
 
 .app-shell.dungeon-mode > .character-strip {
@@ -91,14 +94,15 @@ button:active:not(:disabled) {
 
 .app-shell.dungeon-mode #dungeonView {
   grid-column: 1;
-  grid-row: 2;
-  padding-bottom: 60px;
-  scroll-padding-bottom: 60px;
+  grid-row: 1;
+  padding-bottom: 7px;
+  scroll-padding-bottom: 7px;
+  overflow: hidden;
 }
 
 .app-shell.dungeon-mode .log-panel {
   grid-column: 1 / -1;
-  grid-row: 3;
+  grid-row: 2;
 }
 
 .app-shell.dungeon-mode .equipment-strip {
@@ -125,13 +129,10 @@ button:active:not(:disabled) {
   background: rgba(52, 42, 27, 0.96);
 }
 
-.app-shell.dungeon-mode .status-bar,
 .app-shell.dungeon-mode .equipment-strip,
-.app-shell.dungeon-mode .materials-panel,
 .app-shell.dungeon-mode .log-panel,
 .app-shell.arena-mode .status-bar,
 .app-shell.arena-mode .equipment-strip,
-.app-shell.arena-mode .materials-panel,
 .app-shell.arena-mode .log-panel {
   border-color: #4f6048;
   background: rgba(18, 25, 18, 0.97);
@@ -148,7 +149,6 @@ button:active:not(:disabled) {
 .equipment-strip,
 .tabs,
 .view,
-.materials-panel,
 .log-panel,
 .floor-line {
   border: 1px solid var(--line);
@@ -232,6 +232,10 @@ button:active:not(:disabled) {
   box-shadow: inset 0 0 18px rgba(214, 174, 84, 0.08);
 }
 
+.app-shell:not(.town-mode) .audio-button {
+  display: none;
+}
+
 span,
 .panel-title,
 small {
@@ -258,6 +262,7 @@ strong {
 .tabs {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(32px, auto));
   gap: 4px;
   padding: 4px;
   overflow: hidden;
@@ -465,9 +470,9 @@ strong {
 .dungeon-stats-overlay {
   position: absolute;
   left: 8px;
-  top: 50%;
+  top: 8px;
   z-index: 12;
-  width: 46px;
+  width: 66px;
   display: grid;
   gap: 5px;
   padding: 0;
@@ -475,7 +480,24 @@ strong {
   background: transparent;
   box-shadow: none;
   pointer-events: none;
-  transform: translateY(-50%);
+  transform: none;
+}
+
+.dungeon-stats-overlay .dungeon-hp-stat {
+  grid-template-columns: auto 1fr;
+  width: 66px;
+  margin-bottom: 2px;
+}
+
+.dungeon-hp-stat > strong {
+  color: #fff3c4;
+  font-size: 11px;
+}
+
+.dungeon-hp-stat .hp-bar {
+  grid-column: 1 / -1;
+  width: 66px;
+  height: 4px;
 }
 
 .dungeon-stats-overlay > div {
@@ -564,11 +586,11 @@ strong {
 
 .cell.light-room {
   z-index: 9;
-  filter: brightness(1.2) saturate(1.08);
+  filter: brightness(1.18) saturate(1.08);
 }
 
 .cell.light-room.tile-floor {
-  background: #222d21;
+  background: #1b241c;
   box-shadow: none;
 }
 
@@ -2460,26 +2482,25 @@ strong {
 .controls {
   margin-top: 0;
   display: grid;
-  grid-template-columns: repeat(3, 52px);
-  grid-template-rows: repeat(3, 44px);
-  gap: 7px;
+  grid-template-columns: repeat(3, 54px);
+  grid-template-rows: repeat(3, 50px);
+  gap: 5px;
   justify-content: center;
-  position: fixed;
-  right: max(10px, env(safe-area-inset-right));
-  bottom: max(10px, env(safe-area-inset-bottom));
-  z-index: 20;
-  padding: 8px;
-  border: 1px solid rgba(214, 174, 84, 0.42);
-  border-radius: 14px;
-  background: linear-gradient(145deg, rgba(24, 31, 27, 0.96), rgba(12, 17, 14, 0.96));
-  box-shadow: inset 0 1px rgba(255, 255, 255, 0.04), 0 12px 34px rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(10px);
+  position: static;
+  z-index: 1;
+  padding: 6px;
+  border: 0;
+  border-radius: 13px;
+  background: linear-gradient(145deg, rgba(24, 31, 27, 0.42), rgba(12, 17, 14, 0.5));
+  box-shadow: none;
+  backdrop-filter: blur(4px);
+  transform: translateY(-3px);
 }
 
 .controls button {
-  width: 52px;
-  min-height: 44px;
-  font-size: 19px;
+  width: 54px;
+  min-height: 50px;
+  font-size: 21px;
   cursor: pointer;
   touch-action: none;
   user-select: none;
@@ -2498,20 +2519,24 @@ strong {
 
 .magic-move-controls {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
-  gap: 7px;
-  width: 100%;
-  margin-top: 7px;
-  padding: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: center;
+  gap: 6px;
+  width: auto;
+  min-width: 0;
+  margin: 0;
+  padding: 6px;
   border: 1px solid rgba(132, 119, 239, 0.48);
   border-radius: 14px;
   background: linear-gradient(145deg, rgba(41, 31, 75, 0.96), rgba(20, 17, 42, 0.96));
   box-shadow: inset 0 1px rgba(255, 255, 255, 0.04), 0 8px 22px rgba(0, 0, 0, 0.32);
+  transform: translateY(-4px) scale(0.9);
+  transform-origin: right center;
 }
 
 .magic-move-controls button {
-  min-height: 42px;
-  padding: 7px;
+  min-height: 38px;
+  padding: 5px;
   border-color: rgba(147, 132, 255, 0.42);
   background: rgba(55, 42, 99, 0.92);
   font-size: 12px;
@@ -2521,6 +2546,15 @@ strong {
   color: #fff;
   border-color: #c4b8ff;
   box-shadow: 0 0 12px rgba(154, 131, 255, 0.45);
+}
+
+.dungeon-action-dock {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 7px;
+  align-items: stretch;
+  width: 100%;
+  margin-top: 7px;
 }
 
 .resistance-board {
@@ -2571,35 +2605,9 @@ strong {
   background: rgba(214, 174, 84, 0.17);
 }
 
-.materials-panel {
-  min-height: 0;
-  max-height: 76px;
-  padding: 5px 6px;
-  overflow: hidden;
-}
-
-.materials-list {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 3px;
-  margin-top: 4px;
-  max-height: 48px;
-  overflow: hidden;
-}
-
-.materials-list div {
-  display: flex;
-  justify-content: space-between;
-  gap: 6px;
-  padding: 3px 5px;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.03);
-  font-size: 11px;
-}
-
 .log-panel {
-  min-height: 72px;
-  max-height: 88px;
+  min-height: 140px;
+  max-height: none;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 4px;
@@ -2654,23 +2662,47 @@ strong {
 
 .log-list {
   min-height: 0;
-  overflow: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
 }
 
-.app-shell.dungeon-mode .materials-panel,
-.app-shell.arena-mode .materials-panel {
+.log-list::-webkit-scrollbar {
   display: none;
 }
 
 .app-shell.dungeon-mode .log-panel,
 .app-shell.arena-mode .log-panel {
-  min-height: 104px;
+  min-height: 140px;
   max-height: none;
-  padding: 8px 198px 8px 9px;
+  padding: 8px 9px;
   overflow: hidden;
   border-color: rgba(105, 136, 116, 0.52);
   background: linear-gradient(180deg, rgba(17, 25, 21, 0.98), rgba(10, 16, 13, 0.98));
   box-shadow: inset 0 1px rgba(255, 255, 255, 0.025), 0 -8px 28px rgba(0, 0, 0, 0.18);
+}
+
+.app-shell.dungeon-mode .log-panel {
+  min-height: 105px;
+  padding: 6px 8px;
+  gap: 3px;
+}
+
+.app-shell.dungeon-mode .log-panel-toolbar > span {
+  font-size: 8px;
+}
+
+.app-shell.dungeon-mode .log-panel-toolbar button {
+  min-height: 20px;
+  padding: 1px 6px;
+  font-size: 9px;
+}
+
+.app-shell.dungeon-mode .log-panel p {
+  margin-bottom: 1px;
+  padding-block: 1px;
+  font-size: 11px;
+  line-height: 1.15;
 }
 
 .app-shell.dungeon-mode .log-list,
@@ -2849,11 +2881,14 @@ textarea:focus-visible,
 
 @media (max-width: 420px) {
   .tabs {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-rows: repeat(2, minmax(38px, auto));
   }
 
   .tabs button {
     min-height: 38px;
+    padding-inline: 2px;
+    font-size: 11px;
   }
 
   .home-profile-heading {
@@ -2964,27 +2999,49 @@ textarea:focus-visible,
 
   .controls {
     grid-template-columns: repeat(3, 48px);
-    grid-template-rows: repeat(3, 44px);
-    gap: 6px;
+    grid-template-rows: repeat(3, 46px);
+    gap: 4px;
+    padding: 5px;
   }
 
   .controls button {
     width: 48px;
-    min-height: 44px;
+    min-height: 46px;
+    font-size: 16px;
+  }
+
+  .dungeon-action-dock {
+    gap: 5px;
+  }
+
+  .magic-move-controls {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+    padding: 5px;
+  }
+
+  .magic-move-controls button {
+    min-height: 34px;
+    padding: 3px;
+    font-size: 11px;
   }
 
   .resistance-total-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .app-shell.dungeon-mode .log-panel,
   .app-shell.arena-mode .log-panel {
-    min-height: 96px;
-    max-height: 116px;
-    padding-right: 180px;
+    min-height: 128px;
+    max-height: 160px;
+    padding-right: 9px;
   }
 
-  .app-shell.dungeon-mode .status-bar,
+  .app-shell.dungeon-mode .log-panel {
+    min-height: 105px;
+    max-height: 132px;
+    padding: 6px 8px;
+  }
+
   .app-shell.arena-mode .status-bar {
     grid-template-columns: repeat(5, minmax(0, 1fr)) 42px;
   }
@@ -2994,28 +3051,25 @@ textarea:focus-visible,
   }
 
   .app-shell.dungeon-mode {
-    --tile: clamp(15px, min(27px, calc((100vw - 56px) / 13), calc((100svh - 286px) / 13)), 27px);
+    --tile: clamp(15px, min(29px, calc((100vw - 42px) / 13), calc((100svh - 320px) / 13)), 29px);
     grid-template-columns: minmax(0, 1fr);
   }
 
   .dungeon-stats-overlay {
     left: 6px;
-    width: 44px;
+    width: 66px;
   }
 
-  .app-shell.dungeon-mode .status-bar > div,
   .app-shell.arena-mode .status-bar > div,
   .app-shell.arena-mode .character-strip > div {
     padding: 3px;
   }
 
-  .app-shell.dungeon-mode .status-bar strong,
   .app-shell.arena-mode .status-bar strong,
   .app-shell.arena-mode .character-strip strong {
     font-size: 10px;
   }
 
-  .app-shell.dungeon-mode .status-bar span,
   .app-shell.arena-mode .status-bar span,
   .app-shell.arena-mode .character-strip span {
     font-size: 8px;

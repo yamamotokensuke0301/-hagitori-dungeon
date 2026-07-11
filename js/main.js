@@ -3,7 +3,7 @@
 
   const SAVE_KEY = "hagitori-dungeon-save-v1";
   const AUDIO_KEY = "hagitori-audio-enabled-v4";
-  const APP_VERSION = "Prototype 3.2.0";
+  const APP_VERSION = "Prototype 3.3.0";
   const MAP_SIZE_RANGE = Object.freeze([36, 60]);
   const VIEW_SIZE = 13;
   const MAX_FLOOR = 100;
@@ -20,6 +20,7 @@
   const INN_COST = 10;
   const DRINK_COST = 1;
   const DRUNKEN_FIST_POWER = 3.6;
+  const START_GUIDANCE = "まずはギルドにいけ。受付で冒険の基本と最初の方針を確かめろ。";
   const SAITAMA_ONE_PUNCH_CHANCE = 0.08;
   const RIMURU_FLOOR_WIPE_CHANCE = 0.025;
   const RIMURU_SLIME_STAT_BONUS = 150;
@@ -30,7 +31,7 @@
   const TRAP_COUNT_MULTIPLIER = 4;
   const FIXED_ARTIFACT_CHEST_CHANCE = 0.01;
   const VAULT_FIXED_ARTIFACT_CHANCE = 0.05;
-  const TRAP_TYPE_LABELS = Object.freeze({ damage: "床罠", drain: "吸精罠", slow: "鈍化罠" });
+  const TRAP_TYPE_LABELS = Object.freeze({ damage: "床罠", drain: "吸精罠", slow: "鈍化罠", bear: "トラバサミ", teleport: "強制転移罠", summon: "召喚罠", scatter: "罠バラまき罠" });
   const TRAP_DANGER_LABELS = Object.freeze(["", "Ⅰ", "Ⅱ", "Ⅲ", "Ⅳ", "Ⅴ"]);
   const TRAP_JOB_DISARM_BONUSES = Object.freeze({ hunter: 0.34, handyman: 0.24, researcher: 0.06 });
   const TRAP_PERSONALITY_DISARM_BONUSES = Object.freeze({
@@ -59,7 +60,7 @@
   });
   const PHASING_UNIQUE_ATTRIBUTES = Object.freeze(["dark", "curse", "illusion"]);
   const DUNGEON_LIGHT_RADIUS = Object.freeze({ near: 2.25, mid: 4.6 });
-  const EMPTY_TELEPORT_COOLDOWNS = Object.freeze({ short: 0, long: 0 });
+  const EMPTY_TELEPORT_COOLDOWNS = Object.freeze({ long: 0 });
   const RESEARCH_LEVEL_LABELS = Object.freeze(["未解析", "目撃", "能力判明", "特性判明", "素材判明", "完全解析"]);
   const SPECIAL_ATTACK_LABELS = Object.freeze({
     ranged: "遠隔攻撃",
@@ -124,7 +125,7 @@
     "最上級や禁断の魔法書ほど深い箱に眠る。浅い階で同じ箱を開け続けても出ないぞ。",
     "全滅狙いで戦い続ければ成長は早いが、撤退できなければ全て失う。階段を見つけた時が考え時だ。",
     "十階ごとの深度標は、その冒険者が倒れれば失われる。次の命へ道そのものは譲れない。",
-    "調査記録と街の流通は次の冒険者へ残る。死んでも、知識まで無駄になるわけじゃない。",
+    "死亡しても魔物の調査記録は残り、完全解析した魔物の心は戻ってくる。装備と街の流通は失う。",
   ]);
   const TAVERN_SNACK_INGREDIENTS = Object.freeze([
     ["枝豆", "青い香り"], ["鶏皮", "濃い脂"], ["砂肝", "こりこりした歯応え"], ["山芋", "ほくほくした甘み"], ["川海老", "香ばしい殻"],
@@ -162,6 +163,8 @@
   let recentInnAdviceIndexes = [];
   let tavernSnackMenu = [];
   const DATA = window.HD_DATA;
+  const SURREAL = window.HD_SURREAL;
+  SURREAL?.decorateData(DATA);
   const ATTRIBUTE_IDS_BY_LABEL = Object.freeze(Object.fromEntries(
     Object.entries(DATA.attributeLabels).map(([id, label]) => [label, id]),
   ));
@@ -292,6 +295,9 @@
     maxHp: document.querySelector("#maxHpText"),
     level: document.querySelector("#levelText"),
     playerHpFill: document.querySelector("#playerHpFill"),
+    dungeonHp: document.querySelector("#dungeonHpText"),
+    dungeonMaxHp: document.querySelector("#dungeonMaxHpText"),
+    dungeonHpFill: document.querySelector("#dungeonHpFill"),
     strength: document.querySelector("#strengthText"),
     speed: document.querySelector("#speedText"),
     dexterity: document.querySelector("#dexterityText"),
@@ -313,6 +319,8 @@
     accessory2: document.querySelector("#accessory2Text"),
     tabs: document.querySelectorAll("[data-view]"),
     townView: document.querySelector("#townView"),
+    innView: document.querySelector("#innView"),
+    jobCenterView: document.querySelector("#jobCenterView"),
     dungeonView: document.querySelector("#dungeonView"),
     homeView: document.querySelector("#homeView"),
     researchView: document.querySelector("#researchView"),
@@ -327,7 +335,6 @@
     map: document.querySelector("#map"),
     returnTown: document.querySelector("#returnTownButton"),
     wait: document.querySelector("#waitButton"),
-    materials: document.querySelector("#materialsList"),
     log: document.querySelector("#logList"),
     openLogHistory: document.querySelector("#openLogHistoryButton"),
     logHistoryCount: document.querySelector("#logHistoryCount"),
@@ -374,7 +381,6 @@
     liveLogAnnouncer: document.querySelector("#liveLogAnnouncer"),
     magicMoveControls: document.querySelector("#magicMoveControls"),
     jobSkill: document.querySelector("#jobSkillButton"),
-    shortTeleport: document.querySelector("#shortTeleportButton"),
     teleport: document.querySelector("#teleportButton"),
     timeStop: document.querySelector("#timeStopButton"),
     activeSpell: document.querySelector("#activeSpellButton"),
@@ -393,10 +399,10 @@
   let sfxPlayer = null;
   let levelUpEffectTimer = null;
   let levelUpStatTimers = [];
-  let shortTeleportArmed = false;
   let spellTargetArmed = false;
   let jobSkillTargetArmed = false;
   let homeSort = "name";
+  let selectedMonsterHeartId = null;
   let researchSort = "floor";
   let researchFilter = "seen";
   let researchQuery = "";
@@ -415,6 +421,8 @@
       adventurer: createAdventurer("human", "swordsman", "gentle"),
       meta: {
         research: {},
+        monsterHearts: {},
+        monsterHeartClaims: {},
         researchSchemaVersion: RESEARCH_SCHEMA_VERSION,
         economySchemaVersion: ECONOMY_SCHEMA_VERSION,
         progressionSchemaVersion: PROGRESSION_SCHEMA_VERSION,
@@ -431,12 +439,14 @@
         guildDonatedEquipmentIds: [],
         compendiumEquipmentUnlocked: false,
         beginnerCourseStatus: "unoffered",
+        startGuidanceShown: true,
         awaitingCreation: true,
+        junkDealerStock: [],
         shop: { soldMaterials: {}, inventory: [] },
       },
       dungeon: null,
       arena: null,
-      log: ["街の冒険者ギルドに到着した。"],
+      log: [START_GUIDANCE],
     };
   }
 
@@ -448,6 +458,7 @@
     const adventurerName = String(name || "たかし").trim().slice(0, 12) || "たかし";
     const rimuruSlimeAwakened = race.id === "slime" && adventurerName === "リムル";
     const startingMaxHp = baseStats.maxHp + (rimuruSlimeAwakened ? RIMURU_SLIME_HP_BONUS : 0);
+    const starter = starterBuildLoadout(race, job, personality);
     return {
       alive: true,
       raceId: race.id,
@@ -463,11 +474,12 @@
       floor: 1,
       deepestFloor: 1,
       inDungeon: false,
-      equipment: { weapon: "rusty_knife", upper: "cloth", lower: null, feet: null, accessory1: null, accessory2: null },
-      ownedEquipment: ["rusty_knife", "cloth"],
+      equipment: starter.equipment,
+      ownedEquipment: starter.ownedEquipment,
       discoveredArtifacts: [],
       randomArtifacts: {},
       craftedDetails: {},
+      equipmentEnhancements: {},
       gold: 0,
       guildPoints: 0,
       junkTokens: 0,
@@ -476,6 +488,7 @@
       scavengerNutrition: 0,
       temporaryDebuffs: {},
       slowTurns: 0,
+      immobilizedTurns: 0,
       intoxicationDrinks: 0,
       intoxicationTurns: 0,
       snackBuff: null,
@@ -486,6 +499,29 @@
       guard: false,
       lastAttack: null,
       debugBonuses: { strength: 0, speed: 0, dexterity: 0, durability: 0, luck: 0, acceleration: 0 },
+    };
+  }
+
+  function starterBuildLoadout(race, job, personality) {
+    const weaponByJob = {
+      swordsman: "starter_swordsman_blade", hunter: "starter_hunter_knife", archer: "starter_archer_bow",
+      mage: "starter_mage_wand", spellblade: "starter_spellblade", researcher: "starter_researcher_probe",
+      heavy: "starter_heavy_maul", tourist: "starter_tourist_camera", psychic: "starter_psychic_focus",
+      scavenger: "starter_scavenger_gauntlet", handyman: "starter_handyman_tool", priest: "starter_priest_censer",
+      ninja: "starter_ninja_kunai", flower_tamer: "starter_flower_scepter", capoeirista: null,
+    };
+    const fireVulnerable = Number(race.resistances?.fire || 0) < 0;
+    const upper = fireVulnerable ? "fire_lizard_cloak" : Number(race.stats?.durability || 0) >= 1 ? "fur_clothes" : "cloth";
+    const agilePersonalities = new Set(["quick", "hasty", "skillful", "lucky", "whimsical"]);
+    const accessory1 = agilePersonalities.has(personality.id) ? "thunder_charm"
+      : personality.id === "glutton" ? "crafted_beast_ring"
+        : "garm_fireguard";
+    const weapon = weaponByJob[job.id] ?? "rusty_knife";
+    const feet = job.id === "capoeirista" ? "starter_capoeira_wraps" : null;
+    const equippedIds = [weapon, upper, feet, accessory1].filter(Boolean);
+    return {
+      equipment: { weapon, upper, lower: null, feet, accessory1, accessory2: null },
+      ownedEquipment: [...new Set(equippedIds)],
     };
   }
 
@@ -524,6 +560,8 @@
     const legacyEconomy = Number(saved.meta.economySchemaVersion || 1) < ECONOMY_SCHEMA_VERSION;
     const legacyProgression = Number(saved.meta.progressionSchemaVersion || 1) < PROGRESSION_SCHEMA_VERSION;
     saved.meta.research = saved.meta.research || {};
+    saved.meta.monsterHearts = saved.meta.monsterHearts && typeof saved.meta.monsterHearts === "object" ? saved.meta.monsterHearts : {};
+    saved.meta.monsterHeartClaims = saved.meta.monsterHeartClaims && typeof saved.meta.monsterHeartClaims === "object" ? saved.meta.monsterHeartClaims : {};
     const legacyResearch = Number(saved.meta.researchSchemaVersion || 1) < RESEARCH_SCHEMA_VERSION;
     Object.entries(saved.meta.research).forEach(([monsterId, value]) => {
       const record = value && typeof value === "object"
@@ -540,6 +578,12 @@
       };
     });
     saved.meta.researchSchemaVersion = RESEARCH_SCHEMA_VERSION;
+    const currentMonsterIds = new Set(DATA.monsters.map((monster) => monster.id));
+    [saved.meta.research, saved.meta.monsterHearts, saved.meta.monsterHeartClaims].forEach((records) => {
+      Object.keys(records).forEach((monsterId) => {
+        if (!currentMonsterIds.has(monsterId)) delete records[monsterId];
+      });
+    });
     saved.meta.deaths = Number(saved.meta.deaths || 0);
     saved.meta.deathLog = Array.isArray(saved.meta.deathLog) ? saved.meta.deathLog : [];
     saved.meta.discoveredRecipes = Array.isArray(saved.meta.discoveredRecipes) ? saved.meta.discoveredRecipes : [];
@@ -578,6 +622,9 @@
     saved.meta.shop.inventory = Array.isArray(saved.meta.shop.inventory)
       ? [...new Set(saved.meta.shop.inventory.filter((id) => equipment[id] && !equipment[id].artifact))]
       : [];
+    saved.meta.junkDealerStock = Array.isArray(saved.meta.junkDealerStock)
+      ? [...new Set(saved.meta.junkDealerStock.filter((id) => junkDealerMaterialEligible(materials[id])))].slice(0, 12)
+      : [];
     saved.meta.guildDonatedEquipmentIds = Array.isArray(saved.meta.guildDonatedEquipmentIds)
       ? [...new Set(saved.meta.guildDonatedEquipmentIds.filter((id) => equipment[id] && !equipment[id].artifact && !PROTECTED_EQUIPMENT_IDS.has(id)))]
       : [];
@@ -605,6 +652,7 @@
     saved.adventurer.scavengerNutrition = Math.max(0, Number(saved.adventurer.scavengerNutrition || 0));
     saved.adventurer.temporaryDebuffs = saved.adventurer.temporaryDebuffs || {};
     saved.adventurer.slowTurns = Math.max(0, Number(saved.adventurer.slowTurns || 0));
+    saved.adventurer.immobilizedTurns = Math.max(0, Math.floor(Number(saved.adventurer.immobilizedTurns || 0)));
     saved.adventurer.intoxicationDrinks = Math.max(0, Math.floor(Number(saved.adventurer.intoxicationDrinks || 0)));
     saved.adventurer.intoxicationTurns = Math.max(0, Math.floor(Number(saved.adventurer.intoxicationTurns || 0)));
     if (saved.adventurer.snackBuff && typeof saved.adventurer.snackBuff === "object") {
@@ -825,6 +873,9 @@
     if (!Array.isArray(saved.adventurer.ownedEquipment)) {
       saved.adventurer.ownedEquipment = Object.values(saved.adventurer.equipment || {}).filter(Boolean);
     }
+    saved.adventurer.equipmentEnhancements = saved.adventurer.equipmentEnhancements && typeof saved.adventurer.equipmentEnhancements === "object"
+      ? saved.adventurer.equipmentEnhancements
+      : {};
     saved.adventurer.discoveredArtifacts = Array.isArray(saved.adventurer.discoveredArtifacts)
       ? [...new Set(saved.adventurer.discoveredArtifacts.filter((id) => equipment[id]?.artifact && !equipment[id].artifact.random))]
       : [];
@@ -839,6 +890,11 @@
     saved.log = (Array.isArray(saved.log) ? saved.log : ["街の冒険者ギルドに到着した。"])
       .map((line) => String(line).slice(0, 500))
       .slice(0, LOG_HISTORY_LIMIT);
+    if (saved.meta.startGuidanceShown !== true) {
+      saved.log.unshift(START_GUIDANCE);
+      saved.log = saved.log.slice(0, LOG_HISTORY_LIMIT);
+      saved.meta.startGuidanceShown = true;
+    }
     return saved;
   }
 
@@ -848,9 +904,10 @@
   }
 
   function log(text) {
-    state.log.unshift(text);
+    const seasonedText = SURREAL?.decorateLog(text, state.log.length) || text;
+    state.log.unshift(seasonedText);
     state.log = state.log.slice(0, LOG_HISTORY_LIMIT);
-    if (els.liveLogAnnouncer) els.liveLogAnnouncer.textContent = text;
+    if (els.liveLogAnnouncer) els.liveLogAnnouncer.textContent = seasonedText;
     saveGame();
     renderLog();
   }
@@ -867,11 +924,13 @@
   function switchView(view) {
     if (state.adventurer.inDungeon) view = "dungeon";
     if (view === "dungeon" && !state.adventurer.inDungeon) view = "town";
+    const enteringJunkDealer = view === "junkDealer" && currentView !== "junkDealer";
+    if (enteringJunkDealer) refreshJunkDealerStock();
     currentView = view;
-    ["town", "dungeon", "home", "research", "shop", "junkDealer", "guild", "arena"].forEach((name) => {
+    ["town", "inn", "jobCenter", "dungeon", "home", "research", "shop", "junkDealer", "guild", "arena"].forEach((name) => {
       document.querySelector(`#${name}View`).classList.toggle("hidden", name !== view);
     });
-    const activeTab = ["home", "shop", "junkDealer"].includes(view) ? "town" : view;
+    const activeTab = view;
     els.tabs.forEach((button) => {
       const active = button.dataset.view === activeTab;
       button.classList.toggle("active", active);
@@ -883,12 +942,13 @@
   }
 
   const BEGINNER_COURSE_LESSONS = Object.freeze([
-    { title: "初心者講座 1/6・生還", text: "迷宮では欲張らず、危険を感じたら帰還してください。死亡すると冒険者の資産と深度標は失われますが、調査記録や街の流通は次の冒険者へ残ります。" },
-    { title: "初心者講座 2/6・調査", text: "魔物は戦う、攻撃を受ける、剥ぎ取ることで調査が進みます。調査度が上がると能力、弱点、危険技、素材条件が順に判明します。" },
-    { title: "初心者講座 3/6・属性", text: "攻撃属性は敵の弱点と耐性で威力が変わります。装備の赤い負耐性は被害を増やしますが、同属性の免疫装備があれば負耐性を完全に塞げます。" },
-    { title: "初心者講座 4/6・装備パズル", text: "装備は攻撃力だけで選ばないでください。大きな長所には弱点があり、別部位の耐性・免疫・固有連携で穴を埋めることが重要です。自宅で変更後の合計耐性を確認できます。" },
-    { title: "初心者講座 5/6・セット装備", text: "組物は2・3・4部位で段階的に効果が発動します。四部位完成は強力ですが、固定アーティファクトを一枠入れて弱点を塞ぐ構成も有効です。" },
-    { title: "初心者講座 6/6・街の活用", text: "素材を商店へ流すと装備が入荷します。ガラクタはGにするか、ガラクタマニアの偏愛札へ換えて珍素材を狙えます。宿の酒や職業には危険な裏技も隠れています。" },
+    { title: "初心者講座 1/7・生還", text: "迷宮では欲張らず、危険を感じたら帰還してください。死亡すると装備、強化、資産、街の流通は初期化されます。ただしモンスター調査は引き継がれ、完全調査済みの心は各1個へ復活します。" },
+    { title: "初心者講座 2/7・調査", text: "魔物は戦う、攻撃を受ける、剥ぎ取ることで調査が進みます。調査度が上がると能力、弱点、危険技、素材条件が順に判明します。" },
+    { title: "初心者講座 3/7・属性", text: "攻撃属性は敵の弱点と耐性で威力が変わります。装備の赤い負耐性は被害を増やしますが、同属性の免疫装備があれば負耐性を完全に塞げます。" },
+    { title: "初心者講座 4/7・装備パズル", text: "装備は攻撃力だけで選ばないでください。大きな長所には弱点があり、別部位の耐性・免疫・固有連携で穴を埋めることが重要です。自宅で変更後の合計耐性を確認できます。" },
+    { title: "初心者講座 5/7・セット装備", text: "組物は2・3・4部位で段階的に効果が発動します。四部位完成は強力ですが、固定アーティファクトを一枠入れて弱点を塞ぐ構成も有効です。" },
+    { title: "初心者講座 6/7・モンスターの心", text: "一体の調査度を最大にすると、その魔物固有の心を一度だけ得ます。自宅で心を消費して装備を強化できますが、心を宿せるのは一つの装備につき一度だけです。強敵の心ほど基礎強化量と属性値が高く、武器には攻撃属性、防具・足・アクセサリには属性耐性が宿ります。" },
+    { title: "初心者講座 7/7・街の活用", text: "素材を商店へ流すと装備が入荷します。ガラクタはGにするか、ガラクタマニアの偏愛札へ換えて珍素材を狙えます。宿の酒や職業には危険な裏技も隠れています。" },
   ]);
 
   function offerBeginnerCourse() {
@@ -897,7 +957,7 @@
     saveGame();
     askConfirm(
       "冒険者ギルド初心者講座",
-      "受付係「初めての方へ、全6項目の初心者講座があります。受講は任意で、断っても不利益はありません。受けますか？」",
+      `受付係「初めての方へ、全${BEGINNER_COURSE_LESSONS.length}項目の初心者講座があります。受講は任意で、断っても不利益はありません。受けますか？」`,
       () => showBeginnerCourseLesson(0),
       () => {
         state.meta.beginnerCourseStatus = "declined";
@@ -912,7 +972,8 @@
     const lesson = BEGINNER_COURSE_LESSONS[index];
     if (!lesson) {
       state.meta.beginnerCourseStatus = "completed";
-      log("冒険者ギルドの初心者講座を修了した。受付係「知識より生還が大事です。ご武運を」");
+      state.adventurer.guildPoints += 1;
+      log("冒険者ギルドの初心者講座を修了し、修了報酬として1GPを得た。受付係「知識より生還が大事です。ご武運を」");
       playSfx("researchUp");
       saveGame();
       return;
@@ -941,15 +1002,19 @@
         : "街";
     const intoxicationLabel = intoxicated() ? drunkenFistActive() ? `・酔拳${adv.intoxicationTurns}` : `・酩酊${adv.intoxicationTurns}` : "";
     const snackBuffLabel = adv.snackBuff?.turns > 0 ? `・満腹${statLabel(adv.snackBuff.stat)}+${adv.snackBuff.amount}(${adv.snackBuff.turns})` : "";
+    const immobilizedLabel = adv.immobilizedTurns > 0 ? `・拘束${adv.immobilizedTurns}` : "";
     els.job.textContent = (adv.jobId === "scavenger"
       ? `${jobs[adv.jobId].name}・摂食${adv.scavengerNutrition || 0}`
       : adv.jobId === "flower_tamer" && adv.inDungeon
         ? `${jobs[adv.jobId].name}・花ペット${activeFlowerPets().length}/${flowerPetLimit()}`
-        : jobs[adv.jobId].name) + intoxicationLabel + snackBuffLabel;
+        : jobs[adv.jobId].name) + intoxicationLabel + snackBuffLabel + immobilizedLabel;
     els.race.textContent = `${personalities[adv.personalityId].name}な${races[adv.raceId].name}${adv.name}`;
     els.hp.textContent = adv.hp;
     els.maxHp.textContent = stats.maxHp;
     updateHpFill(els.playerHpFill, adv.hp, stats.maxHp);
+    els.dungeonHp.textContent = adv.hp;
+    els.dungeonMaxHp.textContent = stats.maxHp;
+    updateHpFill(els.dungeonHpFill, adv.hp, stats.maxHp);
     els.level.textContent = adv.level;
     els.level.parentElement.title = adv.level >= MAX_LEVEL ? "最大レベル" : `経験値 ${adv.experience}/${experienceToNext(adv.level)}（種族補正×${raceExperienceMultiplier().toFixed(2)}）`;
     [
@@ -977,6 +1042,8 @@
       renderDungeon();
     } else {
       renderTown();
+      renderInn();
+      renderJobCenter();
       renderHome();
       renderResearch();
       renderShop();
@@ -984,7 +1051,6 @@
       renderGuild();
       renderArena();
     }
-    renderMaterials();
     renderLog();
     renderSetupPanel();
     updateAudioScene();
@@ -1256,58 +1322,12 @@
 
   // Town and facility views.
   function renderTown() {
-    const adv = state.adventurer;
-    if (!tavernSnackMenu.length) refreshTavernSnackMenu();
-    const drinkRisk = acuteAlcoholRisk(adv.intoxicationDrinks + 1);
-    const alcoholStatus = adv.intoxicationTurns > 0
-      ? drunkenFistActive() ? `酔拳状態・残り${adv.intoxicationTurns}世界ターン` : `酩酊状態・残り${adv.intoxicationTurns}世界ターン`
-      : "しらふ";
-    const snackBuffStatus = adv.snackBuff?.turns > 0
-      ? ` / 満腹効果 ${statLabel(adv.snackBuff.stat)}+${adv.snackBuff.amount}・残り${adv.snackBuff.turns}世界ターン`
-      : "";
-    const snackButtons = tavernSnackMenu.map((snack) => (
-      `<button type="button" data-tavern-snack="${snack.id}" ${adv.gold < snack.price ? "disabled" : ""}><strong>${snack.name}</strong><small>${snack.price}G・${snack.flavor}</small></button>`
-    )).join("");
-    const jobButtons = DATA.jobs
-      .map((job) => {
-        const selected = job.id === adv.jobId ? "selected" : "";
-        const progress = adv.jobProgress?.[job.id] || { level: 1, experience: 0 };
-        return `<button type="button" class="${selected}" data-job="${job.id}">
-          <strong>${job.name} Lv${progress.level}</strong><small>${job.description}<br>装備適性: ${jobEquipmentHint(job.id)}</small>
-        </button>`;
-      })
-      .join("");
-
     els.townView.innerHTML = `
       <div class="town-grid">
-        <article class="town-card inn-card">
-          <h2>宿屋「眠り鹿」</h2>
-          <p>10Gで一晩休み、HPと一時的な能力低下を完全に回復する。酒は一杯1G。飲むたび主人から攻略話を聞けるが、飲み過ぎは命に関わる。</p>
-          <p><strong>${alcoholStatus}</strong>${snackBuffStatus} / 次の一杯の急性中毒死リスク ${Math.round(drinkRisk * 1000) / 10}%</p>
-          <div class="inline-actions"><button type="button" id="drinkInnButton" ${adv.gold < DRINK_COST ? "disabled" : ""}>1Gで一杯飲む</button>
-          <button type="button" id="restInnButton" ${adv.gold < INN_COST ? "disabled" : ""}>${INN_COST}Gで休む</button>
-          </div>
-          <h3>今夜のつまみ</h3>
-          <div class="tavern-snack-menu">${snackButtons}</div>
-        </article>
         <article class="town-card">
-          <h2>商店</h2>
-          <p>素材を流通させると装備品が入荷する。宝箱の魔法書やガラクタも買い取る。</p>
-          <button type="button" id="openShopButton">品物を売る・装備品を買う</button>
-        </article>
-        <article class="town-card junk-dealer-card">
-          <h2>ガラクタマニア「珍品偏愛堂」</h2>
-          <p>ガラクタを偏愛札へ換え、通常の市場には出ない超レア・ウルトラレア素材と交換する専門店。</p>
-          <button type="button" id="openJunkDealerButton">ガラクタを鑑定・交換する</button>
-        </article>
-        <article class="town-card">
-          <h2>転職所</h2>
-          <div class="job-grid">${jobButtons}</div>
-        </article>
-        <article class="town-card">
-          <h2>自宅</h2>
-          <p>自分の戦闘情報を確認し、装備を整え、魔法書を読んで魔法を習得する。</p>
-          <button type="button" id="openHomeButton">情報・装備・魔法書を見る</button>
+          <h2>中央広場</h2>
+          <p>施設は上の二段タブへ分散した。宿屋、商店、自宅、転職所、珍品店へ直接移動できる。</p>
+          <p>迷宮へ向かうなら「ダンジョン」、依頼と講座は「ギルド」、戦闘記録は「調査」を選ぶ。</p>
         </article>
         <article class="town-card">
           <h2>管理</h2>
@@ -1319,13 +1339,6 @@
         </article>
       </div>
     `;
-
-    document.querySelector("#restInnButton").addEventListener("click", restAtInn);
-    document.querySelector("#drinkInnButton").addEventListener("click", drinkAtInn);
-    document.querySelectorAll("[data-tavern-snack]").forEach((button) => button.addEventListener("click", () => eatTavernSnack(button.dataset.tavernSnack)));
-    document.querySelector("#openHomeButton").addEventListener("click", () => switchView("home"));
-    document.querySelector("#openShopButton").addEventListener("click", () => switchView("shop"));
-    document.querySelector("#openJunkDealerButton").addEventListener("click", () => switchView("junkDealer"));
     document.querySelector("#openDeveloperPanelButton").addEventListener("click", openDeveloperPanel);
     document.querySelector("#newAdventurerButton").addEventListener("click", () => {
       askConfirm("新しい冒険者", "調査記録を残して、現在の冒険者を作り直します。", () => {
@@ -1344,9 +1357,40 @@
         switchView("town");
       });
     });
-    document.querySelectorAll("[data-job]").forEach((button) => {
-      button.addEventListener("click", () => changeJob(button.dataset.job));
-    });
+  }
+
+  function renderInn() {
+    const adv = state.adventurer;
+    if (!tavernSnackMenu.length) refreshTavernSnackMenu();
+    const drinkRisk = acuteAlcoholRisk(adv.intoxicationDrinks + 1);
+    const alcoholStatus = adv.intoxicationTurns > 0
+      ? drunkenFistActive() ? `酔拳状態・残り${adv.intoxicationTurns}世界ターン` : `酩酊状態・残り${adv.intoxicationTurns}世界ターン`
+      : "しらふ";
+    const snackBuffStatus = adv.snackBuff?.turns > 0
+      ? ` / 満腹効果 ${statLabel(adv.snackBuff.stat)}+${adv.snackBuff.amount}・残り${adv.snackBuff.turns}世界ターン`
+      : "";
+    const snackButtons = tavernSnackMenu.map((snack) => (
+      `<button type="button" data-tavern-snack="${snack.id}" ${adv.gold < snack.price ? "disabled" : ""}><strong>${snack.name}</strong><small>${snack.price}G・${snack.flavor}</small></button>`
+    )).join("");
+    els.innView.innerHTML = `<article class="town-card inn-card"><h2>宿屋「眠り鹿」</h2>
+      <p>10Gで一晩休み、HPと一時的な能力低下を完全に回復する。酒は一杯1G。飲み過ぎは命に関わる。</p>
+      <p><strong>${alcoholStatus}</strong>${snackBuffStatus} / 次の一杯の急性中毒死リスク ${Math.round(drinkRisk * 1000) / 10}%</p>
+      <div class="inline-actions"><button type="button" id="drinkInnButton" ${adv.gold < DRINK_COST ? "disabled" : ""}>1Gで一杯飲む</button><button type="button" id="restInnButton" ${adv.gold < INN_COST ? "disabled" : ""}>${INN_COST}Gで休む</button></div>
+      <h3>今夜のつまみ</h3><div class="tavern-snack-menu">${snackButtons}</div></article>`;
+    document.querySelector("#restInnButton").addEventListener("click", restAtInn);
+    document.querySelector("#drinkInnButton").addEventListener("click", drinkAtInn);
+    document.querySelectorAll("[data-tavern-snack]").forEach((button) => button.addEventListener("click", () => eatTavernSnack(button.dataset.tavernSnack)));
+  }
+
+  function renderJobCenter() {
+    const adv = state.adventurer;
+    const jobButtons = DATA.jobs.map((job) => {
+      const selected = job.id === adv.jobId ? "selected" : "";
+      const progress = adv.jobProgress?.[job.id] || { level: 1, experience: 0 };
+      return `<button type="button" class="${selected}" data-job="${job.id}"><strong>${job.name} Lv${progress.level}</strong><small>${job.description}<br>装備適性: ${jobEquipmentHint(job.id)}</small></button>`;
+    }).join("");
+    els.jobCenterView.innerHTML = `<section class="town-card"><h2>転職所</h2><p>職業ごとのレベルと経験値は独立して保存される。</p><div class="job-grid">${jobButtons}</div></section>`;
+    document.querySelectorAll("[data-job]").forEach((button) => button.addEventListener("click", () => changeJob(button.dataset.job)));
   }
 
   function developerNumberInput(id, label, value, min, max) {
@@ -1449,6 +1493,12 @@
       return `<div class="resistance-total tier-${tier}"><span>${attr(id)}</span><strong>${value === "immune" ? "免疫" : value}</strong><i style="--tier:${tier}"></i></div>`;
     }).join("");
     const slotLabels = { weapon: "武器", upper: "上半身防具", lower: "下半身防具", feet: "足回り", accessory: "アクセサリ" };
+    const heartEntries = Object.entries(state.meta.monsterHearts || {})
+      .filter(([id, count]) => monsters[id] && Number(count) > 0)
+      .sort(([left], [right]) => monsterHeartPower(monsters[right]) - monsterHeartPower(monsters[left]) || monsters[left].name.localeCompare(monsters[right].name, "ja"));
+    if (!heartEntries.some(([id]) => id === selectedMonsterHeartId)) selectedMonsterHeartId = heartEntries[0]?.[0] || null;
+    const selectedHeart = monsters[selectedMonsterHeartId] || null;
+    const heartOptions = heartEntries.map(([id, count]) => `<option value="${id}" ${id === selectedMonsterHeartId ? "selected" : ""}>${monsters[id].name}の心 ×${count}（強化+${monsterHeartPower(monsters[id])}）</option>`).join("");
     const owned = adv.ownedEquipment.map((id) => equipment[id]).filter(Boolean);
     const ownedIds = new Set(owned.map((item) => item.id));
     const activeSetById = Object.fromEntries((stats.activeEquipmentSets || []).map((set) => [set.id, set]));
@@ -1477,14 +1527,18 @@
           : `<button type="button" data-equip="${item.id}" data-target-slot="${slot}" ${equippedSlots.length || !canJob ? "disabled" : ""}>${equippedSlots.length ? "装備中" : canJob ? "装備する" : "職業制限"}</button>`;
         const crafted = adv.craftedDetails[item.id];
         const artifact = item.artifact;
+        const enhancement = equipmentEnhancement(item.id);
+        const canHeartEnhance = Boolean(selectedHeart && !enhancement.level);
         return `<article class="equipment-card ${crafted ? "crafted-equipment" : ""} ${artifact ? "artifact-card" : ""}">
-          <strong>${crafted ? `${crafted.qualityName}・` : ""}${equipmentDisplayName(item)}${equippedSlots.length ? "（装備中）" : ""}</strong>
+          <strong>${crafted ? `${crafted.qualityName}・` : ""}${equipmentDisplayName(item)}${enhancement.level ? ` +${enhancement.total}` : ""}${equippedSlots.length ? "（装備中）" : ""}</strong>
           ${artifact ? `<span class="artifact-tier">${artifact.label}</span>` : ""}
           ${item.setId ? `<span class="equipment-set-label">組物：${equipmentSets[item.setId]?.name || item.setId}</span>` : ""}
           ${item.risque ? '<span class="risque-label">艶装備</span>' : ""}
           ${item.curse ? `<span class="cursed-label">呪われている</span>` : ""}
           <div class="equipment-actions">${buttons}</div>
           <p>${ECONOMY.equipmentStats(item)}${equipmentAttackAttributes(item).length ? ` / 攻撃属性:${formatAttackAttributes(equipmentAttackAttributes(item))}` : ""}${formatResistances(item.resistances) ? ` / 耐性:${formatResistances(item.resistances)}` : ""}</p>
+          ${enhancement.level ? `<p class="heart-enhancement">心強化済み / ${item.slot === "weapon" ? `攻撃力+${enhancement.total}` : `防御力+${enhancement.total}`} / 属性値 ${Object.entries(enhancement.attributes).map(([id, value]) => `${attrHtml(id)}+${value}`).join("・")}</p>` : ""}
+          <button type="button" data-heart-enhance="${item.id}" ${canHeartEnhance ? "" : "disabled"}>${enhancement.level ? "この装備は心強化済み" : selectedHeart ? `${selectedHeart.name}の心で+${monsterHeartPower(selectedHeart)}強化` : "モンスターの心がない"}</button>
           ${item.puzzleEffects?.length ? item.puzzleEffects.map((effect) => {
             const status = equipmentPuzzleStatus(stats, effect, adv);
             return `<p class="equipment-puzzle-effect ${status.active ? "active" : "inactive"}"><strong>${status.active ? "発動中" : "未発動"}</strong> ${effect.text}<br><small>${status.progress}</small></p>`;
@@ -1546,6 +1600,7 @@
       </section>
       <section class="inventory-section"><h2>魔法書とガラクタ</h2><p>魔法職は魔法書を読むと1冊消費して魔法を習得できる。読まずに商店へ売ることもできる。</p><div class="treasure-sell-list">${inventoryCards}</div></section>
       <section class="inventory-section"><h2>習得魔法</h2><div class="spell-list">${learnedCards}</div></section>
+      <section class="inventory-section monster-heart-workshop"><h2>モンスターの心</h2><p>調査度を最大にした魔物から一度だけ得られる。強敵の心ほど強化量が大きい。一つの装備に心を宿せるのは一度だけで、使用した心は失われる。</p>${heartEntries.length ? `<label>使用する心<select id="monsterHeartSelect">${heartOptions}</select></label>` : "<p>まだ心を所持していない。魔物を完全解析せよ。</p>"}</section>
       <section class="equipment-set-board"><div><h2>セット装備</h2><p>2・3・4部位で効果が段階的に発動する。緑色が現在発動中。</p></div><div class="equipment-set-grid">${setBoard}</div></section>
       <section class="resistance-board"><div><h2>装備中の合計耐性</h2><p>同じ属性を重ねて耐性5を作る。呪耐性はアーティファクトのペナルティも軽減する。</p></div><div class="resistance-total-grid">${resistanceBoard}</div></section><div class="equipment-sortbar"><label>並び順<select id="homeSortSelect">
       <option value="name" ${homeSort === "name" ? "selected" : ""}>名前順</option>
@@ -1563,6 +1618,13 @@
     });
     document.querySelectorAll("[data-select-spell]").forEach((button) => {
       button.addEventListener("click", () => selectActiveSpell(button.dataset.selectSpell));
+    });
+    document.querySelectorAll("[data-heart-enhance]").forEach((button) => {
+      button.addEventListener("click", () => enhanceEquipmentWithHeart(button.dataset.heartEnhance, selectedMonsterHeartId));
+    });
+    document.querySelector("#monsterHeartSelect")?.addEventListener("change", (event) => {
+      selectedMonsterHeartId = event.target.value;
+      renderHome();
     });
     document.querySelector("#saveBackstoryButton").addEventListener("click", saveBackstoryAtHome);
     document.querySelector("#regenerateBackstoryButton").addEventListener("click", () => {
@@ -1702,6 +1764,9 @@
         const rewardTag = rec.level >= 2 && monster.rewardProfile?.tag === "harvest-rich"
           ? '<span class="reward-tag harvest">剥ぎ取り豊富</span>'
           : rec.level >= 2 && monster.rewardProfile?.tag === "exp-rich" ? '<span class="reward-tag experience">経験値豊富</span>' : "";
+        const heartRecord = rec.level >= MAX_RESEARCH_LEVEL
+          ? `<p class="heart-enhancement"><strong>${monster.name}の心</strong>：基礎強化+${monsterHeartPower(monster)} / ${attrHtml(monster.attackAttribute)}属性値+${monsterHeartAttributePower(monster)} / ${Number(state.meta.monsterHearts[monster.id] || 0) > 0 ? `所持${state.meta.monsterHearts[monster.id]}個` : "取得済み・消費済み"}</p>`
+          : "";
         const dots = Array.from({ length: MAX_RESEARCH_LEVEL }, (_, index) => `<i class="research-level-dot ${index < rec.level ? "filled" : ""}"></i>`).join("");
         const open = researchFocusId === monster.id ? " open" : "";
         const graphicClasses = rec.seen
@@ -1709,7 +1774,7 @@
           : "research-monster-graphic unknown";
         return `<details class="research-card" data-research-card="${monster.id}"${open}>
           <summary><span class="${graphicClasses}" aria-hidden="true">${rec.seen ? monsterMarker(monster) : "?"}</span><span class="monster-research-title"><strong>${rec.seen ? monster.name : "未確認の魔物"}</strong><small>${rec.seen ? `${monsterSpeciesDisplay(monster, rec.level)} / ${monster.colorTierName}階級 / ` : ""}${rec.seen && monster.unique ? "ユニーク / " : ""}${rec.seen ? floorText : "出現階不明"}</small></span><span class="research-level-dots" aria-label="${researchStatusText(rec.level)}">${dots}</span><span>${rec.level}/5</span></summary>
-          <div class="research-card-details"><p><strong>${researchStatusText(rec.level)}</strong> ${rewardTag}</p>${rec.level >= 1 ? `<p class="research-stat-line"><span>基礎最大HP</span><strong>${monster.hp}</strong></p>` : ""}${rec.level >= 3 ? `<p class="research-stat-line"><span>弱点属性</span><strong>${monster.weaknesses?.length ? monster.weaknesses.map(attrHtml).join("・") : "なし"}</strong></p><p class="research-stat-line"><span>耐性属性</span><strong>${Object.keys(monster.resistances || {}).length ? formatResistances(monster.resistances) : "なし"}</strong></p>` : ""}${lines.length ? lines.join("") : "<p>まだ詳細不明。遭遇、戦闘、調査で記録が進む。</p>"}${rec.level >= 4 ? `<p>剥ぎ取り候補：${lootCandidateNames(monster).join("・") || "なし"}</p>` : ""}</div>
+          <div class="research-card-details"><p><strong>${researchStatusText(rec.level)}</strong> ${rewardTag}</p>${heartRecord}${rec.level >= 1 ? `<p class="research-stat-line"><span>基礎最大HP</span><strong>${monster.hp}</strong></p>` : ""}${rec.level >= 3 ? `<p class="research-stat-line"><span>弱点属性</span><strong>${monster.weaknesses?.length ? monster.weaknesses.map(attrHtml).join("・") : "なし"}</strong></p><p class="research-stat-line"><span>耐性属性</span><strong>${Object.keys(monster.resistances || {}).length ? formatResistances(monster.resistances) : "なし"}</strong></p>` : ""}${lines.length ? lines.join("") : "<p>まだ詳細不明。遭遇、戦闘、調査で記録が進む。</p>"}${rec.level >= 4 ? `<p>剥ぎ取り候補：${lootCandidateNames(monster).join("・") || "なし"}</p>` : ""}</div>
         </details>`;
       })
       .join("");
@@ -1849,7 +1914,7 @@
     shopPage = clamp(shopPage, 0, pageCount - 1);
     const visibleStock = stock.slice(shopPage * 24, (shopPage + 1) * 24);
     els.shopView.innerHTML = `
-      <section class="shop-wallet"><span>所持金</span><strong>${adv.gold}G</strong><small>売却実績は死亡後も街へ残る。</small></section>
+      <section class="shop-wallet"><span>所持金</span><strong>${adv.gold}G</strong><small>死亡すると売却実績と入荷状況も失う。</small></section>
       <section class="shop-section">
         <h2>素材を売る</h2>
         <div class="shop-material-list">${sellable.length ? sellable.map(([id, count]) => `
@@ -1922,14 +1987,36 @@
   }
 
   function junkMaterialCost(material) {
-    return material?.rarity === "ultra" ? 600 : 120;
+    return material?.junkDealerTier === "ultra" ? 600 : material?.junkDealerTier === "super" ? 120 : 45;
+  }
+
+  function junkDealerMaterialEligible(material) {
+    return ["refined", "super", "ultra"].includes(material?.junkDealerTier);
+  }
+
+  function shuffledCopy(values) {
+    const result = values.slice();
+    for (let index = result.length - 1; index > 0; index -= 1) {
+      const target = Math.floor(Math.random() * (index + 1));
+      [result[index], result[target]] = [result[target], result[index]];
+    }
+    return result;
+  }
+
+  function refreshJunkDealerStock() {
+    const tiers = { refined: 6, super: 4, ultra: 2 };
+    state.meta.junkDealerStock = Object.entries(tiers).flatMap(([tier, count]) => shuffledCopy(
+      DATA.materials.filter((material) => material.junkDealerTier === tier),
+    ).slice(0, count).map((material) => material.id));
+    saveGame();
   }
 
   function renderJunkDealer() {
     const adv = state.adventurer;
     const ownedJunk = (DATA.junkItems || []).filter((item) => getItemCount(item.id) > 0)
       .sort((a, b) => junkTokenValue(b) - junkTokenValue(a));
-    const rareMaterials = DATA.materials.filter((material) => ["super", "ultra"].includes(material.rarity))
+    if (!Array.isArray(state.meta.junkDealerStock) || state.meta.junkDealerStock.length !== 12) refreshJunkDealerStock();
+    const rareMaterials = state.meta.junkDealerStock.map((id) => materials[id]).filter(junkDealerMaterialEligible)
       .sort((a, b) => junkMaterialCost(a) - junkMaterialCost(b) || a.name.localeCompare(b.name, "ja"));
     els.junkDealerView.innerHTML = `
       <section class="junk-dealer-header"><div><span>ガラクタマニア</span><h2>珍品偏愛堂</h2><p>「金じゃない。用途の分からなさにこそ価値がある」</p></div><strong>偏愛札 ${adv.junkTokens}</strong></section>
@@ -1937,7 +2024,7 @@
       <section class="shop-section"><h2>ガラクタを鑑定へ出す</h2><p class="guild-guidance">商店でGに換える代わりに偏愛札へ交換する。高級品ほど査定倍率が高い。</p>
         <div class="treasure-sell-list">${ownedJunk.length ? ownedJunk.map((item) => `<article class="inventory-card"><div><strong>${item.name}</strong><small>${treasureTierLabel(item)} / 所持${getItemCount(item.id)} / 1個${junkTokenValue(item)}札</small></div><button type="button" data-appraise-junk-one="${item.id}">1個交換</button><button type="button" data-appraise-junk-all="${item.id}">全部交換</button></article>`).join("") : "<p>鑑定に出せるガラクタを持っていない。</p>"}</div>
       </section>
-      <section class="shop-section"><h2>珍素材との交換</h2><p class="guild-guidance">超レア素材は120札、ウルトラレア素材は600札。在庫は無制限だが必要札は重い。</p>
+      <section class="shop-section"><h2>本日の珍素材・12枠</h2><p class="guild-guidance">上位加工素材45札、超レア120札、ウルトラレア600札。全48種の候補から毎回来店時に6・4・2枠をランダム陳列する。店内にいる間は品揃えが変わらない。</p>
         <div class="card-list">${rareMaterials.map((material) => { const cost = junkMaterialCost(material); return `<article class="recipe-card"><h2>${material.name}</h2><p>${material.description}</p><button type="button" data-junk-material="${material.id}" ${adv.junkTokens < cost ? "disabled" : ""}>${cost}札で交換</button></article>`; }).join("")}</div>
       </section>`;
     document.querySelector("#closeJunkDealerButton")?.addEventListener("click", () => switchView("town"));
@@ -1961,7 +2048,7 @@
 
   function exchangeJunkMaterial(materialId) {
     const material = materials[materialId];
-    if (!material || !["super", "ultra"].includes(material.rarity)) return;
+    if (!junkDealerMaterialEligible(material) || !state.meta.junkDealerStock.includes(materialId)) return;
     const cost = junkMaterialCost(material);
     if (state.adventurer.junkTokens < cost) return;
     state.adventurer.junkTokens -= cost;
@@ -2470,16 +2557,9 @@
   }
 
   // Shared panels and character setup.
-  function renderMaterials() {
-    const entries = Object.entries(state.adventurer.materials).filter(([, count]) => count > 0);
-    els.materials.innerHTML = entries.length
-      ? entries.map(([id, count]) => `<div><span>${materials[id].name}</span><strong>${count}</strong></div>`).join("")
-      : `<div><span>素材なし</span><strong>0</strong></div>`;
-  }
-
   function renderLog() {
     const combatView = state.adventurer.inDungeon || (currentView === "arena" && state.arena);
-    const limit = combatView ? 14 : 8;
+    const limit = combatView ? 14 : 10;
     els.log.innerHTML = state.log.slice(0, limit).map((line) => `<p>${escapeHtml(line)}</p>`).join("");
     els.logHistoryCount.textContent = String(state.log.length);
     els.openLogHistory.disabled = state.log.length === 0;
@@ -2610,6 +2690,7 @@
     state.meta.awaitingCreation = false;
     if (selection.preserveMeta) {
       log(`新しい冒険者を登録した。${personalities[selection.personalityId].name}な${races[selection.raceId].name}${selection.name}、${jobs[selection.jobId].name}として出発する。`);
+      log(START_GUIDANCE);
     } else {
       state.log = ["冒険者の登録が完了した。"];
       saveGame();
@@ -2813,13 +2894,10 @@
     const cooldowns = teleportCooldowns();
     els.magicMoveControls.classList.remove("hidden");
     els.jobSkill.classList.remove("hidden");
-    els.shortTeleport.classList.toggle("hidden", !magicJob);
     els.teleport.classList.toggle("hidden", !magicJob);
     els.timeStop.classList.toggle("hidden", !psychicJob || state.adventurer.level < 40);
     els.activeSpell?.classList.toggle("hidden", !canCastLearnedSpell);
-    els.shortTeleport.disabled = !magicJob || cooldowns.short > 0;
     els.teleport.disabled = !magicJob || cooldowns.long > 0;
-    els.shortTeleport.textContent = cooldowns.short > 0 ? `短距離転移 ${cooldowns.short}` : shortTeleportArmed ? "方向を選択" : "短距離転移";
     els.teleport.textContent = cooldowns.long > 0 ? `テレポート ${cooldowns.long}` : "テレポート";
     els.timeStop.disabled = Number(state.dungeon.timeStopCooldown || 0) > 0;
     const healCooldown = Number(state.dungeon.healCooldown || 0);
@@ -2837,7 +2915,6 @@
       els.activeSpell.classList.toggle("selected", spellTargetArmed);
     }
     els.timeStop.textContent = state.dungeon.timeStopCooldown > 0 ? `時間停止 ${state.dungeon.timeStopCooldown}` : "時間停止";
-    els.shortTeleport.classList.toggle("selected", shortTeleportArmed);
   }
 
   function currentDungeonLightRadius() {
@@ -3140,7 +3217,6 @@
     const destination = debugOverride || destinations.includes(requestedFloor) ? requestedFloor : 1;
     spellTargetArmed = false;
     jobSkillTargetArmed = false;
-    shortTeleportArmed = false;
     state.adventurer.inDungeon = true;
     state.adventurer.floor = destination;
     state.adventurer.deepestFloor = Math.max(state.adventurer.deepestFloor || 1, destination);
@@ -3167,7 +3243,6 @@
     const deliveredBounties = state.adventurer.bountyCorpses.splice(0);
     spellTargetArmed = false;
     jobSkillTargetArmed = false;
-    shortTeleportArmed = false;
     state.meta.guildClaims.push(...deliveredBounties);
     state.adventurer.inDungeon = false;
     state.dungeon = null;
@@ -3296,7 +3371,7 @@
       if (pos && !dungeon.traps.some((trap) => trap.x === pos.x && trap.y === pos.y)) {
         dungeon.traps.push({
           ...pos,
-          type: pick(["damage", "slow", "drain"]),
+          type: pick(["damage", "slow", "drain", "bear", "teleport", "summon", "scatter"]),
           danger: rollTrapDanger(floorNumber),
           discovered: false,
           disarmed: false,
@@ -3416,38 +3491,6 @@
     return state.adventurer.inDungeon && state.dungeon && MAGIC_JOB_IDS.has(state.adventurer.jobId);
   }
 
-  function shortTeleport(dx, dy) {
-    if (!canUseTeleport()) {
-      shortTeleportArmed = false;
-      return;
-    }
-    const cooldowns = teleportCooldowns();
-    if (cooldowns.short > 0) return;
-    let destination = null;
-    for (let distance = 1; distance <= 4; distance += 1) {
-      const x = state.dungeon.player.x + dx * distance;
-      const y = state.dungeon.player.y + dy * distance;
-      if (state.dungeon.map[y]?.[x] !== "floor") break;
-      if (state.dungeon.enemies.some((enemy) => enemy.alive && enemy.x === x && enemy.y === y)) break;
-      destination = { x, y };
-    }
-    shortTeleportArmed = false;
-    if (!destination) {
-      log("短距離転移の着地点を確保できない。");
-      playSfx("bump");
-      render();
-      return;
-    }
-    state.dungeon.player = destination;
-    state.dungeon.teleportCooldowns = { ...cooldowns, short: 5 };
-    log("空間を折り畳み、4マス以内を短距離転移した。");
-    discoverSpecialRoomsAt(destination.x, destination.y);
-    playSfx("teleportShort");
-    advanceWorldIfDue();
-    saveGame();
-    render();
-  }
-
   function teleportRandomly() {
     if (!canUseTeleport()) return;
     const cooldowns = teleportCooldowns();
@@ -3459,7 +3502,6 @@
     }
     state.dungeon.player = destination;
     state.dungeon.teleportCooldowns = { ...cooldowns, long: 13 };
-    shortTeleportArmed = false;
     log("テレポートでフロア内の遠い地点へ跳んだ。");
     discoverSpecialRoomsAt(destination.x, destination.y);
     playSfx("teleportLong");
@@ -3506,12 +3548,23 @@
     if (!state.adventurer.inDungeon || !state.dungeon) return;
     [dx, dy] = capoeiraDirection(dx, dy, state.dungeon);
     [dx, dy] = intoxicatedDirection(dx, dy);
-    if (shortTeleportArmed) {
-      shortTeleport(dx, dy);
-      return;
-    }
     const nx = state.dungeon.player.x + dx;
     const ny = state.dungeon.player.y + dy;
+    if (Number(state.adventurer.immobilizedTurns || 0) > 0) {
+      const adjacentEnemy = state.dungeon.enemies.find((item) => item.alive && item.x === nx && item.y === ny);
+      if (adjacentEnemy) {
+        bumpAttack(adjacentEnemy);
+        return;
+      }
+      log(`トラバサミが脚を噛み、移動できない。拘束残り${state.adventurer.immobilizedTurns}世界ターン。`);
+      playSfx("bump");
+      advanceWorldIfDue();
+      if (state.dungeon && state.adventurer.inDungeon) {
+        saveGame();
+        render();
+      }
+      return;
+    }
     const mapSize = state.dungeon.map.length;
     const insideMap = ny >= 0 && ny < mapSize && nx >= 0 && nx < mapSize;
     const wall = insideMap && state.dungeon.map[ny][nx] === "wall";
@@ -3861,18 +3914,88 @@
       state.adventurer.experience = Math.max(0, state.adventurer.experience - drained);
       saveActiveJobProgress();
       log(`危険度${trapDangerLabel(trap)}の吸精罠が作動し、経験値を${drained}奪われた。`);
-    } else {
+    } else if (trap.type === "slow") {
       const turns = Math.max(1, Math.round((6 + danger * 2) * effectMultiplier));
       state.adventurer.slowTurns = Math.max(state.adventurer.slowTurns, turns);
       log(`危険度${trapDangerLabel(trap)}の鈍化罠が作動し、素早さが${turns}世界ターン低下した。`);
+    } else if (trap.type === "bear") {
+      const turns = Math.max(1, Math.round((2 + danger) * effectMultiplier));
+      state.adventurer.immobilizedTurns = Math.max(state.adventurer.immobilizedTurns, turns);
+      const damage = Math.max(1, Math.round((2 + danger * 2) * effectMultiplier));
+      state.adventurer.hp -= damage;
+      log(`危険度${trapDangerLabel(trap)}のトラバサミが脚へ食い込み、${damage}ダメージ。${turns}世界ターン移動不能！`);
+    } else if (trap.type === "teleport") {
+      const distance = 6 + danger * 3;
+      const destination = window.HD_DUNGEON.spawnPosition(state.dungeon, distance);
+      if (destination) {
+        state.dungeon.player = destination;
+        discoverSpecialRoomsAt(destination.x, destination.y);
+        log(`危険度${trapDangerLabel(trap)}の強制転移罠が空間を裏返し、フロア内の遠方へ放り出した！`);
+      } else log(`強制転移罠が空間を歪めたが、転移先を確保できず不発に終わった。`);
+    } else if (trap.type === "summon") {
+      const summoned = summonTrapEncirclement(danger, effectMultiplier);
+      log(`危険度${trapDangerLabel(trap)}の召喚罠が作動。周囲1マスへ${summoned}体の魔物が出現し、退路を塞いだ！`);
+    } else if (trap.type === "scatter") {
+      const scattered = scatterTrapField(danger, effectMultiplier);
+      log(`危険度${trapDangerLabel(trap)}の罠バラまき罠が弾け、フロア全域へ新たな罠を${scattered}基ばらまいた！`);
     }
     if (firstTrigger) log("罠の場所と仕組みが露出した。まだ作動可能だが、隣接すれば解除を試みられる。 ");
     if (trap.triggerCount >= 3) {
       trap.disarmed = true;
       log("仕掛けは三度目の作動で壊れ、完全に沈黙した。 ");
     }
-    playSfx(trap.type === "damage" ? "trapDamage" : trap.type === "drain" ? "trapDrain" : "trapSlow");
+    const trapSound = { damage: "trapDamage", drain: "trapDrain", slow: "trapSlow", bear: "trapDamage", teleport: "teleportLong", summon: "chaos", scatter: "anomaly" }[trap.type] || "trapSlow";
+    playSfx(trapSound);
     if (state.adventurer.hp <= 0) die("ダンジョンの罠");
+  }
+
+  function summonTrapEncirclement(danger, effectMultiplier = 1) {
+    if (!state.dungeon) return 0;
+    const floor = floorByNumber[state.adventurer.floor];
+    const center = state.dungeon.player;
+    const positions = [];
+    for (let dy = -1; dy <= 1; dy += 1) {
+      for (let dx = -1; dx <= 1; dx += 1) {
+        if (!dx && !dy) continue;
+        const x = center.x + dx;
+        const y = center.y + dy;
+        const inside = x > 0 && y > 0 && x < state.dungeon.map.length - 1 && y < state.dungeon.map.length - 1;
+        if (!inside) continue;
+        if (state.dungeon.map[y][x] === "wall") state.dungeon.map[y][x] = "floor";
+        positions.push({ x, y });
+      }
+    }
+    const targetCount = Math.min(positions.length, Math.max(1, Math.ceil(positions.length * effectMultiplier)));
+    let summoned = 0;
+    positions.slice(0, targetCount).forEach((position, index) => {
+      if (state.dungeon.enemies.some((enemy) => enemy.alive && enemy.x === position.x && enemy.y === position.y)) return;
+      const poolIndex = (danger * 3 + index + state.adventurer.floor) % floor.monsterPool.length;
+      state.dungeon.enemies.push(createEnemy(floor.monsterPool[poolIndex], position, false));
+      summoned += 1;
+    });
+    return summoned;
+  }
+
+  function scatterTrapField(danger, effectMultiplier = 1) {
+    if (!state.dungeon) return 0;
+    const targetCount = Math.max(1, Math.round((8 + danger * 5) * effectMultiplier));
+    const scatteredTypes = ["damage", "slow", "drain", "bear", "teleport", "summon"];
+    let scattered = 0;
+    for (let index = 0; index < targetCount; index += 1) {
+      const position = window.HD_DUNGEON.trapPosition(state.dungeon, { minPlayerDistance: 3, minTrapDistance: 1, protectedDistance: 1 });
+      if (!position) break;
+      state.dungeon.traps.push({
+        ...position,
+        type: scatteredTypes[(index + danger + state.adventurer.floor) % scatteredTypes.length],
+        danger: clamp(danger + (index % 5 === 0 ? 1 : index % 7 === 0 ? -1 : 0), 1, 5),
+        discovered: false,
+        disarmed: false,
+        triggerCount: 0,
+        disarmFailures: 0,
+      });
+      scattered += 1;
+    }
+    return scattered;
   }
 
   function trapDanger(trap) {
@@ -3890,7 +4013,7 @@
   function trapDisarmProfile(trap) {
     const stats = getPlayerStats();
     const dangerPenalty = (trapDanger(trap) - 1) * 0.12;
-    const typePenalty = trap?.type === "drain" ? 0.05 : trap?.type === "slow" ? 0.02 : 0;
+    const typePenalty = trap?.type === "scatter" ? 0.15 : trap?.type === "summon" ? 0.12 : trap?.type === "teleport" ? 0.08 : trap?.type === "bear" ? 0.06 : trap?.type === "drain" ? 0.05 : trap?.type === "slow" ? 0.02 : 0;
     const jobBonus = Number(TRAP_JOB_DISARM_BONUSES[state.adventurer.jobId] || 0);
     const personalityBonus = Number(TRAP_PERSONALITY_DISARM_BONUSES[state.adventurer.personalityId] || 0);
     const raceBonus = Number(TRAP_RACE_DISARM_BONUSES[state.adventurer.raceId] || 0);
@@ -4592,6 +4715,7 @@
   }
 
   function reconcileResearchCompletion(announce = false) {
+    reconcileMonsterHearts(false);
     if (state.meta.compendiumEquipmentUnlocked) {
       grantCompendiumEquipment();
       return true;
@@ -4606,6 +4730,65 @@
       playSfx("victory");
     }
     return true;
+  }
+
+  function monsterHeartPower(monster) {
+    if (!monster) return 1;
+    return clamp(1 + Math.floor(Number(monster.threatScore || monster.threatRank || 0) / 250) + (monster.unique ? 2 : 0), 1, 12);
+  }
+
+  function monsterHeartAttributePower(monster) {
+    return clamp(Math.ceil(monsterHeartPower(monster) / 3), 1, 4);
+  }
+
+  function grantMonsterHeart(monsterId, announce = false) {
+    const monster = monsters[monsterId];
+    if (!monster || state.meta.monsterHeartClaims[monsterId]) return false;
+    state.meta.monsterHeartClaims[monsterId] = true;
+    state.meta.monsterHearts[monsterId] = Number(state.meta.monsterHearts[monsterId] || 0) + 1;
+    if (announce) {
+      log(`完全解析の果てに「${monster.name}の心」を得た。強化+${monsterHeartPower(monster)}、${attr(monster.attackAttribute)}属性値+${monsterHeartAttributePower(monster)}。自宅で装備へ宿せる。`);
+      playSfx("researchUp");
+    }
+    return true;
+  }
+
+  function reconcileMonsterHearts(announce = false) {
+    DATA.monsters.forEach((monster) => {
+      if (Number(state.meta.research[monster.id]?.level || 0) >= MAX_RESEARCH_LEVEL) grantMonsterHeart(monster.id, announce);
+    });
+  }
+
+  function equipmentEnhancement(itemId) {
+    const record = state.adventurer.equipmentEnhancements?.[itemId] || {};
+    return {
+      level: Math.max(0, Math.floor(Number(record.level || 0))),
+      total: Math.max(0, Math.floor(Number(record.total || 0))),
+      attributes: record.attributes && typeof record.attributes === "object" ? record.attributes : {},
+    };
+  }
+
+  function enhanceEquipmentWithHeart(itemId, monsterId) {
+    if (state.adventurer.inDungeon) return;
+    const item = equipment[itemId];
+    const monster = monsters[monsterId];
+    const count = Number(state.meta.monsterHearts?.[monsterId] || 0);
+    if (!item || !state.adventurer.ownedEquipment.includes(itemId) || !monster || count <= 0 || equipmentEnhancement(itemId).level > 0) return;
+    const power = monsterHeartPower(monster);
+    const attributePower = monsterHeartAttributePower(monster);
+    const attribute = monster.attackAttribute || "physical";
+    const record = state.adventurer.equipmentEnhancements[itemId] || { level: 0, total: 0, attributes: {} };
+    record.level = 1;
+    record.total = Number(record.total || 0) + power;
+    record.attributes = record.attributes && typeof record.attributes === "object" ? record.attributes : {};
+    record.attributes[attribute] = Number(record.attributes[attribute] || 0) + attributePower;
+    state.adventurer.equipmentEnhancements[itemId] = record;
+    state.meta.monsterHearts[monsterId] = count - 1;
+    if (state.meta.monsterHearts[monsterId] <= 0) delete state.meta.monsterHearts[monsterId];
+    log(`${monster.name}の心を${equipmentDisplayName(item)}へ宿した。${item.slot === "weapon" ? "攻撃力" : "防御力"}+${power}、${attr(attribute)}属性値+${attributePower}。心は静かに砕けた。`);
+    playSfx("purchase");
+    saveGame();
+    render();
   }
 
   function raceExperienceMultiplier(raceId = state.adventurer.raceId) {
@@ -4893,35 +5076,48 @@
     });
   }
 
+  function resetAfterDeath(pendingDeathReview) {
+    const deaths = Number(state.meta.deaths || 0);
+    const deathLog = Array.isArray(state.meta.deathLog) ? state.meta.deathLog.slice(0, 12) : [];
+    const research = JSON.parse(JSON.stringify(state.meta.research || {}));
+    const fresh = defaultSave();
+    state.adventurer = fresh.adventurer;
+    state.meta = fresh.meta;
+    state.meta.deaths = deaths;
+    state.meta.deathLog = deathLog;
+    state.meta.research = research;
+    DATA.monsters.forEach((monster) => {
+      if (Number(research[monster.id]?.level || 0) < MAX_RESEARCH_LEVEL) return;
+      state.meta.monsterHeartClaims[monster.id] = true;
+      state.meta.monsterHearts[monster.id] = 1;
+    });
+    state.meta.pendingDeathReview = pendingDeathReview;
+    state.dungeon = null;
+    state.arena = null;
+    state.log = fresh.log;
+  }
+
   function die(reason) {
     const floor = state.adventurer.floor;
     state.meta.deaths += 1;
     state.meta.deathLog.unshift(`B${floor}F: ${reason}で死亡`);
     state.meta.deathLog = state.meta.deathLog.slice(0, 12);
-    const jobId = state.adventurer.jobId;
-    const raceId = state.adventurer.raceId;
-    const personalityId = state.adventurer.personalityId || "gentle";
     const adventurerName = state.adventurer.name || "たかし";
     const deathCry = chooseDeathCry(state.adventurer, reason);
     const deathVoice = DEATH_CRY_VOICE_TYPES[Math.floor(Math.random() * DEATH_CRY_VOICE_TYPES.length)];
     log(`${adventurerName}の断末魔：「${deathCry}」`);
-    resetAdventurerProgressionMeta();
-    state.adventurer = createAdventurer(raceId, jobId, personalityId, adventurerName);
-    state.meta.awaitingCreation = true;
-    state.dungeon = null;
-    state.arena = null;
-    log("冒険者は失われた。調査・街の流通・称号・賞金情報は残るが、資産・深度標・賞金精算回数は失われた。");
-    state.meta.pendingDeathReview = {
+    const pendingDeathReview = {
       reason: String(reason || "不明").slice(0, 160),
       cry: deathCry,
-      log: state.log.slice(0, 20),
+      log: ["冒険者は失われた。調査記録は残り、完全調査済みの心は各1個へ復活した。それ以外の進行は初期化された。", ...state.log].slice(0, 20),
     };
+    resetAfterDeath(pendingDeathReview);
     audio.musicBlocked = true;
     stopMusic();
     playSfx(deathVoice);
     currentView = "town";
     initialSetupPending = true;
-    pendingSetup = { raceId, jobId, personalityId, name: adventurerName, preserveMeta: true };
+    pendingSetup = { raceId: "human", jobId: "swordsman", personalityId: "gentle", name: "たかし", preserveMeta: true };
     saveGame();
     showDeathEffect(reason, deathCry);
   }
@@ -5040,7 +5236,8 @@
     }
     if (rimuruSlimeAwakened) STAT_KEYS.forEach((key) => { grownStats[key] += RIMURU_SLIME_STAT_BONUS; });
     const weapon = equipment[adv.equipment.weapon] || null;
-    const weaponAttributes = equipmentAttackAttributes(weapon);
+    const weaponHeartEnhancement = equipmentEnhancement(adv.equipment.weapon);
+    const weaponAttributes = [...new Set([...equipmentAttackAttributes(weapon), ...Object.keys(weaponHeartEnhancement.attributes)])];
     const stats = {
       strength: grownStats.strength,
       speed: grownStats.speed,
@@ -5061,6 +5258,7 @@
       defense: Math.max(0, job.defense + Math.floor(grownStats.durability / 2) + Math.floor((adv.level - 1) / 10)),
       attackAttribute: weaponAttributes[0] || job.baseAttackAttribute,
       attackAttributes: weaponAttributes.length ? weaponAttributes.slice() : [job.baseAttackAttribute],
+      attackAttributeValues: { ...weaponHeartEnhancement.attributes },
       resistances: Object.fromEntries(DATA.attributes.map((id) => [id, 0])),
       attackTrials: Math.max(1, Math.min(9, job.combat.attackTrials + Math.floor(grownStats.speed / 4))),
       attackMin: Math.max(1, job.combat.attackMin + Math.floor(grownStats.strength / 2) + Math.floor((adv.level - 1) / 5) + (weapon ? Math.floor((weapon.attack || 0) / 2) : 0)),
@@ -5083,8 +5281,16 @@
       stats.resistances[id] = combineResistance(stats.resistances[id], value);
     });
     equipped.forEach(({ item, crafted, slot }) => {
+      const heartEnhancement = equipmentEnhancement(item.id);
       stats.attack += item.attack || 0;
       stats.defense += item.defense || 0;
+      if (slot === "weapon") {
+        stats.attack += heartEnhancement.total;
+        stats.attackMin += Math.floor(heartEnhancement.total / 2);
+        stats.attackMax += heartEnhancement.total;
+      } else {
+        stats.defense += heartEnhancement.total;
+      }
       stats.attack += crafted?.bonusAttack || 0;
       stats.defense += crafted?.bonusDefense || 0;
       if (slot !== "weapon" && item.attack) {
@@ -5104,6 +5310,9 @@
         });
       }
       Object.entries(item.resistances || {}).forEach(([id, value]) => {
+        stats.resistances[id] = combineResistance(stats.resistances[id], value);
+      });
+      if (slot !== "weapon") Object.entries(heartEnhancement.attributes).forEach(([id, value]) => {
         stats.resistances[id] = combineResistance(stats.resistances[id], value);
       });
       Object.entries(crafted?.bonusResistances || {}).forEach(([id, value]) => {
@@ -5262,8 +5471,9 @@
     const attackTrials = mode === "skill" || spellMode
       ? Math.max(1, Math.ceil(stats.attackTrials * 0.6))
       : stats.attackTrials;
-    const attackMin = Math.max(1, Math.round(stats.attackMin * skillPower));
-    const attackMax = Math.max(attackMin, Math.round(stats.attackMax * skillPower));
+    const heartAttributePower = Math.max(0, ...attributes.map((id) => Number(stats.attackAttributeValues?.[id] || 0)));
+    const attackMin = Math.max(1, Math.round(stats.attackMin * skillPower) + heartAttributePower);
+    const attackMax = Math.max(attackMin, Math.round(stats.attackMax * skillPower) + heartAttributePower);
     const hitChance = drunkenFist ? Math.max(0.94, clamp(stats.accuracy - (enemy ? (enemy.evasion || 0) : 0), 0.1, 0.98)) : clamp((mode === "skill" || spellMode ? stats.accuracy + 0.08 : stats.accuracy) - (enemy ? (enemy.evasion || 0) : 0), 0.1, 0.98);
     const critChance = clamp(stats.critChance + (drunkenFist ? 0.12 : mode === "skill" ? 0.05 : spellMode ? 0.03 : 0), 0, drunkenFist ? 0.82 : 0.6);
     return {
@@ -5351,7 +5561,10 @@
     }
     rec.level = RESEARCH_EVIDENCE_THRESHOLDS.reduce((result, threshold, index) => rec.evidence >= threshold ? index : result, 0);
     if (!options.force && gainedEvidence > 0) spreadSpeciesResearch(monsterId, gainedEvidence);
-    if (previousLevel < MAX_RESEARCH_LEVEL && rec.level >= MAX_RESEARCH_LEVEL) reconcileResearchCompletion(true);
+    if (previousLevel < MAX_RESEARCH_LEVEL && rec.level >= MAX_RESEARCH_LEVEL) {
+      grantMonsterHeart(monsterId, true);
+      reconcileResearchCompletion(true);
+    }
   }
 
   function getResearch(monsterId) {
@@ -5795,12 +6008,15 @@
     state.dungeon.actionProgress = 0;
     const cooldowns = state.dungeon.teleportCooldowns;
     if (cooldowns) {
-      cooldowns.short = Math.max(0, Number(cooldowns.short || 0) - 1);
       cooldowns.long = Math.max(0, Number(cooldowns.long || 0) - 1);
     }
     state.dungeon.timeStopCooldown = Math.max(0, Number(state.dungeon.timeStopCooldown || 0) - 1);
     state.dungeon.healCooldown = Math.max(0, Number(state.dungeon.healCooldown || 0) - 1);
     state.adventurer.slowTurns = Math.max(0, Number(state.adventurer.slowTurns || 0) - 1);
+    if (state.adventurer.immobilizedTurns > 0) {
+      state.adventurer.immobilizedTurns -= 1;
+      if (state.adventurer.immobilizedTurns === 0) log("トラバサミの拘束を振りほどき、再び移動できるようになった。");
+    }
     tickIntoxication();
     tickSnackBuff();
     if (state.dungeon.timeStopTurns > 0) {
@@ -5828,7 +6044,8 @@
     if (!pos) return;
     let monsterId = pick(floor.monsterPool);
     let unique = false;
-    if (!state.dungeon.uniqueSpawned && floor.uniques?.length && Math.random() < 0.08) {
+    const deepUniqueReinforcementChance = Math.min(0.42, 0.08 + Math.max(0, Number(floor.floor || 1) - 40) * 0.006);
+    if (!state.dungeon.uniqueSpawned && floor.uniques?.length && Math.random() < deepUniqueReinforcementChance) {
       monsterId = pick(floor.uniques);
       unique = true;
       state.dungeon.uniqueSpawned = true;
@@ -5902,6 +6119,7 @@
   }
 
   function toggleAudio() {
+    if (state.adventurer.inDungeon || currentView === "arena") return;
     if (!audio.enabled) {
       audio.enabled = true;
       localStorage.setItem(AUDIO_KEY, "1");
@@ -5959,7 +6177,7 @@
     els.audioButton.classList.toggle("is-on", audio && audio.enabled);
     els.audioButton.setAttribute("aria-pressed", String(Boolean(audio && audio.enabled)));
     els.audioIcon.textContent = audio && audio.enabled ? "♫" : "♪";
-    els.audioText.textContent = audio && audio.enabled ? (audio.started ? "ON" : "再生") : "音楽";
+    els.audioText.textContent = audio && audio.enabled ? (audio.started ? "ON" : "再生") : "OFF";
   }
 
   function playStartupSound() {
@@ -6097,16 +6315,6 @@
     if (disarmTrap()) return;
     searchForTraps();
   });
-  els.shortTeleport.addEventListener("click", () => {
-    if (!canUseTeleport() || Number(teleportCooldowns().short || 0) > 0) return;
-    shortTeleportArmed = !shortTeleportArmed;
-    if (shortTeleportArmed) {
-      spellTargetArmed = false;
-      jobSkillTargetArmed = false;
-    }
-    log(shortTeleportArmed ? "短距離転移の方向を選べ。" : "短距離転移の詠唱をやめた。");
-    render();
-  });
   els.teleport.addEventListener("click", teleportRandomly);
   els.timeStop.addEventListener("click", stopTime);
   els.jobSkill?.addEventListener("click", () => {
@@ -6124,7 +6332,6 @@
     jobSkillTargetArmed = !jobSkillTargetArmed;
     if (jobSkillTargetArmed) {
       spellTargetArmed = false;
-      shortTeleportArmed = false;
     }
     log(jobSkillTargetArmed ? `${skill.name}を構えた。光っている射程内の敵を選べ。` : `${skill.name}を取りやめた。`);
     render();
@@ -6135,7 +6342,6 @@
     spellTargetArmed = !spellTargetArmed;
     if (spellTargetArmed) {
       jobSkillTargetArmed = false;
-      shortTeleportArmed = false;
     }
     log(spellTargetArmed ? `${spell.name}を構えた。光っている射程内の敵を選べ。` : `${spell.name}の詠唱を取りやめた。`);
     render();
