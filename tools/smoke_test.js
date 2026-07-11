@@ -92,6 +92,8 @@ assert(indexSource.includes('id="logHistoryPanel"') && indexSource.includes('ari
 assert(indexSource.includes('id="logHistoryList"') && indexSource.includes('aria-live="off"') && indexSource.includes('tabindex="0"'), "log-history focus target can announce the whole history live");
 assert(styleSource.includes(".log-history-card") && styleSource.includes(".log-history-list") && styleSource.includes("overscroll-behavior: contain"), "log-history dialog cannot scroll safely on short screens");
 assert(mainSource.includes("LOG_HISTORY_LIMIT = 60") && mainSource.includes("function openLogHistory") && mainSource.includes("function closeLogHistory"), "bounded log-history behavior is missing");
+assert(mainSource.includes("const DEVELOPER_MODE_ENABLED") && mainSource.includes("localhost|127\\.0\\.0\\.1") && mainSource.includes("if (!DEVELOPER_MODE_ENABLED) return"), "developer controls are not sealed on public hosts");
+assert(mainSource.includes("DEVELOPER_MODE_ENABLED ? '<button type=\"button\" id=\"openDeveloperPanelButton\""), "developer-panel opener is still unconditional");
 assert(mainSource.includes('id="shopCompatibilitySelect"') && mainSource.includes("!shopCompatibleOnly || item.jobs.includes(adv.jobId)"), "shop current-job compatibility filter is missing");
 assert(mainSource.includes("function equipmentRole(item)") && mainSource.includes("window.HD_EQUIPMENT_ROLES"), "internal equipment role classification is missing");
 assert(!mainSource.includes('id="shopEquipmentRoleSelect"') && !mainSource.includes('id="homeEquipmentRoleSelect"') && !styleSource.includes(".equipment-role-tag"), "internal equipment roles leaked into player-facing UI");

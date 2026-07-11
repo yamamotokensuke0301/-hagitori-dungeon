@@ -4,6 +4,8 @@
   const SAVE_KEY = "hagitori-dungeon-save-v1";
   const AUDIO_KEY = "hagitori-audio-enabled-v4";
   const APP_VERSION = "Prototype 3.4.0";
+  const DEVELOPER_MODE_ENABLED = /^(localhost|127\.0\.0\.1|\[?::1\]?)$/.test(String(window.location?.hostname || ""))
+    && /(?:^|[?&])debug=1(?:&|$)/.test(String(window.location?.search || ""));
   const MAP_SIZE_RANGE = Object.freeze([36, 60]);
   const VIEW_SIZE = 13;
   const MAX_FLOOR = 100;
@@ -1358,14 +1360,14 @@
         <article class="town-card">
           <h2>管理</h2>
           <div class="inline-actions">
-            <button type="button" id="openDeveloperPanelButton">開発者パネル</button>
+            ${DEVELOPER_MODE_ENABLED ? '<button type="button" id="openDeveloperPanelButton">開発者パネル</button>' : ""}
             <button type="button" id="newAdventurerButton">新しい冒険者</button>
             <button type="button" id="resetSaveButton">セーブ初期化</button>
           </div>
         </article>
       </div>
     `;
-    document.querySelector("#openDeveloperPanelButton").addEventListener("click", openDeveloperPanel);
+    document.querySelector("#openDeveloperPanelButton")?.addEventListener("click", openDeveloperPanel);
     document.querySelector("#newAdventurerButton").addEventListener("click", () => {
       askConfirm("新しい冒険者", "調査記録を残して、現在の冒険者を作り直します。", () => {
         openSetup({ raceId: state.adventurer.raceId, jobId: state.adventurer.jobId, personalityId: state.adventurer.personalityId, name: state.adventurer.name, preserveMeta: true });
@@ -1424,6 +1426,7 @@
   }
 
   function openDeveloperPanel() {
+    if (!DEVELOPER_MODE_ENABLED) return;
     const panel = document.querySelector("#developerPanel");
     const body = document.querySelector("#developerPanelBody");
     const adv = state.adventurer;
