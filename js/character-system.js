@@ -16,6 +16,7 @@
     handyman: ["speed", "dexterity", "luck", "strength", "durability"],
     priest: ["luck", "durability", "dexterity", "luck", "speed"],
     ninja: ["speed", "dexterity", "speed", "strength", "luck"],
+    flower_tamer: ["luck", "dexterity", "speed", "luck", "durability"],
   };
   const BACKSTORY_ORIGINS = Object.freeze({
     human: "街道沿いの小さな宿場町",

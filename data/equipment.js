@@ -3,10 +3,10 @@
   const allJobs = window.HD_DATA.jobs.map((job) => job.id);
   const bladeJobs = ["swordsman", "hunter", "archer", "spellblade", "scavenger", "handyman", "ninja"];
   const maulJobs = ["swordsman", "heavy", "researcher", "scavenger", "handyman", "priest"];
-  const toolJobs = ["hunter", "archer", "researcher", "mage", "spellblade", "tourist", "psychic", "scavenger", "handyman", "priest", "ninja"];
+  const toolJobs = ["hunter", "archer", "researcher", "mage", "spellblade", "tourist", "psychic", "scavenger", "handyman", "priest", "ninja", "flower_tamer"];
   const coatJobs = allJobs;
   const greavesJobs = ["swordsman", "heavy", "spellblade", "scavenger", "handyman", "ninja"];
-  const bootsJobs = ["hunter", "archer", "researcher", "mage", "spellblade", "tourist", "psychic", "handyman", "priest", "ninja"];
+  const bootsJobs = ["hunter", "archer", "researcher", "mage", "spellblade", "tourist", "psychic", "handyman", "priest", "ninja", "flower_tamer"];
 
   window.HD_DATA.equipment = [
     {
@@ -155,6 +155,22 @@
     { id: "thunder", name: "雷角", material: "thunder_horn", sub: "unbroken_horn", attribute: "thunder", resistance: "thunder" },
     { id: "lizard", name: "火蜥蜴", material: "fire_lizard_scale", sub: "cool_fire_gland", attribute: "water", resistance: "fire" },
     { id: "garm", name: "赤熱", material: "garm_fire_core", sub: "garm_red_pelt", attribute: "fire", resistance: "fire" },
+    { id: "slimeborn", name: "晶粘", material: "slime_gel", sub: "slime_crystal", super: "slime_super", ultra: "slime_ultra", attribute: "acid", resistance: "blunt" },
+    { id: "verminborn", name: "王牙獣", material: "vermin_hide", sub: "vermin_fang", super: "vermin_super", ultra: "vermin_ultra", attribute: "slash", resistance: "poison" },
+    { id: "insectborn", name: "節核蟲", material: "insect_shell", sub: "insect_core", super: "insect_super", ultra: "insect_ultra", attribute: "steel", resistance: "slash" },
+    { id: "wingborn", name: "風翼", material: "winged_feather", sub: "winged_pinion", super: "winged_super", ultra: "winged_ultra", attribute: "wind", resistance: "wind" },
+    { id: "scaleborn", name: "竜芽鱗", material: "reptile_scale", sub: "reptile_heart", super: "reptile_super", ultra: "reptile_ultra", attribute: "fire", resistance: "fire" },
+    { id: "spiritborn", name: "凝魂", material: "spirit_ectoplasm", sub: "spirit_gem", super: "spirit_super", ultra: "spirit_ultra", attribute: "curse", resistance: "illusion" },
+    { id: "constructborn", name: "動力造魔", material: "construct_scrap", sub: "construct_core", super: "construct_super", ultra: "construct_ultra", attribute: "steel", resistance: "steel" },
+    { id: "plantborn", name: "千年妖樹", material: "plant_fiber", sub: "plant_seed", super: "plant_super", ultra: "plant_ultra", attribute: "earth", resistance: "poison" },
+    { id: "fiendborn", name: "黒血魔侯", material: "fiend_horn", sub: "fiend_blood", super: "fiend_super", ultra: "fiend_ultra", attribute: "dark", resistance: "curse" },
+    { id: "giantborn", name: "巨神髄", material: "giant_bone", sub: "giant_marrow", super: "giant_super", ultra: "giant_ultra", attribute: "blunt", resistance: "earth" },
+    { id: "aberrantborn", name: "異界観測", material: "aberrant_tissue", sub: "aberrant_eye", super: "aberration_super", ultra: "aberration_ultra", attribute: "illusion", resistance: "dark" },
+    { id: "warriorborn", name: "歴戦芯金", material: "warrior_badge", sub: "warrior_relic", super: "warrior_super", ultra: "warrior_ultra", attribute: "slash", resistance: "steel" },
+    { id: "elfborn", name: "古樹王", material: "elf_thread", sub: "elf_dewdrop", super: "elf_super", ultra: "elf_ultra", attribute: "wind", resistance: "light" },
+    { id: "dragonborn", name: "始祖竜", material: "dragon_scale", sub: "dragon_heart", super: "dragon_super", ultra: "dragon_ultra", attribute: "fire", resistance: "steel" },
+    { id: "demonborn", name: "魔王契約", material: "demon_horn", sub: "demon_seal", super: "demon_super", ultra: "demon_ultra", attribute: "dark", resistance: "curse" },
+    { id: "angelborn", name: "原初天使", material: "angel_feather", sub: "angel_halo", super: "angel_super", ultra: "angel_ultra", attribute: "light", resistance: "light" },
   ];
   const weaponForms = [
     { id: "blade", name: "刃", jobs: bladeJobs },
@@ -184,6 +200,7 @@
         resistances: formIndex === 2 ? { [theme.resistance]: 1 } : {},
         jobs: form.jobs,
         recipe: { [theme.material]: 1 + (themeIndex > 5 ? 1 : 0), [theme.sub]: 1 },
+        rarityMaterials: theme.super ? { super: theme.super, ultra: theme.ultra } : null,
         description: `${theme.name}素材を活かした${form.name}。${window.HD_DATA.attributeLabels[formIndex === 1 ? "blunt" : theme.attribute]}属性の戦い方に向く。`,
       });
     });
@@ -198,6 +215,7 @@
         resistances: { [theme.resistance]: formIndex === 2 || themeIndex >= 8 ? 2 : 1 },
         jobs: form.jobs,
         recipe: { [theme.material]: 2 + formIndex, [theme.sub]: 1 },
+        rarityMaterials: theme.super ? { super: theme.super, ultra: theme.ultra } : null,
         description: `${theme.name}素材で仕立てた${form.name}。${window.HD_DATA.attributeLabels[theme.resistance]}耐性を備える。`,
       });
     });
@@ -212,6 +230,7 @@
         resistances: { [theme.resistance]: formIndex === 2 ? 2 : 1 },
         jobs: allJobs,
         recipe: { [theme.material]: 1 + formIndex, [theme.sub]: 1 },
+        rarityMaterials: theme.super ? { super: theme.super, ultra: theme.ultra } : null,
         description: `${theme.name}の力を封じた${form.name}。${window.HD_DATA.attributeLabels[theme.resistance]}への備えとなる。`,
       });
     });
@@ -222,11 +241,37 @@
   const grades = ["粗製", "普及", "良質", "精巧", "名工", "希少", "秘宝", "英雄", "神話"];
   const gradeShopMinimumFloors = [1, 1, 15, 25, 35, 45, 55, 70, 85];
   const resistanceAttributes = window.HD_DATA.attributes.filter((id) => !["slash", "blunt"].includes(id));
+  const equipmentEpithets = [
+    "薄明", "宵闇", "明星", "流雲", "遠雷", "白雨", "霜月", "烈日", "深緑", "蒼波", "紅蓮",
+    "銀砂", "黒鉄", "紫電", "金風", "青嵐", "幽谷", "天穹", "地脈", "星屑", "月影",
+  ];
+  const equipmentDeeds = [
+    "拓く", "駆ける", "断つ", "砕く", "守る", "鎮める", "穿つ", "照らす", "招く", "越える",
+    "隠す", "結ぶ", "祓う", "纏う", "奏でる", "映す", "巡る",
+  ];
+  function seriesEquipmentName(base, baseIndex, gradeIndex) {
+    const epithet = equipmentEpithets[(baseIndex + gradeIndex * 5) % equipmentEpithets.length];
+    const deed = equipmentDeeds[(baseIndex * 3 + gradeIndex * 7) % equipmentDeeds.length];
+    const names = [
+      `継ぎ接ぎの${base.name}「${epithet}」`,
+      `${epithet}印の${base.name}`,
+      `${epithet}を${deed}${base.name}`,
+      `工房銘・${epithet}の${base.name}`,
+      `名匠${epithet}の${base.name}`,
+      `秘境${epithet}より来たる${base.name}`,
+      `遺宝「${epithet}・${deed}${base.name}」`,
+      `英雄装・${epithet}を${deed}${base.name}`,
+      `神話装「${epithet}天命の${base.name}」`,
+    ];
+    return names[gradeIndex];
+  }
   baseCatalog.forEach((base, baseIndex) => {
     grades.forEach((grade, gradeIndex) => {
       const fallbackMaterial = materials[(baseIndex + gradeIndex) % materials.length];
       const sourceRecipe = base.recipe || { [fallbackMaterial]: 1 };
       const recipe = Object.fromEntries(Object.entries(sourceRecipe).map(([id, count]) => [id, count + gradeIndex]));
+      if (gradeIndex >= 6 && base.rarityMaterials?.super) recipe[base.rarityMaterials.super] = 1 + Math.floor((gradeIndex - 6) / 2);
+      if (gradeIndex >= 8 && base.rarityMaterials?.ultra) recipe[base.rarityMaterials.ultra] = 1;
       const resistanceBonus = gradeIndex >= 5 ? 1 : 0;
       const resistances = Object.fromEntries(Object.entries(base.resistances || {}).map(([id, value]) => [id, value === "immune" ? value : Math.min(5, value + resistanceBonus)]));
       const extraAttributes = [
@@ -243,7 +288,7 @@
       window.HD_DATA.equipment.push({
         ...base,
         id: `series_${gradeIndex + 1}_${base.id}`,
-        name: `${grade}・${base.name}`,
+        name: seriesEquipmentName(base, baseIndex, gradeIndex),
         attack: (base.attack || 0) + Math.ceil(gradeIndex / 2),
         defense: (base.defense || 0) + Math.floor(gradeIndex / 2),
         resistances,
@@ -251,7 +296,7 @@
         hpRegen: gradeIndex >= 6 && baseIndex % 19 === 0 ? 1 + Math.floor((gradeIndex - 6) / 2) : 0,
         shopMinFloor: gradeShopMinimumFloors[gradeIndex],
         recipe,
-        description: `${base.description} ${grade}等級の派生装備。`,
+        description: `${base.description} 「${equipmentEpithets[(baseIndex + gradeIndex * 5) % equipmentEpithets.length]}」の銘を持つ${grade}等級装備。`,
       });
     });
   });

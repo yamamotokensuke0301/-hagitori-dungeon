@@ -47,7 +47,7 @@
     const finalFloor = floor === 100;
     window.HD_DATA.floors.push({
       floor,
-      name: finalFloor ? "迷宮主の玉座" : `${regionNames[regionIndex]}・${floor}`,
+      name: finalFloor ? "キキルクルスの蛇宮" : `${regionNames[regionIndex]}・${floor}`,
       monsterPool: pool(floor),
       uniques: finalFloor ? ["dungeon_lord_nox"] : uniquePool(floor),
       uniqueChance: finalFloor ? 1 : Math.min(0.48, 0.24 + floor * 0.0024),

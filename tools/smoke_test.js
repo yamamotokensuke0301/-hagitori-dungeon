@@ -65,7 +65,7 @@ assert(indexSource.includes('id="logHistoryPanel"') && indexSource.includes('ari
 assert(indexSource.includes('id="logHistoryList"') && indexSource.includes('aria-live="off"') && indexSource.includes('tabindex="0"'), "log-history focus target can announce the whole history live");
 assert(styleSource.includes(".log-history-card") && styleSource.includes(".log-history-list") && styleSource.includes("overscroll-behavior: contain"), "log-history dialog cannot scroll safely on short screens");
 assert(mainSource.includes("LOG_HISTORY_LIMIT = 60") && mainSource.includes("function openLogHistory") && mainSource.includes("function closeLogHistory"), "bounded log-history behavior is missing");
-assert(mainSource.includes("[els.deathReviewPanel, els.depthPickerPanel, els.logHistoryPanel]") && mainSource.includes('event.key === "Escape"'), "log-history focus trapping or Escape close is missing");
+assert(mainSource.includes("els.deathReviewPanel, els.depthPickerPanel, els.logHistoryPanel") && mainSource.includes('event.key === "Escape"'), "log-history focus trapping or Escape close is missing");
 assert(mainSource.includes('id="arenaSkillButton"'), "arena job skill control is missing");
 assert(mainSource.includes("enemy.unique ? [3, 5]") && mainSource.includes(": [1, 2]"), "harvest count ranges are missing");
 assert(!mainSource.includes("残り${corpse.harvestsRemaining}回"), "harvest count is exposed to the player");
@@ -158,8 +158,8 @@ assert(lazyBackstory === window.HD_CHARACTER.generateBackstory({
 }), "backstory generation is not deterministic");
 assert(lazyBackstory.includes("ねむり丸") && lazyBackstory.includes("昼寝と遠回り"), "lazy backstory traits were lost during extraction");
 
-assert(window.HD_DATA.monsters.length === 957, "monster count changed");
-assert(window.HD_DATA.equipment.length === 1267, "equipment count changed");
+assert(window.HD_DATA.monsters.length === 985, "monster count changed");
+assert(window.HD_DATA.equipment.length === 2707, "equipment count changed");
 assert(window.HD_DATA.equipment.every((item) => Array.isArray(item.attackAttributes)), "equipment attackAttributes were not normalized");
 assert(window.HD_DATA.equipment.some((item) => item.attackAttributes.length >= 2), "multi-attribute equipment is missing");
 const chestArtifacts = window.HD_DATA.equipment.filter((item) => item.artifact?.chestOnly);
@@ -180,13 +180,14 @@ assert(window.HD_DATA.personalities.some((item) => item.id === "ordinary" && ite
 assert(window.HD_DATA.personalities.some((item) => item.id === "lewd" && item.name === "すけべ"), "lewd personality is missing");
 assert(window.HD_DATA.personalities.some((item) => item.id === "lazy" && item.name === "なまけもの"), "lazy personality is missing");
 assert(window.HD_DATA.personalities.every((item) => Object.values(item.stats).reduce((sum, value) => sum + value, 0) === 1), "personality starting-stat budget changed");
-assert(window.HD_DATA.jobs.length === 13, "job roster must contain 13 jobs");
+assert(window.HD_DATA.jobs.length === 14, "job roster must contain 14 jobs");
+assert(window.HD_DATA.jobs.some((job) => job.id === "flower_tamer" && job.skill.tag === "flower_command"), "flower tamer job is missing");
 const ninjaJob = window.HD_DATA.jobs.find((job) => job.id === "ninja" && job.name === "忍者");
 assert(ninjaJob?.acceleration === 30 && ninjaJob.accelerationGrowthEvery === 3 && ninjaJob.stats.speed === 8 && ninjaJob.rangedRange === 5, "ninja strongest-class profile is invalid");
 assert(window.HD_DATA.equipment.find((item) => item.id === "rusty_knife").jobs.includes("ninja") && window.HD_DATA.equipment.find((item) => item.id === "cloth").jobs.includes("ninja"), "ninja cannot use starter equipment");
 assert(["iron_sword", "crafted_beast_tool", "carapace_armor", "ward_fire_stride"].every((id) => window.HD_DATA.equipment.find((item) => item.id === id)?.jobs.includes("ninja")), "ninja regular blade/tool/leg/foot equipment compatibility is incomplete");
 assert(window.HD_DATA.floors.slice(0, 99).every((floor) => floor.stairRange[0] === 4 && floor.stairRange[1] === 6), "normal stair count was not increased to 4-6");
-assert(window.HD_DATA.junkItems.length === 15, "junk catalog count changed");
+assert(window.HD_DATA.junkItems.length === 55, "junk catalog count changed");
 assert(new Set(window.HD_DATA.monsters.map((monster) => monster.id)).size === window.HD_DATA.monsters.length, "monster id collision");
 assert(new Set(window.HD_DATA.monsters.filter((monster) => monster.unique).map((monster) => monster.name)).size === 580, "unique monster name collision");
 assert(window.HD_DATA.monsters.every((monster) => window.HD_DATA.attributes.includes(monster.attackAttribute)), "monster has an invalid attack attribute");
@@ -215,11 +216,8 @@ const expansionUniques = dungeonUniques.filter((monster) => monster.dungeonExpan
 const summoningUniques = dungeonUniques.filter((monster) => monster.summon);
 assert(uniqueMonsters.length === 580, "unique monster count changed");
 assert(arenaMonsters.length === 192, "arena roster must contain 192 uniques");
-assert(new Set(arenaMonsters.map((monster) => monster.mapMarker)).size === arenaMonsters.length, "arena kana markers are not unique");
-assert(arenaMonsters.every((monster) => /^[\u3041-\u3096\u30a1-\u30fa\u31f0-\u31ff]$/u.test(monster.mapMarker)), "arena monster marker is not one kana character");
-assert(arenaMonsters.slice(0, 90).every((monster) => /^[\u30a1-\u30fa]$/u.test(monster.mapMarker)), "katakana was not used before hiragana");
-assert(arenaMonsters.slice(90, 176).every((monster) => /^[\u3041-\u3096]$/u.test(monster.mapMarker)), "hiragana fallback range is invalid");
-assert(new Set(arenaMonsters.map((monster) => `${monster.mapMarker}:${monster.arenaMarkerFamilyHue}`)).size === arenaMonsters.length, "arena katakana/color identities are not unique");
+assert(arenaMonsters.every((monster) => typeof monster.speciesGlyph === "string" && [...monster.speciesGlyph].length === 1), "arena species marker is not one character");
+assert(window.HD_DATA.monsters.every((monster) => window.HD_DATA.monsters.filter((peer) => peer.speciesId === monster.speciesId).every((peer) => peer.speciesGlyph === monster.speciesGlyph)), "species marker is not consistent");
 assert(arenaMonsters.every((monster) => Number.isFinite(monster.arenaMarkerHue) && Number.isFinite(monster.arenaMarkerAccentHue)), "arena marker color is missing");
 assert(dungeonUniques.length === 388, "dungeon roster must contain 388 uniques");
 assert(transferredUniques.length === 150, "150 arena uniques were not transferred");
@@ -576,7 +574,11 @@ const viewTabs = ["town", "dungeon", "research", "guild", "arena"].map((view) =>
 var document = {
   listeners: {},
   querySelector(selector) {
-    if (!elements.has(selector)) elements.set(selector, new FakeElement());
+    if (!elements.has(selector)) {
+      const element = new FakeElement();
+      if (selector === "#developerPanel") element.classList.add("hidden");
+      elements.set(selector, element);
+    }
     return elements.get(selector);
   },
   querySelectorAll(selector) {
@@ -889,7 +891,7 @@ assert(!appShell.classList.contains("town-mode"), "town mode remained active dur
 assert(arenaHtml.includes("arena-floor-line"), "compact arena header is missing");
 assert(arenaHtml.includes("arena-move-pad"), "arena movement pad is missing");
 assert(arenaHtml.includes("第1戦 / 192"), "reduced arena battle count is not shown");
-assert(arenaHtml.includes(">レ</button>"), "katakana arena monster marker is not rendered");
+assert(arenaHtml.includes(`>${arenaMonsters[0].speciesGlyph}</button>`), "arena species marker is not rendered");
 assert(arenaHtml.includes("--arena-marker-hue:"), "arena marker attribute color is not rendered");
 assert(arenaHtml.includes("--arena-marker-family-hue:"), "arena marker title color is not rendered");
 assert(!arenaHtml.includes("arena-actions"), "arena action button still overlaps the log");
@@ -1646,7 +1648,7 @@ Math.random = function () { return 0; };
 eval(read("js/main.js"));
 elements.get("#waitButton").listeners.click();
 Math.random = selfDestructOriginalRandom;
-assert(persistedOneTrialSave.log.some((line) => line.includes("の攻撃。1回試行")), "enemy normal attack did not use exactly one trial");
+assert(persistedOneTrialSave.log.some((line) => line.includes("の攻撃（") && line.includes("。1回試行")), "enemy normal attack did not use exactly one trial");
 
 const telegraphStopSave = clone(corpseSave);
 const telegraphStopEnemy = clone(window.HD_DATA.monsters.find((monster) => monster.id === "cave_rat"));
@@ -2130,7 +2132,7 @@ elements.get("#jobSkillButton").listeners.click();
 elements.get("#map").listeners.click({ target: { closest() { return { dataset: { enemyX: "13", enemyY: "10" } }; } } });
 Math.random = originalRandom;
 assert(persistedJobSkillSave.adventurer.lastAttack.skill === "precise", "dungeon job skill did not enter combat");
-assert(persistedJobSkillSave.dungeon.enemies[0].lootMaterialId === "fine_pelt", "skill-specific loot lost priority to attack attribute loot");
+assert(persistedJobSkillSave.dungeon.enemies[0].lootMaterialId === "vermin_fang", "species rare loot lost priority to attack attribute loot");
 assert(persistedJobSkillSave.dungeon.turnsElapsed === 1, "a killing job skill did not consume an action");
 
 const spellCastSave = clone(rangedSave);
@@ -2282,7 +2284,7 @@ assert(persistedCompleteSave?.meta?.compendiumEquipmentUnlocked, "complete compe
 assert(persistedCompleteSave.meta.titles.includes("万象の記録者"), "complete compendium title was not awarded");
 assert(persistedCompleteSave.adventurer.ownedEquipment.includes("omniscient_archive"), "complete compendium equipment was not awarded");
 viewTabs.find((tab) => tab.dataset.view === "research").listeners.click();
-assert(elements.get("#researchView").innerHTML.includes("957 / 957"), "complete compendium progress is not shown");
+assert(elements.get("#researchView").innerHTML.includes("985 / 985"), "complete compendium progress is not shown");
 assert(elements.get("#researchView").innerHTML.includes("報酬受領済み"), "complete compendium reward status is not shown");
 viewTabs.find((tab) => tab.dataset.view === "guild").listeners.click();
 assert(!elements.get("#guildView").innerHTML.includes('data-guild-donate="omniscient_archive"'), "complete compendium reward can be donated");

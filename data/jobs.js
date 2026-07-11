@@ -145,5 +145,13 @@
       skill: { id: "shadow_assassination", name: "影縫い暗殺", attribute: "dark", power: 2.2, tag: "precise" },
       description: "最強格の高速職。射程5の忍具、初期加速度+30、3レベルごとの加速度成長で圧倒的な手数を得る。",
     },
+    {
+      id: "flower_tamer", name: "お花使い", hp: 27, attack: 3, defense: 1,
+      baseAttackAttribute: "poison", rangedRange: 4,
+      stats: { strength: -2, speed: 1, dexterity: 3, durability: -1, luck: 5 },
+      combat: { attackTrials: 3, attackMin: 2, attackMax: 7, accuracy: 0.81, evasion: 0.06, crit: 0.08 },
+      skill: { id: "full_bloom_command", name: "満開の花印", attribute: "poison", power: 0.8, tag: "flower_command" },
+      description: "射程4。攻撃で花印を植え、確率で生きた魔物を使い捨ての花ペットへ変える特殊使役職。本人の戦闘力は低い。",
+    },
   ];
 })();

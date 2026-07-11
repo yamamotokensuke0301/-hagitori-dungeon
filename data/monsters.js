@@ -416,8 +416,9 @@
     const isFinal = floor === 100;
     window.HD_DATA.monsters.push({
       id: isFinal ? "dungeon_lord_nox" : `abyss_unique_${floor}`,
-      name: isFinal ? "迷宮主ノクス" : `${abyssUniqueTitles[index]}の${["アギト", "ネブラ", "オルム", "ゼノ", "ミラ"][index % 5]}`,
-      glyph: "王", mapMarker: isFinal ? "ノ" : "ユ", floors: [floor], unique: true,
+      name: isFinal ? "太古からの闇キキルクルス" : `${abyssUniqueTitles[index]}の${["アギト", "ネブラ", "オルム", "ゼノ", "ミラ"][index % 5]}`,
+      glyph: isFinal ? "闇" : "王", mapMarker: isFinal ? "闇" : "ユ", floors: [floor], unique: true,
+      forcedSpeciesId: isFinal ? "reptile" : null,
       hp: 180 + floor * 13,
       attack: 18 + Math.floor(floor * 0.9),
       defense: 9 + Math.floor(floor * 0.24),
@@ -428,9 +429,9 @@
       dangerous: { every: 2, telegraph: `${isFinal ? "迷宮そのもの" : "ユニーク個体"}が${window.HD_DATA.attributeLabels[secondary]}の奥義を構えた。`, name: `${window.HD_DATA.attributeLabels[secondary]}終極`, attribute: secondary, power: 55 + floor * 2 },
       loot: [{ condition: "default", material: "garm_red_pelt" }, { condition: { lastAttribute: weakness }, material: "garm_fire_core" }],
       research: {
-        1: `B${floor}F級ユニーク。${window.HD_DATA.attributeLabels[primary]}属性の通常攻撃を持つ。`,
-        2: `危険技は${window.HD_DATA.attributeLabels[secondary]}。弱点は${window.HD_DATA.attributeLabels[weakness]}。複合耐性が必須。`,
-        3: `${window.HD_DATA.attributeLabels[weakness]}属性での討伐が希少核の条件。`,
+        1: isFinal ? "百層の最奥に横たわる、輪郭さえ定まらない太古の闇。迷宮全体が呼吸するように脈動している。" : `B${floor}F級ユニーク。${window.HD_DATA.attributeLabels[primary]}属性の通常攻撃を持つ。`,
+        2: isFinal ? `追加観測により、闇の正体は迷宮を埋め尽くすほど巨大な蛇と判明した。${window.HD_DATA.attributeLabels[primary]}と${window.HD_DATA.attributeLabels[secondary]}を吐息として操り、弱点は${window.HD_DATA.attributeLabels[weakness]}。` : `危険技は${window.HD_DATA.attributeLabels[secondary]}。弱点は${window.HD_DATA.attributeLabels[weakness]}。複合耐性が必須。`,
+        3: isFinal ? `キキルクルスの蛇鱗は百層分の闇を吸っている。${window.HD_DATA.attributeLabels[weakness]}属性だけが心核へ届く。` : `${window.HD_DATA.attributeLabels[weakness]}属性での討伐が希少核の条件。`,
       },
     });
   }
@@ -685,7 +686,192 @@
     illusion: ["夢路を惑わす", "鏡界に棲む", "真実を嘲る"], slash: ["一閃に葬る", "血月を描く", "刃境を越えた"],
     blunt: ["城門を粉にする", "轟音を従える", "骨鐘を鳴らす"],
   };
+  // 最深層に棲む四つの最上位種族。各種族に白〜虹の七階級を一体ずつ置く。
+  const apexMonsterSpecies = [
+    {
+      id: "elf", speciesName: "エルフ族", glyph: "森", rank: 11, floorStart: 64,
+      names: ["木陰の斥候", "蒼葉の弓手", "翠環のドルイド", "黄金樹の番人", "紅森の狩猟者", "紫苑の森導師", "万華樹の長老"],
+      primary: "wind", secondary: "light", weakness: "fire", hp: 610, attack: 58, defense: 17, acceleration: 17,
+      materials: ["fine_pelt", "unbroken_horn"],
+    },
+    {
+      id: "dragon", speciesName: "ドラゴン族", glyph: "竜", rank: 13, floorStart: 76,
+      names: ["白鱗の幼竜", "蒼海の飛竜", "翠嵐の地竜", "黄金雷竜", "紅蓮古竜", "紫冥の邪竜", "虹天の始祖竜"],
+      primary: "fire", secondary: "steel", weakness: "ice", hp: 940, attack: 78, defense: 30, acceleration: 14,
+      materials: ["fire_lizard_scale", "garm_fire_core"],
+    },
+    {
+      id: "demon", speciesName: "悪魔族", glyph: "悪", rank: 14, floorStart: 79,
+      names: ["白契の小悪魔", "蒼欲の誘惑者", "翠毒の魔侯", "黄金瞳の契約卿", "紅獄の処刑魔", "紫冥の大公", "虹界の魔王"],
+      primary: "dark", secondary: "curse", weakness: "light", hp: 860, attack: 84, defense: 25, acceleration: 21,
+      materials: ["garm_red_pelt", "garm_fire_core"],
+    },
+    {
+      id: "angel", speciesName: "天使族", glyph: "天", rank: 15, floorStart: 82,
+      names: ["白羽の使徒", "蒼穹の奏使", "翠風の守護天使", "黄金輪の審判者", "紅涙の戦天使", "紫星の熾天使", "虹冠の原初天使"],
+      primary: "light", secondary: "thunder", weakness: "dark", hp: 900, attack: 88, defense: 28, acceleration: 24,
+      materials: ["fine_pelt", "garm_fire_core"],
+    },
+  ];
+  apexMonsterSpecies.forEach((species, speciesIndex) => {
+    species.names.forEach((name, colorIndex) => {
+      const floor = Math.min(100, species.floorStart + colorIndex * 3);
+      window.HD_DATA.monsters.push({
+        id: `apex_${species.id}_${colorIndex + 1}`,
+        name,
+        glyph: species.glyph,
+        mapMarker: species.glyph,
+        floors: [floor],
+        forcedSpeciesId: species.id,
+        forcedColorTierIndex: colorIndex,
+        hp: species.hp,
+        attack: species.attack,
+        defense: species.defense,
+        acceleration: species.acceleration + colorIndex,
+        attackAttribute: species.primary,
+        weaknesses: [species.weakness],
+        resistances: {
+          [species.primary]: Math.min(5, 3 + Math.floor(colorIndex / 2)),
+          [species.secondary]: Math.min(5, 2 + Math.floor(colorIndex / 2)),
+        },
+        dangerous: {
+          every: colorIndex >= 4 ? 2 : 3,
+          telegraph: `${name}が${window.HD_DATA.attributeLabels[species.secondary]}の上位術式を展開した。`,
+          name: `${species.speciesName}の${window.HD_DATA.attributeLabels[species.secondary]}天威`,
+          attribute: species.secondary,
+          power: 150 + speciesIndex * 15 + colorIndex * 12,
+        },
+        loot: [
+          { condition: "default", material: species.materials[0] },
+          { condition: { lastAttribute: species.weakness }, material: species.materials[1] },
+        ],
+        research: {
+          1: `B${floor}Fに現れる${species.speciesName}の${["白", "青", "緑", "黄", "赤", "紫", "虹"][colorIndex]}階級。`,
+          2: `${window.HD_DATA.attributeLabels[species.primary]}と${window.HD_DATA.attributeLabels[species.secondary]}を操り、${window.HD_DATA.attributeLabels[species.weakness]}を弱点とする。`,
+          3: `${window.HD_DATA.attributeLabels[species.weakness]}で仕留めると最上位素材を傷付けず回収できる。`,
+        },
+      });
+    });
+  });
+
   const uniqueEpithetTails = ["異境の王", "帰らずの災禍", "迷宮の古き傷", "屍山の覇者", "忘れられた神敵", "深層の凶兆", "黄泉路の番人"];
+
+  // 全モンスターを「種族の基礎格＋色階級」で読める共通則へ載せる。
+  // 種族格が1上がるごとに100点、色は25点刻みなので、弱い種族の赤(+100)と
+  // 一段強い種族の白(+0)が同じ脅威帯になる。色内は個体能力で0〜24.9を加える。
+  const monsterColorTiers = [
+    { id: "white", name: "白", multiplier: 1 },
+    { id: "blue", name: "青", multiplier: 1.04 },
+    { id: "green", name: "緑", multiplier: 1.08 },
+    { id: "yellow", name: "黄", multiplier: 1.12 },
+    { id: "red", name: "赤", multiplier: 1.16 },
+    { id: "purple", name: "紫", multiplier: 1.2 },
+    { id: "rainbow", name: "虹", multiplier: 1.24 },
+  ];
+  const monsterSpecies = [
+    { id: "slime", name: "粘体族", glyph: "粘", rank: 0, pattern: /スライム|粘|ゼリー|泥雫|酸液|黒油/ },
+    { id: "vermin", name: "小獣族", glyph: "獣", rank: 1, pattern: /鼠|ネズミ|兎|ウサギ|鼬|狐|犬|狼|獣|ガルム/ },
+    { id: "insect", name: "蟲族", glyph: "蟲", rank: 2, pattern: /虫|蟲|蟹|百足|蠍|蜘蛛|蛾|甲|殻|コガネ/ },
+    { id: "winged", name: "翼獣族", glyph: "翼", rank: 3, pattern: /蝙蝠|翼|羽|烏|梟|鳥|ハネ/ },
+    { id: "reptile", name: "鱗族", glyph: "鱗", rank: 4, pattern: /蜥蜴|蛇|竜|龍|ヤモリ|蛙|亀/ },
+    { id: "spirit", name: "霊族", glyph: "霊", rank: 5, pattern: /霊|魂|火花精|雫精|砂塵精|風切精|氷晶精|雷雲精|迷い火|チビヒカリ/ },
+    { id: "construct", name: "造魔族", glyph: "造", rank: 6, pattern: /像|土偶|歯車|番人|巨像|鎧|騎士|鋼匠|時計/ },
+    { id: "plant", name: "妖植族", glyph: "植", rank: 7, pattern: /花|華|茸|キノコ|苔|庭|樹|根|ワタボコリ/ },
+    { id: "fiend", name: "魔族", glyph: "魔", rank: 8, pattern: /魔|鬼|妃|王子|道化|魔女|悪魔|アザゼル/ },
+    { id: "giant", name: "巨人族", glyph: "巨", rank: 9, pattern: /巨|翁|山|城|壁|神|主/ },
+    { id: "aberration", name: "異形族", glyph: "異", rank: 10, pattern: /眼|面|影|夢|深淵|奈落|心臓|合唱|冥府/ },
+    { id: "warrior", name: "戦人族", glyph: "武", rank: 11, pattern: /剣|武|闘|騎|兵|狩|盗|書記|料理人/ },
+    { id: "elf", name: "エルフ族", glyph: "森", rank: 11, pattern: /エルフ|森導師|ドルイド/ },
+    { id: "dragon", name: "ドラゴン族", glyph: "竜", rank: 13, pattern: /ドラゴン|古竜|始祖竜|飛竜|地竜|雷竜|邪竜/ },
+    { id: "demon", name: "悪魔族", glyph: "悪", rank: 14, pattern: /悪魔|魔侯|契約卿|処刑魔|大公|魔王/ },
+    { id: "angel", name: "天使族", glyph: "天", rank: 15, pattern: /天使|使徒|奏使|審判者/ },
+  ];
+  const stratumNames = ["浅層", "洞層", "岩層", "鉄層", "魔層", "冥層", "獄層", "星層", "神層", "深淵"];
+  const speciesLootMaterials = {
+    slime: ["slime_gel", "slime_crystal", "slime_super", "slime_ultra"],
+    vermin: ["vermin_hide", "vermin_fang", "vermin_super", "vermin_ultra"],
+    insect: ["insect_shell", "insect_core", "insect_super", "insect_ultra"],
+    winged: ["winged_feather", "winged_pinion", "winged_super", "winged_ultra"],
+    reptile: ["reptile_scale", "reptile_heart", "reptile_super", "reptile_ultra"],
+    spirit: ["spirit_ectoplasm", "spirit_gem", "spirit_super", "spirit_ultra"],
+    construct: ["construct_scrap", "construct_core", "construct_super", "construct_ultra"],
+    plant: ["plant_fiber", "plant_seed", "plant_super", "plant_ultra"],
+    fiend: ["fiend_horn", "fiend_blood", "fiend_super", "fiend_ultra"],
+    giant: ["giant_bone", "giant_marrow", "giant_super", "giant_ultra"],
+    aberration: ["aberrant_tissue", "aberrant_eye", "aberration_super", "aberration_ultra"],
+    warrior: ["warrior_badge", "warrior_relic", "warrior_super", "warrior_ultra"],
+    elf: ["elf_thread", "elf_dewdrop", "elf_super", "elf_ultra"],
+    dragon: ["dragon_scale", "dragon_heart", "dragon_super", "dragon_ultra"],
+    demon: ["demon_horn", "demon_seal", "demon_super", "demon_ultra"],
+    angel: ["angel_feather", "angel_halo", "angel_super", "angel_ultra"],
+  };
+  const bespokeLootMonsterIds = new Set(["cave_rat", "poison_bat", "thunder_hare", "fire_lizard", "red_garm"]);
+
+  function classifyMonster(monster, index) {
+    const text = `${monster.id} ${monster.name} ${monster.glyph || ""}`;
+    const apexSpeciesIds = new Set(["elf", "dragon", "demon", "angel"]);
+    const fallbackSpecies = monsterSpecies.filter((entry) => !apexSpeciesIds.has(entry.id));
+    const species = monsterSpecies.find((entry) => entry.id === monster.forcedSpeciesId)
+      || monsterSpecies.find((entry) => entry.pattern.test(text))
+      || fallbackSpecies[(index + window.HD_DATA.attributes.indexOf(monster.attackAttribute)) % fallbackSpecies.length];
+    const nativeFloor = monster.arenaOnly
+      ? 1 + Math.floor((Number(monster.arenaRank || 1) - 1) * 99 / 191)
+      : Math.max(1, Math.min(...(monster.floors?.length ? monster.floors : [1])));
+    const stratum = Math.min(9, Math.floor((nativeFloor - 1) / 10));
+    const withinStratum = (nativeFloor - 1) % 10;
+    const colorIndex = Number.isInteger(monster.forcedColorTierIndex)
+      ? Math.max(0, Math.min(6, monster.forcedColorTierIndex))
+      : Math.min(6, Math.round((withinStratum / 9) * 6) + (monster.unique ? 1 : 0));
+    const color = monsterColorTiers[colorIndex];
+    monster.speciesId = species.id;
+    monster.speciesName = `${stratumNames[stratum]}${species.name}`;
+    monster.speciesGlyph = species.glyph;
+    monster.speciesRank = species.rank;
+    monster.stratumRank = stratum;
+    monster.colorTier = color.id;
+    monster.colorTierName = color.name;
+    monster.colorTierIndex = colorIndex;
+    monster.threatRank = monster.speciesRank * 4 + colorIndex;
+    const speciesMaterials = speciesLootMaterials[species.id];
+    if (speciesMaterials) monster.exceptionalLoot = { super: speciesMaterials[2], ultra: speciesMaterials[3] };
+    if (speciesMaterials && !bespokeLootMonsterIds.has(monster.id)) {
+      const weakness = monster.weaknesses?.[0];
+      monster.loot = [
+        { condition: "default", material: speciesMaterials[0] },
+        ...(weakness ? [{ condition: { lastAttribute: weakness }, material: speciesMaterials[1] }] : []),
+        { condition: { lastSkill: "precise" }, material: speciesMaterials[1] },
+      ];
+    }
+    monster.hp = Math.max(1, Math.round(monster.hp * color.multiplier));
+    monster.attack = Math.max(1, Math.round(monster.attack * color.multiplier));
+    monster.defense = Math.max(0, Math.round(monster.defense * color.multiplier));
+    if (monster.dangerous) monster.dangerous.power = Math.max(1, Math.round(monster.dangerous.power * color.multiplier));
+  }
+
+  window.HD_DATA.monsters.forEach(classifyMonster);
+  const threatColorPoints = [0, 25, 50, 75, 100, 125, 150];
+  const threatGroups = new Map();
+  window.HD_DATA.monsters.forEach((monster) => {
+    const key = `${monster.speciesId}:${monster.stratumRank}:${monster.colorTierIndex}`;
+    if (!threatGroups.has(key)) threatGroups.set(key, []);
+    threatGroups.get(key).push(monster);
+  });
+  threatGroups.forEach((group) => {
+    group.sort((left, right) => {
+      const combatPower = (monster) => Number(monster.hp || 0) * 0.12
+        + Number(monster.attack || 0) * 3
+        + Number(monster.defense || 0) * 2.4
+        + Number(monster.acceleration || 0) * 1.8
+        + Number(monster.dangerous?.power || 0) * 0.7
+        + (monster.unique ? 20 : 0);
+      return combatPower(left) - combatPower(right) || left.id.localeCompare(right.id);
+    });
+    group.forEach((monster, index) => {
+      const detail = group.length === 1 ? 12.5 : (index / (group.length - 1)) * 24.9;
+      monster.threatScore = Number((monster.speciesRank * 100 + monster.stratumRank * 150 + threatColorPoints[monster.colorTierIndex] + detail).toFixed(1));
+    });
+  });
+  window.HD_DATA.monsterColorTiers = monsterColorTiers;
 
   function addUniqueEpithet(monster, index) {
     const hash = [...monster.id].reduce((sum, char) => sum + char.charCodeAt(0), index);
@@ -701,7 +887,7 @@
       `${monster.baseName}〈${phrase}〉`,
       `【${phrase}】${monster.baseName}`,
     ];
-    monster.name = monster.id === "dungeon_lord_nox" ? "《百層を夢見る迷宮そのもの》迷宮主ノクス" : formats[hash % formats.length];
+    monster.name = monster.id === "dungeon_lord_nox" ? "《認識圏外より来たるもの》太古からの闇キキルクルス" : formats[hash % formats.length];
     if (monster.dangerous?.telegraph) monster.dangerous.telegraph = monster.dangerous.telegraph.replace(monster.baseName, monster.name);
   }
 
