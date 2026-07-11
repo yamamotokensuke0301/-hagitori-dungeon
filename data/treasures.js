@@ -12,25 +12,25 @@
   ];
 
   const spells = [
-    { id: "ember_shot", name: "火の粉弾", rank: "beginner", attribute: "fire", power: 1.15, range: 4, jobs: ["mage", "spellblade"], description: "小さな火弾をまっすぐ飛ばす、火術の入門魔法。" },
-    { id: "water_needle", name: "水針", rank: "beginner", attribute: "water", power: 1.1, range: 5, jobs: ["mage", "spellblade", "priest"], description: "圧縮した水を針のように撃ち出す扱いやすい術。" },
-    { id: "guiding_ray", name: "導きの光", rank: "beginner", attribute: "light", power: 1.05, range: 5, jobs: ["mage", "priest"], description: "闇を照らす細い光を敵へ向ける初歩の光術。" },
+    { id: "ember_shot", name: "火の粉弾", rank: "beginner", attribute: "fire", power: 1.15, range: 4, cooldown: 2, effect: "burn", jobs: ["mage", "spellblade"], description: "小さな火弾で傷を燃やし、急速再生を弱める入門魔法。" },
+    { id: "water_needle", name: "水針", rank: "beginner", attribute: "water", power: 1.1, range: 5, cooldown: 2, effect: "dampen", jobs: ["mage", "spellblade", "priest"], description: "圧縮水で敵の攻撃力を一時的に削ぐ扱いやすい術。" },
+    { id: "guiding_ray", name: "導きの光", rank: "beginner", attribute: "light", power: 1.05, range: 5, cooldown: 2, effect: "holy", jobs: ["mage", "priest"], description: "幽霊・悪魔・アンデッドを強く焼く初歩の光術。" },
 
-    { id: "thunder_lance", name: "雷槍", rank: "intermediate", attribute: "thunder", power: 1.45, range: 6, jobs: ["mage", "spellblade"], description: "槍状に束ねた雷を射線上の敵へ突き立てる。" },
-    { id: "ice_shards", name: "氷晶散華", rank: "intermediate", attribute: "ice", power: 1.4, range: 5, jobs: ["mage", "spellblade"], description: "複数の氷片を花弁のように散らして切り刻む。" },
-    { id: "wind_cutter", name: "風裂刃", rank: "intermediate", attribute: "wind", power: 1.5, range: 6, jobs: ["mage", "spellblade", "priest"], description: "見えない風の刃を遠くまで走らせる中級術。" },
+    { id: "thunder_lance", name: "雷槍", rank: "intermediate", attribute: "thunder", power: 1.45, range: 6, cooldown: 4, effect: "stun", jobs: ["mage", "spellblade"], description: "束ねた雷で敵の次の行動を低確率で潰す中級術。" },
+    { id: "ice_shards", name: "氷晶散華", rank: "intermediate", attribute: "ice", power: 1.4, range: 5, cooldown: 3, effect: "slow", jobs: ["mage", "spellblade"], description: "氷片で切り刻み、敵の加速度を一時的に封じる。" },
+    { id: "wind_cutter", name: "風裂刃", rank: "intermediate", attribute: "wind", power: 1.5, range: 6, cooldown: 3, effect: "knockback", jobs: ["mage", "spellblade", "priest"], description: "見えない風刃で敵を後方へ弾き飛ばす中級術。" },
 
-    { id: "acid_nova", name: "酸星爆", rank: "advanced", attribute: "acid", power: 1.9, range: 5, jobs: ["mage", "spellblade"], description: "着弾地点で強酸の星を弾けさせ、硬い外殻を侵す。" },
-    { id: "night_chain", name: "夜鎖", rank: "advanced", attribute: "dark", power: 2, range: 6, jobs: ["mage", "priest"], description: "影から伸びる鎖で遠方の敵を闇へ縫い留める。" },
-    { id: "earth_javelin", name: "地脈投槍", rank: "advanced", attribute: "earth", power: 2.05, range: 6, jobs: ["mage", "spellblade", "priest"], description: "地脈から石槍を抜き出し、強烈な勢いで投射する。" },
+    { id: "acid_nova", name: "酸星爆", rank: "advanced", attribute: "acid", power: 1.9, range: 5, cooldown: 5, effect: "corrode", jobs: ["mage", "spellblade"], description: "強酸の星を弾けさせ、外殻の防御力を侵食する。" },
+    { id: "night_chain", name: "夜鎖", rank: "advanced", attribute: "dark", power: 2, range: 6, cooldown: 5, effect: "bind", jobs: ["mage", "priest"], description: "影から伸びる鎖で敵をその場へ縫い留める。" },
+    { id: "earth_javelin", name: "地脈投槍", rank: "advanced", attribute: "earth", power: 2.05, range: 6, cooldown: 4, accuracyModifier: -0.1, effect: "pierce", jobs: ["mage", "spellblade", "priest"], description: "命中しにくい代わりに防御を半分無視する石槍。" },
 
-    { id: "steel_comet", name: "鋼天彗星", rank: "supreme", attribute: "steel", power: 2.55, range: 6, jobs: ["mage", "spellblade"], description: "天井から鋼の彗星を落とす、破城級の最上位魔法。" },
-    { id: "mirage_maze", name: "千景迷宮", rank: "supreme", attribute: "illusion", power: 2.45, range: 6, jobs: ["mage", "priest"], description: "千の偽景を一瞬で重ね、敵の知覚そのものを砕く。" },
-    { id: "grave_benediction", name: "墓標祝祷", rank: "supreme", attribute: "curse", power: 2.7, range: 6, jobs: ["mage", "priest"], description: "墓標へ捧げた祈りを反転させ、強烈な呪いとして放つ。" },
+    { id: "steel_comet", name: "鋼天彗星", rank: "supreme", attribute: "steel", power: 2.55, range: 6, cooldown: 7, effect: "shatter", jobs: ["mage", "spellblade"], description: "防御を完全に無視して落ちる破城級の鋼彗星。" },
+    { id: "mirage_maze", name: "千景迷宮", rank: "supreme", attribute: "illusion", power: 2.45, range: 6, cooldown: 7, effect: "confuse", jobs: ["mage", "priest"], description: "千の偽景を重ね、敵の命中と回避を同時に砕く。" },
+    { id: "grave_benediction", name: "墓標祝祷", rank: "supreme", attribute: "curse", power: 2.7, range: 6, cooldown: 8, effect: "curse", jobs: ["mage", "priest"], description: "対象へ被ダメージ増加の墓標を刻む反転祝祷。" },
 
-    { id: "black_sun", name: "黒陽墜落", rank: "forbidden", attribute: "dark", power: 3.45, range: 6, jobs: ["mage"], description: "偽りの黒い太陽を迷宮へ落とす、封印指定の殲滅術。" },
-    { id: "name_erasure", name: "真名抹消", rank: "forbidden", attribute: "curse", power: 3.7, range: 6, jobs: ["mage", "priest"], description: "対象の真名を術式から消し去る、使用を禁じられた呪法。" },
-    { id: "heaven_sunder", name: "天断光", rank: "forbidden", attribute: "light", power: 3.6, range: 6, jobs: ["mage", "spellblade", "priest"], description: "迷宮の天蓋ごと敵を断つと伝わる禁断の光術。" },
+    { id: "black_sun", name: "黒陽墜落", rank: "forbidden", attribute: "dark", power: 3.45, range: 6, cooldown: 12, effect: "black_sun", jobs: ["mage"], description: "大火傷と再生封印を残す、魔法使い専用の封印指定術。" },
+    { id: "name_erasure", name: "真名抹消", rank: "forbidden", attribute: "curse", power: 3.7, range: 6, cooldown: 14, effect: "erase", jobs: ["mage", "priest"], description: "対象の防御・命中・再生をまとめて抹消する禁呪。" },
+    { id: "heaven_sunder", name: "天断光", rank: "forbidden", attribute: "light", power: 3.6, range: 6, cooldown: 12, effect: "holy", jobs: ["mage", "spellblade", "priest"], description: "天蓋ごと断ち、邪悪な種族へ壊滅的な威力を出す禁断光術。" },
   ];
 
   const rankById = Object.fromEntries(spellbookRanks.map((rank) => [rank.id, rank]));

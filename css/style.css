@@ -277,6 +277,13 @@ strong {
   white-space: nowrap;
 }
 
+.tabs button.locked {
+  color: #77736b;
+  border-color: rgba(120, 116, 106, 0.28);
+  background: #171816;
+  filter: saturate(0.35);
+}
+
 .tabs button[data-view="dungeon"] {
   padding-inline: 2px;
   font-size: 11px;
@@ -647,6 +654,10 @@ strong {
   font-weight: 400;
   box-shadow: none;
   text-shadow: 0 0 5px #fff5c9, 0 0 12px rgba(238, 198, 94, 0.96);
+}
+
+.player-unlit {
+  text-shadow: none !important;
 }
 
 .capoeira-inverted {
@@ -2990,6 +3001,80 @@ textarea:focus-visible,
 
 .ok {
   color: #cde9a8;
+}
+
+@media (min-width: 980px) {
+  .app-shell {
+    width: min(100vw, 1180px);
+    padding: 12px 16px;
+    gap: 9px;
+  }
+
+  .tabs {
+    grid-template-columns: repeat(10, minmax(0, 1fr));
+  }
+
+  .tabs button {
+    min-height: 42px;
+    font-size: 12px;
+  }
+
+  .view {
+    padding: 12px;
+  }
+
+  .town-grid,
+  .card-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .app-shell.dungeon-mode {
+    --tile: clamp(28px, min(42px, calc((100svh - 360px) / 13)), 42px);
+    grid-template-columns: minmax(600px, 1fr) minmax(310px, 360px);
+    grid-template-rows: minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .app-shell.dungeon-mode #dungeonView {
+    grid-column: 1;
+    grid-row: 1;
+    padding: 10px;
+  }
+
+  .app-shell.dungeon-mode .log-panel {
+    grid-column: 2;
+    grid-row: 1;
+    min-height: 0;
+    max-height: none;
+    padding: 12px;
+    gap: 8px;
+  }
+
+  .app-shell.dungeon-mode .log-panel-toolbar > span {
+    font-size: 11px;
+  }
+
+  .app-shell.dungeon-mode .log-panel-toolbar button {
+    min-height: 32px;
+    padding: 5px 10px;
+    font-size: 11px;
+  }
+
+  .app-shell.dungeon-mode .log-panel p {
+    margin-bottom: 5px;
+    padding: 5px 7px 6px 9px;
+    font-size: 13px;
+    line-height: 1.35;
+  }
+
+  .dungeon-action-dock {
+    max-width: 700px;
+    margin: 10px auto 0;
+  }
+
+  .magic-move-controls {
+    grid-template-columns: repeat(2, minmax(120px, 1fr));
+  }
 }
 
 @media (max-width: 380px) {

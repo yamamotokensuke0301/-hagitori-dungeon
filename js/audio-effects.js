@@ -21,6 +21,11 @@
       corpse: [0.7, 0.32], harvest: [0.45, 0.72], craft: [0.74, 0.88], equip: [0.78, 0.72],
       rest: [0.68, 1.2], victory: [0.66, 1.18], levelUp: [0.58, 1.48], levelStatUp: [0.7, 1.1], death: [0.42, 1.15],
       deathCrySharp: [0.5, 0.82], deathCryFading: [0.46, 1.05], deathCryLow: [0.48, 0.72], flee: [0.8, 0.38],
+      uiTab: [0.68, 0.34], uiConfirm: [0.7, 0.5], uiCancel: [0.66, 0.42], uiOpen: [0.68, 0.58], uiClose: [0.68, 0.4],
+      uiPage: [0.7, 0.36], uiFilter: [0.66, 0.46], uiToggle: [0.68, 0.38], uiError: [0.72, 0.3], menuOpen: [0.66, 0.72], menuClose: [0.68, 0.55],
+      drink: [0.7, 0.46], intoxicate: [0.6, 0.82], heartEquip: [0.58, 1.18], heartRestore: [0.6, 1.2], trapDiscover: [0.66, 0.62], trapDisarm: [0.66, 0.5],
+      summon: [0.54, 1.05], invulnerable: [0.58, 1.28], regenerate: [0.62, 0.78], knockback: [0.7, 0.28], selfDestruct: [0.46, 0.48], debuff: [0.64, 0.8],
+      devour: [0.58, 0.42], jobChange: [0.62, 0.94], tutorial: [0.66, 0.82], shopRefresh: [0.64, 0.88],
     });
 
     let activeLevel = 1;
@@ -344,6 +349,64 @@
         playSweep(720, 430, now + 0.05, 0.94, 0.034, "triangle", out, { pan: 0.05, panEnd: -0.04, reverb: 0.14 });
         playNoiseBand(now, 0.92, 0.052, out, 760, 0.66, 0, { attack: 0.012, reverb: 0.05 });
         playImpact(46, now + 0.9, 0.62, 0.1, out, { click: 115, pan: 0 });
+      }
+      if (type === "uiTab") playArp([392, 493.88, 587.33], now, 0.026, 0.034, out, { spread: 0.18 });
+      if (type === "uiConfirm") playArp([523.25, 659.25, 783.99], now, 0.034, 0.045, out, { spread: 0.2 });
+      if (type === "uiCancel") playArp([493.88, 392, 329.63], now, 0.038, 0.038, out, { spread: 0.16 });
+      if (type === "uiOpen" || type === "menuOpen") playSweep(280, type === "menuOpen" ? 760 : 560, now, 0.14, 0.028, "sine", out, { reverb: 0.12 });
+      if (type === "uiClose" || type === "menuClose") playSweep(type === "menuClose" ? 680 : 520, 240, now, 0.13, 0.026, "sine", out, { reverb: 0.08 });
+      if (type === "uiPage") playNoiseBand(now, 0.065, 0.032, out, 2100, 0.8, -0.3, { panEnd: 0.3 });
+      if (type === "uiFilter") playArp([440, 554.37], now, 0.028, 0.032, out, { spread: 0.12 });
+      if (type === "uiToggle") playMetal(880, now, 0.09, 0.018, out, 0);
+      if (type === "uiError") playArp([196, 185], now, 0.055, 0.052, out, { spread: 0.08, type: "square" });
+      if (type === "drink") {
+        playNoiseBand(now, 0.22, 0.042, out, 950, 0.7, -0.2, { panEnd: 0.2 });
+        playMetal(1174.66, now + 0.16, 0.16, 0.022, out, 0.18);
+      }
+      if (type === "intoxicate") {
+        playSweep(330, 118, now, 0.48, 0.045, "triangle", out, { pan: -0.45, panEnd: 0.45, reverb: 0.16 });
+        playArp([220, 277.18, 207.65], now + 0.05, 0.09, 0.034, out, { spread: 0.5 });
+      }
+      if (type === "heartEquip" || type === "heartRestore") {
+        const restore = type === "heartRestore";
+        playTone(restore ? 98 : 73.42, now, 0.58, 0.05, "sine", out, { reverb: 0.18 });
+        playArp(restore ? [293.66, 440, 587.33, 880] : [220, 329.63, 493.88, 739.99], now + 0.03, 0.07, 0.05, out, { spread: 0.38, lastTail: 1.5 });
+      }
+      if (type === "trapDiscover") {
+        playMetal(1760, now, 0.18, 0.026, out, -0.12);
+        playArp([880, 1174.66], now + 0.02, 0.04, 0.034, out, { spread: 0.22 });
+      }
+      if (type === "trapDisarm") {
+        playMetal(740, now, 0.13, 0.025, out, -0.18);
+        playMetal(987.77, now + 0.07, 0.15, 0.022, out, 0.18);
+      }
+      if (type === "summon") {
+        playTone(55, now, 0.52, 0.072, "sine", out, { reverb: 0.12 });
+        playArp([110, 164.81, 220, 329.63], now + 0.03, 0.08, 0.052, out, { spread: 0.48 });
+      }
+      if (type === "invulnerable") {
+        playArp([659.25, 987.77, 1318.51, 1975.53], now, 0.055, 0.05, out, { spread: 0.5, lastTail: 1.5 });
+        playTone(2637.02, now + 0.13, 0.42, 0.022, "sine", out, { reverb: 0.32 });
+      }
+      if (type === "regenerate") {
+        playSweep(146.83, 440, now, 0.28, 0.032, "sine", out, { pan: -0.2, panEnd: 0.2, reverb: 0.14 });
+        playTone(659.25, now + 0.12, 0.22, 0.018, "sine", out, { reverb: 0.2 });
+      }
+      if (type === "knockback") playImpact(58, now, 0.24, 0.14, out, { click: 620, pan: 0 });
+      if (type === "selfDestruct") {
+        playImpact(45, now, 0.42, 0.18, out, { click: 1900, pan: 0 });
+        playNoiseBand(now, 0.48, 0.12, out, 1350, 0.5, 0, { reverb: 0.08 });
+      }
+      if (type === "debuff") playSweep(420, 82.41, now, 0.46, 0.045, "sawtooth", out, { pan: 0.3, panEnd: -0.3, reverb: 0.13 });
+      if (type === "devour") {
+        playNoiseBand(now, 0.28, 0.09, out, 540, 0.7, -0.2, { panEnd: 0.2 });
+        playImpact(72, now + 0.16, 0.14, 0.08, out, { click: 310, pan: 0 });
+      }
+      if (type === "jobChange") playArp([196, 293.66, 392, 587.33, 783.99], now, 0.065, 0.052, out, { spread: 0.4, lastTail: 1.45 });
+      if (type === "tutorial") playArp([523.25, 587.33, 659.25], now, 0.05, 0.038, out, { spread: 0.2 });
+      if (type === "shopRefresh") {
+        playNoiseBand(now, 0.12, 0.038, out, 1800, 0.8, -0.35, { panEnd: 0.35 });
+        playArp([392, 523.25, 698.46], now + 0.06, 0.045, 0.038, out, { spread: 0.3 });
       }
       if (type === "flee") {
         playNoise(now, 0.11, 0.045, out, 1200, { attack: 0.001, pan: -0.28, reverb: 0.018 });

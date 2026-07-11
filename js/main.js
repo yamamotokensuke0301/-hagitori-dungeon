@@ -3,7 +3,7 @@
 
   const SAVE_KEY = "hagitori-dungeon-save-v1";
   const AUDIO_KEY = "hagitori-audio-enabled-v4";
-  const APP_VERSION = "Prototype 3.3.0";
+  const APP_VERSION = "Prototype 3.4.0";
   const MAP_SIZE_RANGE = Object.freeze([36, 60]);
   const VIEW_SIZE = 13;
   const MAX_FLOOR = 100;
@@ -20,6 +20,7 @@
   const INN_COST = 10;
   const DRINK_COST = 1;
   const DRUNKEN_FIST_POWER = 3.6;
+  const RISQUE_SYNERGY_PER_ITEM = Object.freeze({ strength: 6, speed: 6, dexterity: 8, durability: 6, luck: 12, acceleration: 18 });
   const START_GUIDANCE = "まずはギルドにいけ。受付で冒険の基本と最初の方針を確かめろ。";
   const SAITAMA_ONE_PUNCH_CHANCE = 0.08;
   const RIMURU_FLOOR_WIPE_CHANCE = 0.025;
@@ -47,9 +48,9 @@
   const UNIQUE_SLEEP_CHANCE = 0.05;
   const THIEF_SLEEP_AMBUSH_MULTIPLIER = 3;
   const FLOWER_TAMER_CONFIG = Object.freeze({
-    baseCharmChance: 0.1, skillBonus: 0.2, luckFactor: 0.004, dexterityFactor: 0.002,
-    levelFactor: 0.002, weakenedBonus: 0.12, colorPenalty: 0.018, uniqueMultiplier: 0.25,
-    normalChanceRange: [0.03, 0.58], uniqueChanceRange: [0.01, 0.18],
+    baseCharmChance: 0.055, skillBonus: 0.32, luckFactor: 0.0035, dexterityFactor: 0.002,
+    levelFactor: 0.0018, weakenedBonus: 0.2, colorPenalty: 0.018, uniqueMultiplier: 0.25,
+    normalChanceRange: [0.015, 0.48], uniqueChanceRange: [0.005, 0.16],
     basePetLimit: 2, petLimitEvery: 15, maxPetLimit: 5,
     baseDuration: 7, luckDurationEvery: 3, levelDurationEvery: 6, maxDuration: 24,
     hpDecayRate: 0.08,
@@ -921,9 +922,19 @@
     els.app.classList.toggle("town-mode", !dungeonMode && !arenaMode);
   }
 
+  function arenaUnlocked() {
+    return Boolean(state.arena) || (state.meta.clearedBossFloors || []).includes(10);
+  }
+
+  function junkDealerUnlocked() {
+    return (state.meta.clearedBossFloors || []).includes(20);
+  }
+
   function switchView(view) {
     if (state.adventurer.inDungeon) view = "dungeon";
     if (view === "dungeon" && !state.adventurer.inDungeon) view = "town";
+    if (view === "arena" && !arenaUnlocked()) view = "town";
+    if (view === "junkDealer" && !junkDealerUnlocked()) view = "town";
     const enteringJunkDealer = view === "junkDealer" && currentView !== "junkDealer";
     if (enteringJunkDealer) refreshJunkDealerStock();
     currentView = view;
@@ -933,11 +944,25 @@
     const activeTab = view;
     els.tabs.forEach((button) => {
       const active = button.dataset.view === activeTab;
+      const arenaLocked = button.dataset.view === "arena" && !arenaUnlocked();
+      const junkDealerLocked = button.dataset.view === "junkDealer" && !junkDealerUnlocked();
+      const facilityLocked = arenaLocked || junkDealerLocked;
       button.classList.toggle("active", active);
+      button.classList.toggle("locked", facilityLocked);
+      button.setAttribute("aria-disabled", String(facilityLocked));
+      if (button.dataset.view === "arena") {
+        button.textContent = arenaLocked ? "闘技場・封" : "闘技場";
+        button.title = arenaLocked ? "地下10階の守護者を倒すと解放" : "修練連武闘技場";
+      }
+      if (button.dataset.view === "junkDealer") {
+        button.textContent = junkDealerLocked ? "珍品店・封" : "珍品店";
+        button.title = junkDealerLocked ? "地下20階の守護者を倒すと解放" : "ガラクタマニア・珍品偏愛堂";
+      }
       if (active) button.setAttribute("aria-current", "page");
       else button.removeAttribute("aria-current");
     });
     render();
+    playSfx(enteringJunkDealer ? "shopRefresh" : "uiTab");
     if (view === "guild") offerBeginnerCourse();
   }
 
@@ -978,6 +1003,7 @@
       saveGame();
       return;
     }
+    playSfx("tutorial");
     askConfirm(
       lesson.title,
       lesson.text,
@@ -1568,7 +1594,7 @@
     const learnedCards = adv.learnedSpells.map((id) => spells[id]).filter(Boolean).map((spell) => {
       const usable = spell.jobs.includes(adv.jobId);
       const selected = usable && adv.activeSpellId === spell.id;
-      return `<article class="spell-card ${selected ? "selected" : ""}"><div><span class="rank-badge">${spellbookRankLabel(spell.rank)}</span><strong>${spell.name}</strong><p>${formatAttackAttributes([spell.attribute])} / 威力${spell.power} / 射程${spell.range}。${spell.description}</p></div><button type="button" data-select-spell="${spell.id}" ${selected || !usable ? "disabled" : ""}>${selected ? "使用魔法" : usable ? "使用魔法にする" : "現在は使用不可"}</button></article>`;
+      return `<article class="spell-card ${selected ? "selected" : ""}"><div><span class="rank-badge">${spellbookRankLabel(spell.rank)}</span><strong>${spell.name}</strong><p>${formatAttackAttributes([spell.attribute])} / 威力${spell.power} / 射程${spell.range} / 再詠唱${spell.cooldown || 2}。${spell.description}</p></div><button type="button" data-select-spell="${spell.id}" ${selected || !usable ? "disabled" : ""}>${selected ? "使用魔法" : usable ? "使用魔法にする" : "現在は使用不可"}</button></article>`;
     }).join("") || "<p>魔法書を読むと、ここに習得魔法が記録される。</p>";
     const cursePenaltyText = Object.entries(stats.cursePenalties || {}).filter(([, value]) => value).map(([key, value]) => `${statLabel(key)}${value}`).join("・");
     els.homeView.innerHTML = `
@@ -1588,7 +1614,7 @@
           <div class="combat-metric"><span>運搬</span><strong>${stats.materialCount}/${stats.materialCapacity}</strong><small>重量ペナルティ ${stats.materialBurden}</small></div>
         </div>
         ${cursePenaltyText ? `<p class="curse-summary">呪耐性により呪いのペナルティは${Math.round((stats.cursePenaltyRate ?? 1) * 100)}%まで軽減中：${cursePenaltyText}</p>` : ""}
-        ${adv.personalityId === "lewd" ? `<p class="risque-synergy">すけべ共鳴：艶装備${stats.risqueSynergyCount}個（1個ごとに器用さ+1・運+2・加速+3）</p>` : ""}
+        ${adv.personalityId === "lewd" ? `<p class="risque-synergy">すけべ共鳴・真艶覚醒：艶装備${stats.risqueSynergyCount}個（1個ごとに全基礎能力+6・器用さは追加+2・運は追加+6・加速+18）</p>` : ""}
         ${stats.powerPoleAwakened ? '<p class="name-secret-awakened">名前裏技「孫悟空」× ★如意棒：真価解放中</p>' : ""}
         ${stats.rimuruSlimeAwakened ? '<p class="name-secret-awakened">名前裏技「リムル」× 最弱種スライム：魔王覚醒・最強化中</p>' : ""}
         ${active ? `<p>使用魔法：<strong>${active.name}</strong>（${spellbookRankLabel(active.rank)}）</p>` : ""}
@@ -1598,7 +1624,7 @@
         <textarea id="backstoryInput" maxlength="800" rows="6" aria-label="冒険者の生い立ち">${escapeHtml(adv.backstory || "")}</textarea>
         <div class="inline-actions"><button id="saveBackstoryButton" type="button">生い立ちを保存</button><button id="regenerateBackstoryButton" type="button">初期文を再生成</button></div>
       </section>
-      <section class="inventory-section"><h2>魔法書とガラクタ</h2><p>魔法職は魔法書を読むと1冊消費して魔法を習得できる。読まずに商店へ売ることもできる。</p><div class="treasure-sell-list">${inventoryCards}</div></section>
+      <section class="inventory-section"><h2>魔法書とガラクタ</h2><p>魔法職は魔法書を1冊消費して術を習得する。魔法は固有効果と再詠唱時間を持ち、魔法使い・魔法戦士・プリーストで威力特性が異なる。</p><div class="treasure-sell-list">${inventoryCards}</div></section>
       <section class="inventory-section"><h2>習得魔法</h2><div class="spell-list">${learnedCards}</div></section>
       <section class="inventory-section monster-heart-workshop"><h2>モンスターの心</h2><p>調査度を最大にした魔物から一度だけ得られる。強敵の心ほど強化量が大きい。一つの装備に心を宿せるのは一度だけで、使用した心は失われる。</p>${heartEntries.length ? `<label>使用する心<select id="monsterHeartSelect">${heartOptions}</select></label>` : "<p>まだ心を所持していない。魔物を完全解析せよ。</p>"}</section>
       <section class="equipment-set-board"><div><h2>セット装備</h2><p>2・3・4部位で効果が段階的に発動する。緑色が現在発動中。</p></div><div class="equipment-set-grid">${setBoard}</div></section>
@@ -2169,13 +2195,17 @@
     const currentJob = jobs[state.adventurer.jobId];
     const rangedRange = Number(currentJob.rangedRange || 0);
     const arenaHealCooldown = Number(arena.healCooldown || 0);
+    const arenaJobSkillCooldown = jobSkillCooldownRemaining(currentJob.skill.id);
     const arenaSkillDisabled = currentJob.skill.tag === "heal"
       && (arenaHealCooldown > 0 || state.adventurer.hp >= getPlayerStats().maxHp);
     const arenaSkillLabel = currentJob.skill.tag === "capoeira_stance"
       ? capoeiraActive(arena) ? "カポエラ解除" : `技・${currentJob.skill.name}`
       : currentJob.skill.tag === "heal" && arenaHealCooldown > 0
         ? `${currentJob.skill.name} ${arenaHealCooldown}`
-        : `技・${currentJob.skill.name}`;
+        : arenaJobSkillCooldown > 0 ? `${currentJob.skill.name} ${arenaJobSkillCooldown}` : `技・${currentJob.skill.name}`;
+    const arenaSpell = activeLearnedSpell();
+    const arenaSpellUsable = Boolean(arenaSpell?.jobs?.includes(state.adventurer.jobId));
+    const arenaSpellCooldown = arenaSpell ? spellCooldownRemaining(arenaSpell.id) : 0;
     const cellsHtml = Array.from({ length: arena.size * arena.size }, (_, index) => {
       const x = index % arena.size;
       const y = Math.floor(index / arena.size);
@@ -2183,7 +2213,7 @@
       const player = arena.player.x === x && arena.player.y === y;
       const foe = enemy.alive && enemy.x === x && enemy.y === y;
       if (obstacle) return `<span class="arena-cell arena-pillar" aria-label="柱">◆</span>`;
-      if (player) return `<span class="arena-cell arena-player${capoeiraActive(arena) ? " capoeira-inverted" : ""}" aria-label="冒険者${capoeiraActive(arena) ? "・カポエラ状態" : ""}">@</span>`;
+      if (player) return `<span class="arena-cell arena-player${state.adventurer.jobId === "ninja" ? " player-unlit" : ""}${capoeiraActive(arena) ? " capoeira-inverted" : ""}" aria-label="冒険者${capoeiraActive(arena) ? "・カポエラ状態" : ""}">@</span>`;
       if (foe) {
         const markerData = monsters[enemy.id] || enemy;
         const markerStyle = `--arena-marker-hue:${Number(markerData.arenaMarkerHue || 18)};--arena-marker-accent-hue:${Number(markerData.arenaMarkerAccentHue || 36)};--arena-marker-family-hue:${Number(markerData.arenaMarkerFamilyHue || 18)}`;
@@ -2224,7 +2254,8 @@
             <strong class="arena-enemy-name">${enemy.name}</strong>
             <small class="arena-compact-status">${hpText} / ${rangeText} / ${arenaStats || "能力未判明"}</small>
           </div>
-          ${arena.awaitingNext ? "" : `<button type="button" id="arenaSkillButton" ${arenaSkillDisabled ? "disabled" : ""}>${arenaSkillLabel}</button>`}
+          ${arena.awaitingNext ? "" : `<button type="button" id="arenaSkillButton" ${arenaSkillDisabled || arenaJobSkillCooldown > 0 ? "disabled" : ""}>${arenaSkillLabel}</button>`}
+          ${arena.awaitingNext || !arenaSpellUsable ? "" : `<button type="button" id="arenaSpellButton" ${arenaSpellCooldown > 0 ? "disabled" : ""}>${arenaSpellCooldown > 0 ? `${arenaSpell.name} ${arenaSpellCooldown}` : `魔法・${arenaSpell.name}`}</button>`}
           <button type="button" id="arenaRetireButton">撤退</button>
         </div>
         ${arena.awaitingNext ? victory : tactical}
@@ -2239,6 +2270,7 @@
       if (currentJob.skill.tag === "capoeira_stance") toggleCapoeiraStance(arena, "arena");
       else arenaAttack("skill", false);
     });
+    document.querySelector("#arenaSpellButton")?.addEventListener("click", arenaCastSpell);
     document.querySelector("[data-arena-guard]")?.addEventListener("click", arenaGuard);
     document.querySelector("#arenaNextButton")?.addEventListener("click", nextArenaRound);
     document.querySelector("#arenaRetireButton")?.addEventListener("click", retireArena);
@@ -2344,8 +2376,32 @@
     log(mode === "skill"
       ? `${enemy.name}へ職業技「${job.skill.name}」を使った。`
       : distance > 1 ? `${enemy.name}へ距離${distance}から攻撃した。` : `${enemy.name}へ踏み込み攻撃した。`);
-    playerAttack(enemy, mode);
+    const attackMode = mode === "attack" && distance > 1 ? "ranged" : mode;
+    const outcome = playerAttack(enemy, attackMode);
+    if (mode === "skill") {
+      beginJobSkillCooldown(job.skill);
+      applyRangedJobSkillEffect(enemy, job.skill, outcome);
+    }
     // とどめでも選択した1行動を消費し、世界ターン処理後に勝敗を確定する。
+    advanceArenaWorld();
+  }
+
+  function arenaCastSpell() {
+    const arena = state.arena;
+    const enemy = arena?.enemy;
+    const spell = activeLearnedSpell();
+    if (!enemy?.alive || !spell?.jobs?.includes(state.adventurer.jobId) || spellCooldownRemaining(spell.id) > 0) return;
+    const distance = arenaDistance(arena.player, enemy);
+    if (distance > Number(spell.range || 1) || (distance > 1 && !arenaLineOfSight(arena, arena.player, enemy))) {
+      log(`魔法「${spell.name}」は射程または射線が届かない（距離${distance}）。`);
+      playSfx("warning");
+      render();
+      return;
+    }
+    log(`${enemy.name}へ${spellbookRankLabel(spell.rank)}魔法「${spell.name}」を放った。`);
+    const result = playerAttack(enemy, "spell", spell);
+    beginSpellCooldown(spell);
+    applySpellEffect(enemy, spell, result);
     advanceArenaWorld();
   }
 
@@ -2365,7 +2421,11 @@
       tickIntoxication();
       tickSnackBuff();
       arena.healCooldown = Math.max(0, Number(arena.healCooldown || 0) - 1);
-      const enemyActions = Math.min(4, 1 + Math.floor(Math.max(0, enemy.acceleration || 0) / 12));
+      tickSpellCooldowns(arena);
+      tickJobSkillCooldowns(arena);
+      const arenaSpellSlowed = Number(enemy.spellSlowedTurns || 0) > 0;
+      if (arenaSpellSlowed) enemy.spellSlowedTurns -= 1;
+      const enemyActions = Math.min(4, 1 + Math.floor(Math.max(0, arenaSpellSlowed ? 0 : enemy.acceleration || 0) / 12));
       for (let index = 0; index < enemyActions && state.arena && state.adventurer.hp > 0 && enemy.alive && enemy.hp > 0; index += 1) {
         if (arenaEnemyAct(arena, enemy) === "telegraphed") break;
       }
@@ -2384,8 +2444,22 @@
 
   function arenaEnemyAct(arena, enemy) {
     const distance = arenaDistance(arena.player, enemy);
+    if (Number(enemy.spellStunnedTurns || 0) > 0) {
+      enemy.spellStunnedTurns -= 1;
+      log(`${enemy.name}は雷術の痺れで行動できない。`);
+      return;
+    }
     if (distance <= 1) {
       return enemyTurn(enemy);
+    }
+    if (Number(enemy.spellCursedTurns || 0) > 0) enemy.spellCursedTurns -= 1;
+    if (Number(enemy.spellArmorBreakTurns || 0) > 0) {
+      enemy.spellArmorBreakTurns -= 1;
+      if (enemy.spellArmorBreakTurns <= 0) enemy.spellArmorBreak = 0;
+    }
+    if (Number(enemy.spellBoundTurns || 0) > 0) {
+      enemy.spellBoundTurns -= 1;
+      return;
     }
     if (enemy.specialAttack === "ranged" && distance <= 6 && arenaLineOfSight(arena, enemy, arena.player) && Math.random() < 0.4) {
       enemyAttack(enemy, "遠隔攻撃", chooseEnemyAttackAttribute(enemy, enemy.attackAttribute), enemy.attack, { trials: 2 });
@@ -2582,12 +2656,14 @@
     els.logHistoryPanel.classList.remove("hidden");
     els.logHistoryList.scrollTop = 0;
     els.logHistoryList.focus();
+    playSfx("menuOpen");
   }
 
   function closeLogHistory(restoreFocus = true) {
     if (!els.logHistoryPanel) return;
     const wasOpen = !els.logHistoryPanel.classList.contains("hidden");
     els.logHistoryPanel.classList.add("hidden");
+    if (wasOpen) playSfx("menuClose");
     const returnFocus = logHistoryReturnFocus;
     logHistoryReturnFocus = null;
     if (restoreFocus && wasOpen) returnFocus?.focus?.();
@@ -2639,6 +2715,7 @@
       </button>`;
     }).join("");
     els.setupPickerPanel.classList.remove("hidden");
+    playSfx("uiOpen");
     document.querySelectorAll("[data-picker-id]").forEach((button) => {
       button.addEventListener("click", () => {
         pendingSetup[config.selected] = button.dataset.pickerId;
@@ -2649,7 +2726,9 @@
   }
 
   function closeSetupPicker() {
+    const wasOpen = !els.setupPickerPanel.classList.contains("hidden");
     els.setupPickerPanel.classList.add("hidden");
+    if (wasOpen) playSfx("uiClose");
   }
 
   function openSetup({ raceId, jobId, personalityId, name, preserveMeta } = {}) {
@@ -2699,6 +2778,7 @@
     initialSetupPending = false;
     currentView = "town";
     switchView("town");
+    if (Object.keys(state.meta.monsterHearts || {}).length > 0) playSfx("heartRestore");
   }
 
   // Dungeon lifecycle, map rendering, and exploration actions.
@@ -2828,6 +2908,7 @@
         if (discoveredFeature) cell.classList.add(`room-${discoveredFeature.id}`);
         if (state.dungeon.player.x === x && state.dungeon.player.y === y) {
           cell.classList.add("tile-player");
+          if (state.adventurer.jobId === "ninja") cell.classList.add("player-unlit");
           if (capoeiraActive(state.dungeon)) cell.classList.add("capoeira-inverted");
           if (state.dungeon.map[y]?.[x] === "wall") cell.classList.add("tile-phasing-wall");
           cell.textContent = "@";
@@ -2891,6 +2972,7 @@
     const jobSkill = jobs[state.adventurer.jobId].skill;
     const learnedSpell = activeLearnedSpell();
     const canCastLearnedSpell = Boolean(learnedSpell?.jobs?.includes(state.adventurer.jobId));
+    const activeSpellCooldown = learnedSpell ? spellCooldownRemaining(learnedSpell.id) : 0;
     const cooldowns = teleportCooldowns();
     els.magicMoveControls.classList.remove("hidden");
     els.jobSkill.classList.remove("hidden");
@@ -2902,16 +2984,17 @@
     els.timeStop.disabled = Number(state.dungeon.timeStopCooldown || 0) > 0;
     const healCooldown = Number(state.dungeon.healCooldown || 0);
     const healingSkill = jobSkill.tag === "heal";
-    els.jobSkill.disabled = healingSkill && (healCooldown > 0 || state.adventurer.hp >= getPlayerStats().maxHp);
+    const jobSkillCooldown = jobSkillCooldownRemaining(jobSkill.id);
+    els.jobSkill.disabled = healingSkill ? (healCooldown > 0 || state.adventurer.hp >= getPlayerStats().maxHp) : jobSkillCooldown > 0;
     els.jobSkill.textContent = jobSkill.tag === "capoeira_stance"
       ? capoeiraActive(state.dungeon) ? "カポエラ解除" : `技・${jobSkill.name}`
       : healingSkill && healCooldown > 0
         ? `${jobSkill.name} ${healCooldown}`
-        : jobSkillTargetArmed ? "技の対象を選択" : `技・${jobSkill.name}`;
+      : jobSkillCooldown > 0 ? `${jobSkill.name} ${jobSkillCooldown}` : jobSkillTargetArmed ? "技の対象を選択" : `技・${jobSkill.name}`;
     els.jobSkill.classList.toggle("selected", jobSkillTargetArmed);
     if (els.activeSpell) {
-      els.activeSpell.disabled = !canCastLearnedSpell;
-      els.activeSpell.textContent = canCastLearnedSpell ? (spellTargetArmed ? "対象を選択" : `魔法・${learnedSpell.name}`) : "習得魔法";
+      els.activeSpell.disabled = !canCastLearnedSpell || activeSpellCooldown > 0;
+      els.activeSpell.textContent = canCastLearnedSpell ? activeSpellCooldown > 0 ? `${learnedSpell.name} ${activeSpellCooldown}` : (spellTargetArmed ? "対象を選択" : `魔法・${learnedSpell.name}`) : "習得魔法";
       els.activeSpell.classList.toggle("selected", spellTargetArmed);
     }
     els.timeStop.textContent = state.dungeon.timeStopCooldown > 0 ? `時間停止 ${state.dungeon.timeStopCooldown}` : "時間停止";
@@ -3025,7 +3108,7 @@
     const stats = getPlayerStats();
     state.adventurer.hp = Math.max(1, Math.round(stats.maxHp * oldHpRatio));
     log(`${jobs[jobId].name}（Lv${state.adventurer.level}）に転職した。`);
-    playSfx("select");
+    playSfx("jobChange");
     saveGame();
     render();
   }
@@ -3114,7 +3197,8 @@
     log(drunkenFistActive()
       ? `武器を持たぬバーサーカーの足腰に酒気が巡った。超強力な打撃「酔拳」が${adv.intoxicationTurns}世界ターン続く！`
       : `酩酊状態になった。移動がふらつく状態が${adv.intoxicationTurns}世界ターン続く。宿泊すれば即座に醒める。`);
-    playSfx("rest");
+    playSfx("drink");
+    playSfx("intoxicate");
     saveGame();
     render();
   }
@@ -3857,7 +3941,7 @@
     if (found) {
       found.discovered = true;
       log(`床の違和感を調べ、危険度${trapDangerLabel(found)}の${trapTypeLabel(found)}を発見した。隣接すれば解除を試みられる。`);
-      playSfx("observe");
+      playSfx("trapDiscover");
     } else {
       log(hiddenTraps.length ? "周囲を探ったが、罠の仕掛けを見抜けなかった。" : "周囲を丁寧に調べたが、罠の気配はない。");
     }
@@ -3875,7 +3959,7 @@
     if (Math.random() < profile.chance) {
       trap.disarmed = true;
       log(`危険度${trapDangerLabel(trap)}の${trapTypeLabel(trap)}を解除し、無力化した（成功率${profile.percent}%）。`);
-      playSfx("select");
+      playSfx("trapDisarm");
     } else {
       trap.disarmFailures = Number(trap.disarmFailures || 0) + 1;
       log(`危険度${trapDangerLabel(trap)}の${trapTypeLabel(trap)}の解除に失敗した（成功率${profile.percent}%）。仕掛けが半作動し、次回の解除率が上がる！`);
@@ -4109,14 +4193,14 @@
       state.adventurer.lastAttack = { attribute: "dark", attributes: ["dark"], skill: "secret:imaginary_collapse" };
       if (annihilateDungeonFloor()) return { skipWorldAdvance: true };
     }
-    const profile = getPlayerBattleProfile(enemy, mode, learnedSpell);
+    const profile = getPlayerBattleProfile(enemy, mode, learnedSpell, { wasAsleep });
     const divineShielded = Number(enemy.divineInvulnerabilityCharges || 0) > 0;
     if (thiefSleepAmbush) {
       profile.hitChance = Math.max(profile.hitChance, 0.96);
       profile.critChance = Math.max(profile.critChance, 0.3);
     }
     const outcome = rollAttackSequence(profile, (raw) => {
-      const resistedDamage = divineShielded ? 0 : damageAfterDefense(raw, profile.attributes, enemy);
+      const resistedDamage = divineShielded ? 0 : damageAfterDefense(raw, profile.attributes, enemy, profile.defensePierce);
       const damage = resistedDamage <= 0
         ? 0
         : Math.max(1, Math.round(resistedDamage * (thiefSleepAmbush ? THIEF_SLEEP_AMBUSH_MULTIPLIER : 1)));
@@ -4132,6 +4216,7 @@
     if (divineShielded) {
       enemy.divineInvulnerabilityCharges = Math.max(0, enemy.divineInvulnerabilityCharges - 1);
       log(`${enemy.name}の神域が攻撃という出来事そのものを拒絶した。残る不可侵${enemy.divineInvulnerabilityCharges}回。`);
+      playSfx("invulnerable");
     }
     log(`${profile.label}。${profile.attackTrials}回試行、${outcome.hitCount}ヒット、合計${outcome.total}ダメージ。`);
     if (outcome.critCount) log(`会心${outcome.critCount}回。`);
@@ -4153,11 +4238,12 @@
       if (outcome.critCount) playSfx("critical");
     } else playSfx("warning");
     markResearch(enemy.id, 2);
-    if (outcome.total > 0 && enemy.hp > 0 && tryFlowerCharm(enemy, mode)) return;
+    if (outcome.total > 0 && enemy.hp > 0 && tryFlowerCharm(enemy, mode)) return outcome;
     const milestoneSpoken = speakByHp(enemy);
     if (!milestoneSpoken && enemy.hp > 0) {
       uniqueSpeak(enemy, outcome.hitCount ? "hit" : "evade", { chance: outcome.hitCount ? 0.72 : 0.82 });
     }
+    return outcome;
   }
 
   function activeFlowerPets() {
@@ -4387,7 +4473,7 @@
     enemy.summonsUsed = Number(enemy.summonsUsed || 0) + summonCount;
     log(`${enemy.name}が眷属召喚を行い、${summonedNames.join("・")}を呼び出した！`);
     uniqueSpeak(enemy, "special", { chance: 0.9 });
-    playSfx("boss");
+    playSfx("summon");
     return true;
   }
 
@@ -4395,11 +4481,22 @@
     if (enemy.hp <= 0) return;
     ensureUniqueEncounterSpeech(enemy);
     enemy.turns += 1;
+    if (Number(enemy.spellCursedTurns || 0) > 0) enemy.spellCursedTurns -= 1;
+    if (Number(enemy.spellArmorBreakTurns || 0) > 0) {
+      enemy.spellArmorBreakTurns -= 1;
+      if (enemy.spellArmorBreakTurns <= 0) enemy.spellArmorBreak = 0;
+    }
+    if (Number(enemy.spellStunnedTurns || 0) > 0) {
+      enemy.spellStunnedTurns -= 1;
+      log(`${enemy.name}は雷術の痺れで行動できない。`);
+      playSfx("debuff");
+      return;
+    }
     if (enemy.divineInvulnerability && enemy.turns % enemy.divineInvulnerability.every === 0
       && Number(enemy.divineInvulnerabilityCharges || 0) <= 0) {
       enemy.divineInvulnerabilityCharges = enemy.divineInvulnerability.charges;
       log(`${enemy.name}が「${enemy.divineInvulnerability.name}」を展開。次の${enemy.divineInvulnerabilityCharges}回、あらゆる攻撃を無効化する！`);
-      playSfx("light");
+      playSfx("invulnerable");
       return;
     }
     const specialInterval = enemy.specialAttack === "gold_steal" ? 3 : 4;
@@ -4510,18 +4607,23 @@
         state.adventurer.experience -= drained;
         saveActiveJobProgress();
         log(`${enemy.name}に経験値を${drained}奪われた。`);
+        playSfx("trapDrain");
       }
     } else if (enemy.specialAttack === "knockback") {
       uniqueSpeak(enemy, "special", { chance: 0.88 });
       const outcome = enemyAttack(enemy, "吹き飛ばし", "blunt", enemy.attack);
       if (!state.dungeon && !state.arena) return true;
-      if (outcome.hitCount > 0) knockPlayerBack(enemy, 2);
+      if (outcome.hitCount > 0) {
+        knockPlayerBack(enemy, 2);
+        playSfx("knockback");
+      }
     } else if (enemy.specialAttack === "self_destruct") {
       if (enemy.floorGuardian || enemy.thrillRoomGuardian) {
         sanitizeGuardianSpecialAttack(enemy);
         return false;
       }
       uniqueSpeak(enemy, "special", { force: true });
+      playSfx("selfDestruct");
       enemyAttack(enemy, "自爆", "fire", enemy.attack * 2);
       if ((!state.dungeon && !state.arena) || state.adventurer.hp <= 0) return true;
       log(`${enemy.name}は爆散した。`);
@@ -4536,9 +4638,11 @@
       const key = pick(STAT_KEYS);
       state.adventurer.temporaryDebuffs[key] = Number(state.adventurer.temporaryDebuffs[key] || 0) - 2;
       log(`${enemy.name}の弱体波で${{ strength: "力", speed: "素早さ", dexterity: "器用さ", durability: "耐久力", luck: "運" }[key]}が一時的に低下した。`);
+      playSfx("debuff");
     } else if (enemy.specialAttack === "time_stop") {
       uniqueSpeak(enemy, "special", { force: true });
       log(`${enemy.name}が時間を停止した。止まった時の中で連続攻撃が迫る。`);
+      playSfx("timeStop");
       enemyAttack(enemy, "時止め連撃", chooseEnemyAttackAttribute(enemy, enemy.attackAttribute), enemy.attack, { trials: 2 });
       if ((state.dungeon || state.arena) && state.adventurer.hp > 0) enemyAttack(enemy, "時止め追撃", chooseEnemyAttackAttribute(enemy, enemy.attackAttribute), enemy.attack, { trials: 2 });
     } else if (enemy.specialAttack === "devour") {
@@ -4554,8 +4658,8 @@
         addMaterial(materialId, -1);
         log(`${enemy.name}が所持素材「${materials[materialId].name}」を食べた。`);
       }
+      playSfx("devour");
     } else return false;
-    playSfx("warning");
     return true;
   }
 
@@ -4585,6 +4689,15 @@
   }
 
   function enemyAttack(enemy, name, attribute, power, options = {}) {
+    const dampened = Number(enemy.spellDampenedTurns || 0) > 0;
+    if (dampened) {
+      power *= 0.78;
+      enemy.spellDampenedTurns -= 1;
+    }
+    if (Number(enemy.spellConfusedTurns || 0) > 0) {
+      options = { ...options, hitBonus: Number(options.hitBonus || 0) - 0.18 };
+      enemy.spellConfusedTurns -= 1;
+    }
     const profile = getEnemyBattleProfile(enemy, attribute, power, options);
     const stats = getPlayerStats();
     const guarding = state.adventurer.guard;
@@ -4614,6 +4727,14 @@
       state.meta.clearedBossFloors.push(guardianFloor);
       state.meta.clearedBossFloors.sort((a, b) => a - b);
       log(`深度標B${guardianFloor}Fを解放した。以後、街からこの階層へ直接出発できる。`);
+      if (guardianFloor === 10) {
+        log("地下10階を踏破した功績が認められ、街の「修練連武闘技場」が解放された！");
+        playSfx("victory");
+      }
+      if (guardianFloor === 20) {
+        log("地下20階を踏破した噂を聞きつけ、ガラクタマニアの「珍品偏愛堂」が開店した！");
+        playSfx("shopRefresh");
+      }
     }
     if (state.adventurer.floor < MAX_FLOOR) state.dungeon.stairs = [{ x: enemy.x, y: enemy.y }];
     log(state.adventurer.floor < MAX_FLOOR ? `${enemy.name}が守っていた場所に下り階段が現れた。` : "最深層の守護者を打ち破った。");
@@ -4786,7 +4907,7 @@
     state.meta.monsterHearts[monsterId] = count - 1;
     if (state.meta.monsterHearts[monsterId] <= 0) delete state.meta.monsterHearts[monsterId];
     log(`${monster.name}の心を${equipmentDisplayName(item)}へ宿した。${item.slot === "weapon" ? "攻撃力" : "防御力"}+${power}、${attr(attribute)}属性値+${attributePower}。心は静かに砕けた。`);
-    playSfx("purchase");
+    playSfx("heartEquip");
     saveGame();
     render();
   }
@@ -5053,7 +5174,7 @@
       || conditionalRules[0];
     const normalMaterial = (matched || enemy.loot.find((rule) => rule.condition === "default")).material;
     if (!enemy.exceptionalLoot) return normalMaterial;
-    const skillfulKill = last.skill === "precise" || enemy.weaknesses?.some((id) => lastAttributes.includes(id));
+    const skillfulKill = ["precise", "piercing_arrow"].includes(last.skill) || enemy.weaknesses?.some((id) => lastAttributes.includes(id));
     const colorMultiplier = 1 + Number(enemy.colorTierIndex || 0) * EXCEPTIONAL_LOOT_CONFIG.colorStep;
     const uniqueMultiplier = enemy.unique ? EXCEPTIONAL_LOOT_CONFIG.uniqueMultiplier : 1;
     const techniqueMultiplier = skillfulKill ? EXCEPTIONAL_LOOT_CONFIG.skillfulMultiplier : 1;
@@ -5225,8 +5346,11 @@
     grownStats.strength += foodGrowth.strength;
     grownStats.durability += foodGrowth.durability;
     grownStats.luck += foodGrowth.luck;
-    grownStats.dexterity += risqueSynergyCount;
-    grownStats.luck += risqueSynergyCount * 2;
+    grownStats.strength += risqueSynergyCount * RISQUE_SYNERGY_PER_ITEM.strength;
+    grownStats.speed += risqueSynergyCount * RISQUE_SYNERGY_PER_ITEM.speed;
+    grownStats.dexterity += risqueSynergyCount * RISQUE_SYNERGY_PER_ITEM.dexterity;
+    grownStats.durability += risqueSynergyCount * RISQUE_SYNERGY_PER_ITEM.durability;
+    grownStats.luck += risqueSynergyCount * RISQUE_SYNERGY_PER_ITEM.luck;
     if (powerPoleAwakened) {
       grownStats.strength += 80;
       grownStats.speed += 40;
@@ -5246,7 +5370,7 @@
       luck: grownStats.luck,
       acceleration: Number(race.acceleration || 0) + Number(job.acceleration || 0) + foodGrowth.acceleration
         + (job.accelerationGrowthEvery ? Math.floor((adv.level - 1) / job.accelerationGrowthEvery) : 0)
-        + risqueSynergyCount * 3
+        + risqueSynergyCount * RISQUE_SYNERGY_PER_ITEM.acceleration
         + (powerPoleAwakened ? 50 : 0)
         + (rimuruSlimeAwakened ? RIMURU_SLIME_ACCELERATION_BONUS : 0),
       hpRegen: 0,
@@ -5455,29 +5579,51 @@
     return { active: false, progress: "条件不明" };
   }
 
-  function getPlayerBattleProfile(enemy, mode, learnedSpell = null) {
+  function getPlayerBattleProfile(enemy, mode, learnedSpell = null, context = {}) {
     const adv = state.adventurer;
     const job = jobs[adv.jobId] || jobs.swordsman;
     const stats = getPlayerStats();
     const spellMode = mode === "spell" && learnedSpell;
+    const rangedMode = mode === "ranged";
     const drunkenFist = mode === "attack" && drunkenFistActive();
     const capoeiraKick = !drunkenFist && mode === "attack" && capoeiraActive(state.arena || state.dungeon);
-    const skillPower = drunkenFist ? DRUNKEN_FIST_POWER : capoeiraKick ? Math.max(1, Number(job.skill.power || 1.8)) : spellMode ? Math.max(1, Number(learnedSpell.power || 1)) : mode === "skill" ? Math.max(1, job.skill.power || 1) : 1;
+    const attackDistance = enemy ? chebyshevDistance(enemy, state.arena?.player || state.dungeon?.player || enemy) : 1;
+    const spellDistance = spellMode && enemy
+      ? chebyshevDistance(enemy, state.arena?.player || state.dungeon?.player || enemy)
+      : 0;
+    const magicJobMultiplier = !spellMode ? 1
+      : adv.jobId === "mage" ? 1.16
+        : adv.jobId === "spellblade" ? (spellDistance <= 2 ? 1.22 : 0.84)
+          : adv.jobId === "priest" ? 0.9 : 1;
+    const holySpeciesMultiplier = spellMode && learnedSpell.effect === "holy" && ["spirit", "fiend", "demon"].includes(enemy?.speciesId) ? 1.5 : 1;
+    const rangedPower = !rangedMode ? 1
+      : adv.jobId === "archer" ? 1 + Math.max(0, attackDistance - 2) * 0.08
+        : adv.jobId === "ninja" ? 0.82
+          : adv.jobId === "flower_tamer" ? 0.9 : 1;
+    const conditionalSkillPower = mode !== "skill" ? 1
+      : job.skill.tag === "shadow_assassination" && context.wasAsleep ? 2.4
+        : Math.max(1, Number(job.skill.power || 1));
+    const skillPower = drunkenFist ? DRUNKEN_FIST_POWER : capoeiraKick ? Math.max(1, Number(job.skill.power || 1.8)) : spellMode ? Math.max(1, Number(learnedSpell.power || 1)) * magicJobMultiplier * holySpeciesMultiplier : mode === "skill" ? conditionalSkillPower : rangedPower;
     const attributes = spellMode
       ? [learnedSpell.attribute]
       : drunkenFist || capoeiraKick ? ["blunt"]
         : mode === "skill" && job.skill.attribute ? [job.skill.attribute] : (stats.attackAttributes?.length ? stats.attackAttributes.slice() : [stats.attackAttribute || job.baseAttackAttribute]);
     const attribute = attributes[0];
-    const attackTrials = mode === "skill" || spellMode
+    let attackTrials = mode === "skill" || spellMode
       ? Math.max(1, Math.ceil(stats.attackTrials * 0.6))
       : stats.attackTrials;
+    if (rangedMode && adv.jobId === "ninja") attackTrials = Math.max(1, Math.ceil(attackTrials * 0.5));
     const heartAttributePower = Math.max(0, ...attributes.map((id) => Number(stats.attackAttributeValues?.[id] || 0)));
     const attackMin = Math.max(1, Math.round(stats.attackMin * skillPower) + heartAttributePower);
     const attackMax = Math.max(attackMin, Math.round(stats.attackMax * skillPower) + heartAttributePower);
-    const hitChance = drunkenFist ? Math.max(0.94, clamp(stats.accuracy - (enemy ? (enemy.evasion || 0) : 0), 0.1, 0.98)) : clamp((mode === "skill" || spellMode ? stats.accuracy + 0.08 : stats.accuracy) - (enemy ? (enemy.evasion || 0) : 0), 0.1, 0.98);
-    const critChance = clamp(stats.critChance + (drunkenFist ? 0.12 : mode === "skill" ? 0.05 : spellMode ? 0.03 : 0), 0, drunkenFist ? 0.82 : 0.6);
+    const spellAccuracy = spellMode ? Number(learnedSpell.accuracyModifier || 0) : 0;
+    const enemyEvasion = Math.max(0, Number(enemy?.evasion || 0) - (Number(enemy?.spellConfusedTurns || 0) > 0 ? 0.12 : 0));
+    const hitChance = drunkenFist ? Math.max(0.94, clamp(stats.accuracy - enemyEvasion, 0.1, 0.98)) : clamp((mode === "skill" || spellMode ? stats.accuracy + 0.08 + spellAccuracy : stats.accuracy) - enemyEvasion, 0.1, 0.98);
+    const rangedCritBonus = rangedMode && adv.jobId === "archer" ? Math.max(0, attackDistance - 2) * 0.015 : 0;
+    const skillCritBonus = mode === "skill" && job.skill.tag === "precise" ? 0.16 : mode === "skill" && job.skill.tag === "shadow_assassination" && context.wasAsleep ? 0.28 : mode === "skill" ? 0.05 : 0;
+    const critChance = clamp(stats.critChance + rangedCritBonus + (drunkenFist ? 0.12 : spellMode ? 0.03 : skillCritBonus), 0, drunkenFist ? 0.82 : 0.6);
     return {
-      label: drunkenFist ? "酔拳・八仙酔打" : capoeiraKick ? "逆立ち旋風脚" : spellMode ? `${spellbookRankLabel(learnedSpell.rank)}魔法「${learnedSpell.name}」` : mode === "skill" ? job.skill.name : `${job.name}の連撃`,
+      label: drunkenFist ? "酔拳・八仙酔打" : capoeiraKick ? "逆立ち旋風脚" : spellMode ? `${spellbookRankLabel(learnedSpell.rank)}魔法「${learnedSpell.name}」` : mode === "skill" ? job.skill.name : rangedMode ? `${job.name}の遠隔攻撃` : `${job.name}の連撃`,
       attribute,
       attributes,
       attackTrials,
@@ -5485,6 +5631,9 @@
       attackMax,
       hitChance,
       critChance,
+      defensePierce: spellMode && learnedSpell.effect === "shatter" ? 1 : spellMode && learnedSpell.effect === "pierce" ? 0.5
+        : mode === "skill" && job.skill.tag === "piercing_arrow" ? 0.7
+          : mode === "skill" && job.skill.tag === "precise" ? 0.25 : 0,
     };
   }
 
@@ -5529,13 +5678,15 @@
     return Number(a || 0) + Number(b || 0);
   }
 
-  function damageAfterDefense(raw, attackAttributes, enemy) {
+  function damageAfterDefense(raw, attackAttributes, enemy, defensePierce = 0) {
     const attributes = Array.isArray(attackAttributes) && attackAttributes.length ? attackAttributes : [attackAttributes].filter(Boolean);
     return Math.max(0, ...attributes.map((attribute) => {
       const weak = enemy.weaknesses.includes(attribute) ? 1.35 : 1;
       const res = enemy.resistances[attribute] || 0;
       const mult = DATA.resistanceMultipliers[res] ?? 1;
-      return mult === 0 ? 0 : Math.max(1, Math.round(Math.max(1, raw * weak - enemy.defense) * mult));
+      const defense = Math.max(0, Number(enemy.defense || 0) * (1 - clamp(defensePierce, 0, 1)) - Number(enemy.spellArmorBreak || 0));
+      const cursed = Number(enemy.spellCursedTurns || 0) > 0 ? 1.2 : 1;
+      return mult === 0 ? 0 : Math.max(1, Math.round(Math.max(1, raw * weak - defense) * mult * cursed));
     }));
   }
 
@@ -5793,6 +5944,8 @@
     if (enemy?.flowerPet) return { skill, range: Number(job?.rangedRange || 1), available: false, reason: "使役中の花ペット" };
     if (!skill || !state.dungeon) return { skill, range: 0, available: false, reason: "ダンジョン内でのみ使用できる" };
     if (["heal", "capoeira_stance"].includes(skill.tag)) return { skill, range: 0, available: false, reason: "敵を対象にしない技" };
+    const cooldown = jobSkillCooldownRemaining(skill.id);
+    if (cooldown > 0) return { skill, range: Number(job.rangedRange || 1), cooldown, available: false, reason: `再使用まで${cooldown}世界ターン` };
     const rangedRange = Number(job.rangedRange || 0);
     const range = skill.tag === "observe" ? Math.max(4, rangedRange) : Math.max(1, rangedRange);
     const distance = chebyshevDistance(enemy, state.dungeon.player);
@@ -5805,11 +5958,152 @@
     const spell = activeLearnedSpell();
     if (enemy?.flowerPet) return { spell, range: Number(spell?.range || 0), available: false, reason: "使役中の花ペット" };
     if (!spell || !spell.jobs.includes(state.adventurer.jobId) || !state.dungeon) return { spell, range: Number(spell?.range || 0), available: false, reason: "使用できる習得魔法がない" };
+    const cooldown = spellCooldownRemaining(spell.id);
+    if (cooldown > 0) return { spell, range: Number(spell.range || 1), cooldown, available: false, reason: `再詠唱まで${cooldown}世界ターン` };
     const range = Number(spell.range || 1);
     const distance = chebyshevDistance(enemy, state.dungeon.player);
     if (distance > range) return { spell, range, available: false, reason: `射程外（距離${distance}）` };
     if (!hasLineOfSight(state.dungeon.player.x, state.dungeon.player.y, enemy.x, enemy.y)) return { spell, range, available: false, reason: "壁に遮られている" };
     return { spell, range, available: true, reason: "" };
+  }
+
+  function combatCooldownHost() {
+    return state.adventurer.inDungeon ? state.dungeon : state.arena;
+  }
+
+  function cooldownRemaining(bucket, id) {
+    return Math.max(0, Number(combatCooldownHost()?.[bucket]?.[id] || 0));
+  }
+
+  function beginCooldown(bucket, id, turns) {
+    const host = combatCooldownHost();
+    if (!host || !id || Number(turns) <= 0) return;
+    host[bucket] = host[bucket] && typeof host[bucket] === "object" ? host[bucket] : {};
+    host[bucket][id] = Math.max(1, Number(turns));
+  }
+
+  function tickCooldownBucket(host, bucket) {
+    if (!host?.[bucket]) return;
+    Object.keys(host[bucket]).forEach((id) => {
+      host[bucket][id] = Math.max(0, Number(host[bucket][id] || 0) - 1);
+    });
+  }
+
+  function spellCooldownRemaining(spellId) {
+    return cooldownRemaining("spellCooldowns", spellId);
+  }
+
+  function beginSpellCooldown(spell) {
+    if (!spell) return;
+    const jobReduction = state.adventurer.jobId === "mage" ? 1 : 0;
+    beginCooldown("spellCooldowns", spell.id, Number(spell.cooldown || 2) - jobReduction);
+  }
+
+  function tickSpellCooldowns(host) {
+    tickCooldownBucket(host, "spellCooldowns");
+  }
+
+  function jobSkillCooldownRemaining(skillId) {
+    return cooldownRemaining("jobSkillCooldowns", skillId);
+  }
+
+  function beginJobSkillCooldown(skill) {
+    if (!skill?.cooldown) return;
+    beginCooldown("jobSkillCooldowns", skill.id, skill.cooldown);
+  }
+
+  function tickJobSkillCooldowns(host) {
+    tickCooldownBucket(host, "jobSkillCooldowns");
+  }
+
+  function pushEnemyAwayFromPlayer(enemy, distance = 1) {
+    const host = state.arena || state.dungeon;
+    if (!host || !enemy) return { moved: 0, blocked: false };
+    const dx = Math.sign(enemy.x - host.player.x);
+    const dy = Math.sign(enemy.y - host.player.y);
+    let moved = 0;
+    let blockedAtEdge = false;
+    for (let step = 0; step < distance; step += 1) {
+      const x = enemy.x + dx;
+      const y = enemy.y + dy;
+      const blocked = state.arena
+        ? arenaBlocked(state.arena, x, y) || (state.arena.player.x === x && state.arena.player.y === y)
+        : !canEnemyMove(enemy, x, y);
+      if (blocked) {
+        blockedAtEdge = true;
+        break;
+      }
+      enemy.x = x;
+      enemy.y = y;
+      moved += 1;
+    }
+    return { moved, blocked: blockedAtEdge };
+  }
+
+  function applyRangedJobSkillEffect(enemy, skill, outcome) {
+    if (!enemy?.alive || enemy.hp <= 0 || !skill || !outcome?.hitCount) return;
+    if (skill.tag === "psy") {
+      const push = pushEnemyAwayFromPlayer(enemy, 2);
+      if (push.blocked) {
+        const collision = Math.max(1, Math.round(getPlayerStats().attackMax * 0.7));
+        enemy.hp -= collision;
+        log(`${enemy.name}が壁際へ叩きつけられ、衝突で${collision}ダメージ。`);
+        playSfx("knockback");
+        if (enemy.hp <= 0 && enemy.alive && !state.arena) defeatEnemy(enemy, { leaveCorpse: true });
+      } else log(`${enemy.name}を念動衝撃で${push.moved}マス吹き飛ばした。`);
+    } else if (skill.tag === "shadow_assassination") {
+      enemy.spellBoundTurns = Math.max(3, Number(enemy.spellBoundTurns || 0));
+      log(`${enemy.name}の影を地面へ縫い止め、3世界ターン移動を封じた。`);
+    } else if (skill.tag === "piercing_arrow" && state.dungeon) {
+      const player = state.dungeon.player;
+      const vx = enemy.x - player.x;
+      const vy = enemy.y - player.y;
+      const targetDot = vx * vx + vy * vy;
+      const pierced = state.dungeon.enemies.filter((candidate) => candidate.alive && candidate !== enemy
+        && vx * (candidate.y - player.y) === vy * (candidate.x - player.x)
+        && vx * (candidate.x - player.x) + vy * (candidate.y - player.y) > targetDot
+        && chebyshevDistance(candidate, enemy) <= 3).sort((a, b) => chebyshevDistance(a, enemy) - chebyshevDistance(b, enemy))[0];
+      if (pierced) {
+        const damage = Math.max(1, Math.round(outcome.total * 0.45));
+        pierced.hp -= damage;
+        log(`貫通矢が背後の${pierced.name}まで射抜き、${damage}ダメージ。`);
+        if (pierced.hp <= 0 && pierced.alive) defeatEnemy(pierced, { experienceMultiplier: 0.75 });
+      }
+    }
+  }
+
+  function applySpellEffect(enemy, spell, outcome) {
+    if (!enemy?.alive || enemy.hp <= 0 || !spell || !outcome?.hitCount) return;
+    const effect = spell.effect;
+    let applied = true;
+    if (effect === "burn") enemy.regenerationWeakenedTurns = Math.max(4, Number(enemy.regenerationWeakenedTurns || 0));
+    else if (effect === "dampen") enemy.spellDampenedTurns = Math.max(3, Number(enemy.spellDampenedTurns || 0));
+    else if (effect === "stun") {
+      applied = Math.random() < 0.38;
+      if (applied) enemy.spellStunnedTurns = Math.max(1, Number(enemy.spellStunnedTurns || 0));
+    }
+    else if (effect === "slow") enemy.spellSlowedTurns = Math.max(4, Number(enemy.spellSlowedTurns || 0));
+    else if (effect === "knockback") pushEnemyAwayFromPlayer(enemy, 2);
+    else if (effect === "corrode") {
+      enemy.spellArmorBreak = Math.max(Number(enemy.spellArmorBreak || 0), Math.max(2, Math.ceil(enemy.defense * 0.35)));
+      enemy.spellArmorBreakTurns = Math.max(6, Number(enemy.spellArmorBreakTurns || 0));
+    }
+    else if (effect === "bind") enemy.spellBoundTurns = Math.max(3, Number(enemy.spellBoundTurns || 0));
+    else if (effect === "confuse") enemy.spellConfusedTurns = Math.max(5, Number(enemy.spellConfusedTurns || 0));
+    else if (effect === "curse") enemy.spellCursedTurns = Math.max(5, Number(enemy.spellCursedTurns || 0));
+    else if (effect === "black_sun") {
+      enemy.regenerationSuppressedTurns = Math.max(8, Number(enemy.regenerationSuppressedTurns || 0));
+      enemy.spellArmorBreak = Math.max(Number(enemy.spellArmorBreak || 0), Math.max(3, Math.ceil(enemy.defense * 0.25)));
+      enemy.spellArmorBreakTurns = Math.max(8, Number(enemy.spellArmorBreakTurns || 0));
+    } else if (effect === "erase") {
+      enemy.regenerationSuppressedTurns = Math.max(10, Number(enemy.regenerationSuppressedTurns || 0));
+      enemy.spellArmorBreak = Math.max(Number(enemy.spellArmorBreak || 0), Math.max(4, Math.ceil(enemy.defense * 0.5)));
+      enemy.spellArmorBreakTurns = Math.max(10, Number(enemy.spellArmorBreakTurns || 0));
+      enemy.spellConfusedTurns = Math.max(6, Number(enemy.spellConfusedTurns || 0));
+    }
+    else if (!["holy", "pierce", "shatter"].includes(effect)) applied = false;
+    const effectLabels = { burn: "再生弱化", dampen: "攻撃減衰", stun: "感電", slow: "鈍化", knockback: "吹き飛ばし", corrode: "防御侵食", bind: "影縛り", confuse: "幻惑", curse: "被害増幅", black_sun: "再生封印", erase: "真名崩壊" };
+    if (applied && effectLabels[effect]) log(`${spell.name}の追加効果「${effectLabels[effect]}」が${enemy.name}へ刻まれた。`);
   }
 
   function hasLineOfSight(x0, y0, x1, y1) {
@@ -5827,7 +6121,7 @@
     enemy.alertedTurns = Math.max(Number(enemy.alertedTurns || 0), 6);
     ensureUniqueEncounterSpeech(enemy);
     log(`${enemy.name}へ遠隔攻撃を放った。`);
-    const result = playerAttack(enemy, "attack");
+    const result = playerAttack(enemy, "ranged");
     finishDungeonAttack(enemy, result);
   }
 
@@ -5846,6 +6140,8 @@
     ensureUniqueEncounterSpeech(enemy);
     log(`${enemy.name}へ職業技「${status.skill.name}」を使った。`);
     const result = playerAttack(enemy, "skill");
+    beginJobSkillCooldown(status.skill);
+    applyRangedJobSkillEffect(enemy, status.skill, result);
     finishDungeonAttack(enemy, result);
     return true;
   }
@@ -5865,6 +6161,8 @@
     ensureUniqueEncounterSpeech(enemy);
     log(`${enemy.name}へ${spellbookRankLabel(status.spell.rank)}魔法「${status.spell.name}」を放った。`);
     const result = playerAttack(enemy, "spell", status.spell);
+    beginSpellCooldown(status.spell);
+    applySpellEffect(enemy, status.spell, result);
     finishDungeonAttack(enemy, result);
     return true;
   }
@@ -5910,7 +6208,10 @@
         enemy.asleep = false;
         if (sleepDistance <= 6) log(`${enemy.name}が物音に気づいて目を覚ました。`);
       }
-      const actions = Math.min(enemy.unique ? 3 : 2, 1 + Math.floor(Number(enemy.acceleration || 0) / 12));
+      const spellSlowed = Number(enemy.spellSlowedTurns || 0) > 0;
+      if (spellSlowed) enemy.spellSlowedTurns -= 1;
+      const effectiveAcceleration = spellSlowed ? 0 : Number(enemy.acceleration || 0);
+      const actions = Math.min(enemy.unique ? 3 : 2, 1 + Math.floor(effectiveAcceleration / 12));
       for (let action = 0; action < actions; action += 1) {
         if (!state.dungeon || !state.adventurer.inDungeon || !enemy.alive || state.adventurer.hp <= 0) break;
         const dx = Math.abs(enemy.x - state.dungeon.player.x);
@@ -5918,6 +6219,10 @@
         const dist = Math.max(dx, dy);
         if (dist <= 1) {
           if (enemyTurn(enemy) === "telegraphed") break;
+          continue;
+        }
+        if (Number(enemy.spellBoundTurns || 0) > 0) {
+          enemy.spellBoundTurns -= 1;
           continue;
         }
         if (enemy.specialAttack === "ranged" && dist <= 6
@@ -5976,7 +6281,10 @@
       const healed = Math.min(amount, enemy.maxHp - enemy.hp);
       enemy.hp += healed;
       const nearby = state.arena || (state.dungeon && chebyshevDistance(enemy, state.dungeon.player) <= 6);
-      if (nearby) log(`${enemy.name}の急速再生。傷が逆再生し、HPを${healed}回復した！${weakened ? " 毒により回復量半減。" : ""}`);
+      if (nearby) {
+        log(`${enemy.name}の急速再生。傷が逆再生し、HPを${healed}回復した！${weakened ? " 毒により回復量半減。" : ""}`);
+        playSfx("regenerate");
+      }
     });
   }
 
@@ -6012,6 +6320,8 @@
     }
     state.dungeon.timeStopCooldown = Math.max(0, Number(state.dungeon.timeStopCooldown || 0) - 1);
     state.dungeon.healCooldown = Math.max(0, Number(state.dungeon.healCooldown || 0) - 1);
+    tickSpellCooldowns(state.dungeon);
+    tickJobSkillCooldowns(state.dungeon);
     state.adventurer.slowTurns = Math.max(0, Number(state.adventurer.slowTurns || 0) - 1);
     if (state.adventurer.immobilizedTurns > 0) {
       state.adventurer.immobilizedTurns -= 1;
@@ -6273,6 +6583,16 @@
 
   // Static and delegated input bindings.
   els.tabs.forEach((button) => button.addEventListener("click", () => {
+    if (button.dataset.view === "arena" && !arenaUnlocked()) {
+      log("修練連武闘技場は封鎖中。地下10階の守護者を倒した冒険者だけが入場できる。");
+      playSfx("uiError");
+      return;
+    }
+    if (button.dataset.view === "junkDealer" && !junkDealerUnlocked()) {
+      log("珍品偏愛堂はまだ存在しない。地下20階を踏破すれば、ガラクタマニアが噂を聞きつけて現れるらしい。");
+      playSfx("uiError");
+      return;
+    }
     if (button.dataset.view === "dungeon" && !state.adventurer.inDungeon) enterDungeon();
     else switchView(button.dataset.view);
   }));
@@ -6334,6 +6654,7 @@
       spellTargetArmed = false;
     }
     log(jobSkillTargetArmed ? `${skill.name}を構えた。光っている射程内の敵を選べ。` : `${skill.name}を取りやめた。`);
+    playSfx("uiToggle");
     render();
   });
   els.activeSpell?.addEventListener("click", () => {
@@ -6344,16 +6665,21 @@
       jobSkillTargetArmed = false;
     }
     log(spellTargetArmed ? `${spell.name}を構えた。光っている射程内の敵を選べ。` : `${spell.name}の詠唱を取りやめた。`);
+    playSfx("uiToggle");
     render();
   });
   els.returnTown.addEventListener("click", returnTown);
   els.audioButton.addEventListener("click", toggleAudio);
   els.confirmOk.addEventListener("click", () => {
+    playSfx("uiConfirm");
     const action = pendingConfirm;
     closeConfirm();
     if (action) action();
   });
-  els.confirmCancel.addEventListener("click", cancelConfirm);
+  els.confirmCancel.addEventListener("click", () => {
+    playSfx("uiCancel");
+    cancelConfirm();
+  });
   els.setupOk.addEventListener("click", confirmSetup);
   els.setupCancel.addEventListener("click", closeSetup);
   els.openRacePicker.addEventListener("click", () => openSetupPicker("race"));
@@ -6371,6 +6697,13 @@
   document.addEventListener("pointerdown", (event) => {
     if (event.target && event.target.closest && event.target.closest("#audioButton")) return;
     startAudioFromGesture();
+  });
+  document.addEventListener("change", (event) => {
+    if (event.target?.matches?.("select")) playSfx("uiFilter");
+  });
+  document.addEventListener("click", (event) => {
+    const button = event.target?.closest?.("[data-shop-page], [data-research-page]");
+    if (button && !button.disabled) playSfx("uiPage");
   });
   document.addEventListener("keydown", (event) => {
     const developerPanel = document.querySelector("#developerPanel");

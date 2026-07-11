@@ -95,8 +95,13 @@ assert(mainSource.includes("LOG_HISTORY_LIMIT = 60") && mainSource.includes("fun
 assert(mainSource.includes('id="shopCompatibilitySelect"') && mainSource.includes("!shopCompatibleOnly || item.jobs.includes(adv.jobId)"), "shop current-job compatibility filter is missing");
 assert(mainSource.includes("function equipmentRole(item)") && mainSource.includes("window.HD_EQUIPMENT_ROLES"), "internal equipment role classification is missing");
 assert(!mainSource.includes('id="shopEquipmentRoleSelect"') && !mainSource.includes('id="homeEquipmentRoleSelect"') && !styleSource.includes(".equipment-role-tag"), "internal equipment roles leaked into player-facing UI");
+assert(mainSource.includes("function arenaUnlocked") && mainSource.includes(".includes(10)") && mainSource.includes("地下10階を踏破した功績が認められ"), "arena is not gated behind clearing B10");
+assert(styleSource.includes(".tabs button.locked") && mainSource.includes('button.textContent = arenaLocked ? "闘技場・封"'), "locked arena tab has no visible state");
+assert(mainSource.includes("function junkDealerUnlocked") && mainSource.includes(".includes(20)") && mainSource.includes("地下20階を踏破した噂を聞きつけ"), "junk dealer is not gated behind clearing B20");
+assert(mainSource.includes('button.textContent = junkDealerLocked ? "珍品店・封"'), "locked junk-dealer tab has no visible state");
 assert(mainSource.includes('`${attr(item.attributeAttack)}攻`') && mainSource.includes('`${attr(resistanceFocus)}耐`'), "equipment specialization tags do not expose their focus");
 assert(mainSource.includes('playSfx("levelStatUp")') && mainSource.includes("data-level-stat"), "sequential level-up stat presentation is missing");
+assert(mainSource.includes('state.adventurer.jobId === "ninja"') && mainSource.includes('cell.classList.add("player-unlit")') && styleSource.includes(".player-unlit"), "ninja player marker still emits a glow");
 assert(mainSource.includes("const growthStepDelay = 750") && mainSource.includes("const unchangedStepDelay = 480") && mainSource.includes('entry.difference > 0 ? "will-rise" : "unchanged"'), "level-up stat presentation is not using growth-aware cadence");
 assert(mainSource.includes('class="stat-gain">+${entry.difference}') && styleSource.includes(".level-up-stat.will-rise.revealed .stat-gain"), "level-up stat point gains are not visually exposed");
 assert(mainSource.includes('luck: "運", acceleration: "加速度"') && !mainSource.includes('defense: "防御", attackMin: "最低攻撃"'), "level-up presentation includes stats that cannot grow directly");
@@ -132,7 +137,7 @@ assert(mainSource.includes("MAP_SIZE_RANGE = Object.freeze([36, 60])") && mainSo
 assert(styleSource.includes(".cell.light-room") && mainSource.includes("alwaysLitTiles") && dungeonGeneratorSource.includes("alwaysLitTileKeys"), "always-lit rooms and their first corridor tile are not rendered above dungeon darkness");
 assert(!dungeonGeneratorSource.includes("corridorWidth"), "two-tile corridor generation remains enabled");
 assert(mainSource.includes('state.adventurer.jobId === "handyman" ? 1 : 0'), "handyman harvest-count bonus is missing");
-assert(mainSource.includes('adv.personalityId === "lewd"') && mainSource.includes("risqueSynergyCount * 3"), "lewd/risque equipment synergy is missing");
+assert(mainSource.includes('adv.personalityId === "lewd"') && mainSource.includes("RISQUE_SYNERGY_PER_ITEM") && mainSource.includes("risqueSynergyCount * RISQUE_SYNERGY_PER_ITEM.acceleration"), "lewd/risque equipment synergy is missing");
 assert(mainSource.includes('secretName === "サイタマ"') && mainSource.includes("SAITAMA_ONE_PUNCH_CHANCE"), "Saitama name secret is missing");
 assert(mainSource.includes('secretName === "リムル" && state.adventurer.raceId === "slime"') && mainSource.includes("虚崩朧千変万華"), "Rimuru/slime floor-wipe secret is missing or applies to another race");
 assert(mainSource.includes('adv.raceId === "slime"') && mainSource.includes("RIMURU_SLIME_STAT_BONUS") && mainSource.includes("rimuruSlimeAwakened"), "Rimuru/slime strongest-race secret is missing");
@@ -148,6 +153,8 @@ assert(indexSource.includes('id="depthPickerPanel"') && indexSource.includes('ar
 assert(indexSource.indexOf('id="magicMoveControls"') < indexSource.indexOf('class="controls"') && styleSource.includes(".death-review-card"), "action-dock control order or short-screen death review layout is missing");
 assert(/\.controls\s*\{[^}]*border:\s*0;[^}]*background:[^}]*rgba\([^)]*,\s*0\.(?:42|5)\)[^}]*box-shadow:\s*none;/.test(styleSource), "keypad outer frame is not transparently blended into the map");
 assert(styleSource.includes("grid-template-columns: repeat(3, 54px)") && styleSource.includes("grid-template-rows: repeat(3, 50px)"), "keypad did not receive the requested six-pixel size increase");
+assert(styleSource.includes("@media (min-width: 980px)") && styleSource.includes("width: min(100vw, 1180px)") && styleSource.includes("grid-template-columns: repeat(10, minmax(0, 1fr))"), "desktop-wide town layout is missing");
+assert(styleSource.includes("grid-template-columns: minmax(600px, 1fr) minmax(310px, 360px)") && styleSource.includes("min(42px, calc((100svh - 360px) / 13))"), "desktop dungeon map and side-log layout is missing");
 assert(/\.controls\s*\{[^}]*transform:\s*translateY\(-3px\)/.test(styleSource), "keypad does not include the additional one-pixel upward offset");
 assert(/\.magic-move-controls\s*\{[^}]*transform:\s*translateY\(-4px\) scale\(0\.9\)[^}]*transform-origin:\s*right center/.test(styleSource), "purple ability box size or four-pixel upward offset is missing");
 assert(styleSource.includes("clamp(105px, 15svh, 132px)") && styleSource.includes("calc((100svh - 328px) / 13)"), "removed dungeon status space was not assigned to the log");
@@ -255,6 +262,14 @@ assert(window.HD_DATA.spellbookRanks.length === 5, "spellbook rank count changed
 assert(window.HD_DATA.spellbookRanks.every((rank, index, ranks) => index === 0 || (rank.rarityWeight < ranks[index - 1].rarityWeight && rank.minFloor > ranks[index - 1].minFloor)), "higher spellbook ranks are not progressively rarer");
 assert(window.HD_DATA.spells.length === 15 && window.HD_DATA.spellbooks.length === 15, "spell/spellbook catalog count changed");
 assert(window.HD_DATA.spells.every((spell) => spell.range >= 1 && spell.range <= 6), "a spell range exceeds the visible targeting radius");
+assert(window.HD_DATA.spells.every((spell) => spell.cooldown >= 1 && spell.effect), "a spell lacks recast timing or a distinct effect");
+assert(new Set(window.HD_DATA.spells.map((spell) => spell.effect)).size >= 12, "spell effects are not sufficiently differentiated");
+assert(mainSource.includes("function applySpellEffect") && mainSource.includes("function tickSpellCooldowns") && mainSource.includes('id="arenaSpellButton"'), "spell effects, recast timing, or arena casting is missing");
+const rangedJobs = window.HD_DATA.jobs.filter((job) => ["hunter", "archer", "psychic", "ninja", "flower_tamer"].includes(job.id));
+assert(rangedJobs.every((job) => job.rangedRange >= 4 && job.skill.cooldown >= 3), "a non-magic ranged job lacks range or skill recast timing");
+assert(window.HD_DATA.jobs.find((job) => job.id === "archer").rangedRange === 7, "archer is not the longest-range weapon job");
+assert(mainSource.includes("function applyRangedJobSkillEffect") && mainSource.includes('job.skill.tag === "piercing_arrow"') && mainSource.includes('job.skill.tag === "shadow_assassination"'), "ranged-job signature mechanics are missing");
+assert(mainSource.includes('rangedMode && adv.jobId === "ninja"') && mainSource.includes("attackTrials * 0.5"), "ninja ranged attacks still retain full melee attack count");
 assert(window.HD_DATA.personalities.some((item) => item.id === "ordinary" && item.name === "ふつう"), "ordinary personality is missing");
 assert(window.HD_DATA.personalities.some((item) => item.id === "lewd" && item.name === "すけべ"), "lewd personality is missing");
 assert(window.HD_DATA.personalities.some((item) => item.id === "glutton" && item.name === "食いしん坊" && item.stats.strength === 1), "glutton personality is missing");
@@ -676,7 +691,8 @@ FakeAudioContext.prototype.createBuffer = function (channels, length) {
 
 const fakeAudioContext = new FakeAudioContext();
 const sfxPlayer = window.HD_SFX.create(fakeAudioContext, new FakeAudioNode());
-assert(sfxPlayer.types.length === 61, "sound effect recipe count changed");
+assert(sfxPlayer.types.length === 88, "sound effect recipe count changed");
+assert(["uiTab", "uiConfirm", "uiCancel", "drink", "heartEquip", "trapDiscover", "trapDisarm", "summon", "invulnerable", "regenerate", "knockback", "selfDestruct", "debuff", "devour", "jobChange", "tutorial", "shopRefresh"].every((type) => sfxPlayer.types.includes(type)), "expanded sound-effect recipes are missing");
 const voicesBeforeLevelUp = audioVoiceStarts;
 sfxPlayer.play("levelUp");
 assert(audioVoiceStarts - voicesBeforeLevelUp >= 18, "level-up fanfare is not sufficiently layered");
@@ -849,6 +865,7 @@ const legacySave = {
   },
   meta: {
     startGuidanceShown: true,
+    clearedBossFloors: [20],
     guildClaims: [{ id: "red_garm", name: "赤熱のガルム", reward: 400 }],
     research: {
       cave_rat: { seen: true, level: 1 },
@@ -1029,6 +1046,7 @@ shallowShopGateSave.meta.progressionSchemaVersion = 2;
 shallowShopGateSave.meta.shop = { soldMaterials: { small_beast_meat: 999 }, inventory: [] };
 shallowShopGateSave.adventurer.inDungeon = false;
 shallowShopGateSave.adventurer.deepestFloor = 1;
+shallowShopGateSave.meta.clearedBossFloors = [];
 shallowShopGateSave.adventurer.gold = 10;
 shallowShopGateSave.dungeon = null;
 let persistedShallowShopGateSave = null;
@@ -1058,6 +1076,7 @@ assert(persistedDepth15ShopGateSave.meta.shop.inventory.every((id) => Number(win
 
 const legacyShopGateSave = clone(shallowShopGateSave);
 delete legacyShopGateSave.meta.economySchemaVersion;
+legacyShopGateSave.meta.clearedBossFloors = [10];
 legacyShopGateSave.meta.shop.inventory = [window.HD_DATA.equipment.find((item) => item.shopMinFloor === 85).id];
 let persistedLegacyShopGateSave = null;
 localStorage.getItem = function (key) {
@@ -2416,7 +2435,7 @@ localStorage.getItem = function (key) {
 };
 eval(read("js/main.js"));
 viewTabs.find((tab) => tab.dataset.view === "home").listeners.click();
-assert(elements.get("#homeView").innerHTML.includes("すけべ共鳴：艶装備1個"), "lewd/risque equipment synergy is not shown at home");
+assert(elements.get("#homeView").innerHTML.includes("すけべ共鳴・真艶覚醒：艶装備1個"), "lewd/risque equipment synergy is not shown at home");
 
 const gokuSave = clone(lowCurseSave);
 gokuSave.adventurer.name = "孫悟空";
