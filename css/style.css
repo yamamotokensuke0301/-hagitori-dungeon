@@ -64,21 +64,45 @@ button:active:not(:disabled) {
   overflow: hidden;
 }
 
-.app-shell.dungeon-mode,
 .app-shell.arena-mode {
   grid-template-rows: auto auto auto minmax(0, 1fr) clamp(104px, 17svh, 144px);
+  background:
+    radial-gradient(circle at 50% 24%, rgba(151, 57, 45, 0.2), transparent 48%),
+    linear-gradient(180deg, rgba(25, 18, 15, 0.96), rgba(10, 9, 8, 0.99));
 }
 
 .app-shell.dungeon-mode {
+  --tile: clamp(15px, min(30px, calc((100vw - 56px) / 13), calc((100svh - 296px) / 13)), 30px);
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) clamp(104px, 17svh, 144px);
   background:
     radial-gradient(circle at 50% 26%, rgba(74, 101, 84, 0.2), transparent 48%),
     linear-gradient(180deg, rgba(15, 22, 18, 0.94), rgba(8, 12, 10, 0.98));
 }
 
-.app-shell.arena-mode {
-  background:
-    radial-gradient(circle at 50% 24%, rgba(151, 57, 45, 0.2), transparent 48%),
-    linear-gradient(180deg, rgba(25, 18, 15, 0.96), rgba(10, 9, 8, 0.99));
+.app-shell.dungeon-mode .status-bar {
+  grid-column: 1 / -1;
+  grid-row: 1;
+}
+
+.app-shell.dungeon-mode > .character-strip {
+  display: none;
+}
+
+.app-shell.dungeon-mode #dungeonView {
+  grid-column: 1;
+  grid-row: 2;
+  padding-bottom: 60px;
+  scroll-padding-bottom: 60px;
+}
+
+.app-shell.dungeon-mode .log-panel {
+  grid-column: 1 / -1;
+  grid-row: 3;
+}
+
+.app-shell.dungeon-mode .equipment-strip {
+  display: none;
 }
 
 .app-shell.dungeon-mode .tabs,
@@ -391,6 +415,53 @@ strong {
   font-size: 10px;
 }
 
+.dungeon-projection {
+  position: relative;
+  width: fit-content;
+  max-width: 100%;
+  margin-inline: auto;
+}
+
+.dungeon-stats-overlay {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  z-index: 12;
+  width: 46px;
+  display: grid;
+  gap: 5px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.dungeon-stats-overlay > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 3px;
+  align-items: baseline;
+  min-width: 0;
+  padding: 1px 0;
+}
+
+.dungeon-stats-overlay span {
+  color: #a9b8aa;
+  font-size: 9px;
+  line-height: 1;
+  text-shadow: 0 1px 3px #000, 0 0 5px #000;
+}
+
+.dungeon-stats-overlay strong {
+  color: #fff0b3;
+  font-size: 12px;
+  line-height: 1;
+  text-align: right;
+  text-shadow: 0 1px 4px #000;
+}
+
 .map {
   position: relative;
   isolation: isolate;
@@ -399,6 +470,8 @@ strong {
   grid-template-rows: repeat(13, var(--tile));
   gap: 1px;
   justify-content: center;
+  width: fit-content;
+  max-width: 100%;
   overflow: hidden;
   padding: 4px;
   border: 1px solid #4b513f;
@@ -415,13 +488,13 @@ strong {
   border-radius: 8px;
   pointer-events: none;
   background: radial-gradient(
-    circle at 50% 50%,
-    transparent 0 13%,
-    rgba(0, 0, 0, 0.06) 20%,
-    rgba(0, 0, 0, 0.34) 38%,
-    rgba(0, 0, 0, 0.68) 58%,
-    rgba(0, 0, 0, 0.88) 78%,
-    rgba(0, 0, 0, 0.96) 100%
+    circle closest-side at 50% 50%,
+    transparent 0 34%,
+    rgba(0, 0, 0, 0.08) 46%,
+    rgba(0, 0, 0, 0.36) 64%,
+    rgba(0, 0, 0, 0.72) 84%,
+    rgba(0, 0, 0, 0.91) 97%,
+    rgba(0, 0, 0, 0.97) 100%
   );
   box-shadow: inset 0 0 24px 8px rgba(0, 0, 0, 0.78);
 }
@@ -445,6 +518,15 @@ strong {
   filter: brightness(1.18) saturate(1.08);
 }
 
+.cell.light-room {
+  z-index: 9;
+  filter: brightness(1.2) saturate(1.08);
+}
+
+.cell.light-room.tile-floor {
+  box-shadow: inset 0 0 7px rgba(255, 226, 145, 0.2), 0 0 5px rgba(244, 205, 112, 0.12);
+}
+
 .cell.light-mid {
   filter: brightness(0.9) saturate(0.9);
 }
@@ -454,11 +536,42 @@ strong {
 }
 
 .tile-wall {
-  background: #30332b;
+  border: 1px solid rgba(141, 148, 126, 0.22);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.09), transparent 42%),
+    repeating-linear-gradient(0deg, #343830 0 4px, #292d27 4px 8px);
+  box-shadow: inset 1px 1px rgba(197, 202, 174, 0.08), inset -2px -2px rgba(0, 0, 0, 0.34);
 }
 
 .tile-floor {
-  background: #22271f;
+  border: 1px solid rgba(83, 105, 83, 0.11);
+  background:
+    radial-gradient(circle at 30% 28%, rgba(139, 157, 112, 0.12) 0 1px, transparent 2px),
+    linear-gradient(160deg, #20291f, #171e18);
+  box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.24);
+}
+
+.tile-excavated {
+  background:
+    radial-gradient(circle at 25% 70%, rgba(186, 162, 116, 0.28) 0 1px, transparent 2px),
+    radial-gradient(circle at 72% 34%, rgba(162, 145, 108, 0.22) 0 1px, transparent 2px),
+    linear-gradient(160deg, #29271f, #1b1c17);
+  box-shadow: inset 0 0 0 1px rgba(188, 165, 119, 0.18), inset 0 0 7px rgba(0, 0, 0, 0.28);
+}
+
+.cell.room-madness {
+  outline: 1px solid rgba(203, 64, 122, 0.3);
+  outline-offset: -2px;
+}
+
+.cell.room-treasureVault {
+  outline: 1px solid rgba(247, 202, 83, 0.34);
+  outline-offset: -2px;
+}
+
+.cell.room-thrill {
+  outline: 1px solid rgba(137, 210, 255, 0.34);
+  outline-offset: -2px;
 }
 
 .tile-player {
@@ -493,6 +606,27 @@ strong {
 .tile-enemy,
 .tile-unique {
   position: relative;
+}
+
+.tile-sleeping {
+  filter: brightness(0.78) saturate(0.62);
+  box-shadow: inset 0 0 0 1px rgba(151, 184, 222, 0.32);
+}
+
+.sleep-indicator {
+  position: absolute;
+  top: 1px;
+  right: 2px;
+  color: #baddff;
+  font-size: calc(var(--tile) * 0.28);
+  font-weight: 900;
+  text-shadow: 0 0 4px #4e79a8;
+  animation: sleep-drift 1.8s ease-in-out infinite alternate;
+}
+
+@keyframes sleep-drift {
+  from { transform: translateY(1px); opacity: 0.58; }
+  to { transform: translateY(-2px); opacity: 1; }
 }
 
 .tile-invisible-seen {
@@ -540,6 +674,17 @@ strong {
 .tile-trap {
   color: #ff8a65;
   background: #38241f;
+}
+
+.tile-trap.trap-danger-4 {
+  color: #ff635f;
+  box-shadow: inset 0 0 7px rgba(255, 77, 69, 0.42);
+}
+
+.tile-trap.trap-danger-5 {
+  color: #fff0b5;
+  background: #491b20;
+  box-shadow: inset 0 0 8px rgba(255, 44, 62, 0.62), 0 0 5px rgba(255, 44, 62, 0.28);
 }
 
 .monster-marker {
@@ -860,11 +1005,6 @@ strong {
 
 .research-bounties {
   margin: 14px 0;
-}
-
-.research-bounties > h2 {
-  margin-bottom: 4px;
-  color: #ffd09a;
 }
 
 .bounty-card.known {
@@ -1266,6 +1406,48 @@ strong {
   background: rgba(24, 31, 26, 0.7);
 }
 
+.backstory-editor {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 11px;
+  border: 1px solid rgba(121, 157, 184, 0.34);
+  border-radius: 10px;
+  background: linear-gradient(145deg, rgba(33, 48, 58, 0.58), rgba(20, 27, 25, 0.82));
+  box-shadow: inset 3px 0 rgba(117, 169, 202, 0.3);
+}
+
+.backstory-editor h2,
+.backstory-editor p {
+  margin: 0;
+}
+
+.backstory-editor h2 {
+  color: #cae7f6;
+  font-size: 16px;
+}
+
+.backstory-editor p {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.backstory-editor textarea {
+  width: 100%;
+  min-height: 126px;
+  resize: vertical;
+  padding: 9px 10px;
+  border: 1px solid rgba(148, 186, 207, 0.32);
+  border-radius: 8px;
+  color: #edf5f2;
+  background: rgba(4, 9, 9, 0.42);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
 .inventory-card,
 .spell-card {
   display: grid;
@@ -1305,6 +1487,7 @@ strong {
 .rank-badge,
 .artifact-tier,
 .cursed-label,
+.risque-label,
 .reward-tag {
   display: inline-flex;
   align-items: center;
@@ -1316,6 +1499,37 @@ strong {
   font-size: 10px;
   font-weight: 800;
   line-height: 1.2;
+}
+
+.risque-label {
+  color: #ffd5e8;
+  border: 1px solid rgba(240, 125, 176, 0.42);
+  background: rgba(145, 48, 93, 0.28);
+  box-shadow: 0 0 8px rgba(220, 82, 145, 0.16);
+}
+
+.risque-synergy {
+  margin: 8px 0 0;
+  padding: 7px 8px;
+  border: 1px solid rgba(240, 125, 176, 0.32);
+  border-radius: 7px;
+  color: #ffd5e8;
+  background: rgba(145, 48, 93, 0.15);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.name-secret-awakened {
+  margin: 8px 0 0;
+  padding: 8px;
+  border: 1px solid rgba(255, 211, 73, 0.56);
+  border-radius: 7px;
+  color: #fff3a8;
+  background: linear-gradient(90deg, rgba(205, 89, 20, 0.22), rgba(232, 190, 49, 0.1));
+  box-shadow: 0 0 12px rgba(255, 184, 48, 0.16);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.45;
 }
 
 .rank-badge {
@@ -1524,12 +1738,39 @@ strong {
 
 .research-card summary {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  grid-template-columns: 42px minmax(0, 1fr) auto auto auto;
   gap: 8px;
   align-items: center;
   min-width: 0;
   cursor: pointer;
   list-style: none;
+}
+
+.research-monster-graphic {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid rgba(167, 190, 174, 0.3);
+  border-radius: 9px;
+  background:
+    radial-gradient(circle at 50% 38%, rgba(224, 184, 98, 0.13), transparent 52%),
+    rgba(4, 8, 6, 0.48);
+  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.34);
+  font-size: 20px;
+  font-weight: 900;
+  text-shadow: 0 2px 4px #000;
+}
+
+.research-monster-graphic.unknown {
+  color: #687169;
+  border-color: rgba(112, 126, 116, 0.18);
+  filter: grayscale(1);
+}
+
+.research-monster-graphic.unique {
+  border-color: rgba(224, 184, 98, 0.62);
+  box-shadow: inset 0 0 11px rgba(214, 174, 84, 0.12), 0 0 8px rgba(214, 174, 84, 0.18);
 }
 
 .monster-research-title {
@@ -1567,6 +1808,25 @@ strong {
   display: grid;
   gap: 6px;
   min-width: 0;
+}
+
+.research-stat-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 9px;
+  border: 1px solid rgba(201, 184, 126, 0.18);
+  border-radius: 8px;
+  background: rgba(10, 14, 11, 0.42);
+}
+
+.research-stat-line span {
+  color: var(--muted);
+}
+
+.research-stat-line strong {
+  color: #fff0b3;
 }
 
 .research-card[open] {
@@ -1628,21 +1888,6 @@ strong {
   background: rgba(255, 255, 255, 0.028);
 }
 
-.guild-claim-row > div {
-  display: grid;
-  gap: 3px;
-  min-width: 0;
-}
-
-.guild-claim-row button {
-  min-height: 34px;
-  padding-inline: 10px;
-  border-color: rgba(112, 184, 226, 0.46);
-  color: #d9efff;
-  background: linear-gradient(180deg, rgba(56, 105, 134, 0.92), rgba(35, 70, 91, 0.92));
-  font-size: 11px;
-}
-
 .treasure-sell-list {
   display: grid;
   gap: 6px;
@@ -1687,6 +1932,78 @@ strong {
   background:
     radial-gradient(circle, transparent 0 20%, rgba(45, 0, 0, 0.48) 58%, rgba(0, 0, 0, 0.97) 100%),
     rgba(70, 0, 0, 0.45);
+}
+
+.death-review-panel {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(5, 7, 6, 0.9);
+  backdrop-filter: blur(10px);
+}
+
+.death-review-card {
+  width: min(100%, 480px);
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid rgba(154, 70, 59, 0.55);
+  border-radius: 14px;
+  background: linear-gradient(155deg, #271d1a, #111412);
+  box-shadow: inset 3px 0 rgba(154, 51, 40, 0.32), 0 24px 72px rgba(0, 0, 0, 0.62);
+}
+
+.death-review-card > span {
+  color: #bb8277;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.death-review-card h2,
+.death-review-card p {
+  margin: 0;
+}
+
+.death-review-card h2 {
+  color: #dfc8bd;
+}
+
+.death-review-log {
+  min-height: 132px;
+  max-height: min(48dvh, 360px);
+  overflow-y: auto;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 9px;
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.death-review-log p {
+  margin: 0 0 5px;
+  padding: 4px 6px;
+  border-left: 2px solid rgba(159, 83, 70, 0.34);
+  color: #ddd2c8;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.depth-picker-card {
+  width: min(100%, 420px);
+}
+
+.depth-picker-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  max-height: min(56dvh, 440px);
+  overflow-y: auto;
+}
+
+.depth-picker-list button {
+  text-align: center;
 }
 
 .level-up-effect {
@@ -2007,10 +2324,63 @@ strong {
 }
 
 .log-panel {
-  min-height: 58px;
-  max-height: 72px;
+  min-height: 72px;
+  max-height: 88px;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 4px;
   overflow: hidden;
   padding: 5px 6px;
+}
+
+.log-panel-toolbar {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 7px;
+}
+
+.log-panel-toolbar > span {
+  overflow: hidden;
+  color: #91a397;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.log-panel-toolbar button {
+  min-height: 25px;
+  padding: 3px 8px;
+  border-color: rgba(214, 174, 84, 0.34);
+  border-radius: 8px;
+  color: #e8ddb9;
+  background: rgba(71, 58, 34, 0.62);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.log-panel-toolbar button:disabled {
+  opacity: 0.46;
+}
+
+.log-history-count {
+  display: inline-grid;
+  min-width: 18px;
+  min-height: 18px;
+  place-items: center;
+  margin-left: 3px;
+  padding: 0 4px;
+  border-radius: 999px;
+  color: #fff1bd;
+  background: rgba(214, 174, 84, 0.2);
+}
+
+.log-list {
+  min-height: 0;
+  overflow: hidden;
 }
 
 .app-shell.dungeon-mode .materials-panel,
@@ -2023,16 +2393,21 @@ strong {
   min-height: 104px;
   max-height: none;
   padding: 8px 198px 8px 9px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: none;
+  overflow: hidden;
   border-color: rgba(105, 136, 116, 0.52);
   background: linear-gradient(180deg, rgba(17, 25, 21, 0.98), rgba(10, 16, 13, 0.98));
   box-shadow: inset 0 1px rgba(255, 255, 255, 0.025), 0 -8px 28px rgba(0, 0, 0, 0.18);
 }
 
-.app-shell.dungeon-mode .log-panel::-webkit-scrollbar,
-.app-shell.arena-mode .log-panel::-webkit-scrollbar {
+.app-shell.dungeon-mode .log-list,
+.app-shell.arena-mode .log-list {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.app-shell.dungeon-mode .log-list::-webkit-scrollbar,
+.app-shell.arena-mode .log-list::-webkit-scrollbar {
   display: none;
 }
 
@@ -2050,6 +2425,69 @@ strong {
   color: #fff5cf;
   border-left-color: var(--gold);
   background: linear-gradient(90deg, rgba(224, 184, 98, 0.09), transparent 82%);
+}
+
+.log-history-card {
+  width: min(100%, 520px);
+  max-height: calc(100dvh - 32px);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+}
+
+.log-history-heading {
+  display: grid;
+  gap: 4px;
+}
+
+.log-history-heading > span {
+  color: #9ab0a1;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}
+
+.log-history-heading h2,
+.log-history-heading p {
+  margin: 0;
+}
+
+.log-history-heading p {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.log-history-list {
+  min-height: 0;
+  max-height: min(62dvh, 540px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 9px;
+  background: rgba(0, 0, 0, 0.28);
+  scrollbar-color: rgba(214, 174, 84, 0.42) transparent;
+}
+
+.log-history-list p {
+  margin: 0 0 5px;
+  padding: 5px 7px;
+  border-left: 2px solid rgba(127, 157, 137, 0.26);
+  border-radius: 2px;
+  color: #dddacf;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.log-history-list p.latest {
+  border-left-color: var(--gold);
+  color: #fff5cf;
+  background: linear-gradient(90deg, rgba(224, 184, 98, 0.09), transparent 82%);
+}
+
+.log-history-list p.empty {
+  border-left: 0;
+  color: var(--muted);
+  text-align: center;
 }
 
 .modal {
@@ -2127,6 +2565,9 @@ strong {
 button:focus-visible,
 input:focus-visible,
 select:focus-visible,
+textarea:focus-visible,
+.log-history-list:focus-visible,
+.cell[role="button"]:focus-visible,
 .research-card summary:focus-visible {
   outline: 2px solid var(--gold);
   outline-offset: 2px;
@@ -2155,10 +2596,6 @@ select:focus-visible,
 
   .guild-claim-row {
     grid-template-columns: 1fr;
-  }
-
-  .guild-claim-row button {
-    width: 100%;
   }
 
   .treasure-sell-list article {
@@ -2278,27 +2715,33 @@ select:focus-visible,
     grid-template-columns: repeat(5, minmax(0, 1fr)) 42px;
   }
 
-  .app-shell.dungeon-mode .character-strip,
   .app-shell.arena-mode .character-strip {
     grid-template-columns: repeat(7, minmax(0, 1fr));
   }
 
+  .app-shell.dungeon-mode {
+    --tile: clamp(15px, min(27px, calc((100vw - 56px) / 13), calc((100svh - 286px) / 13)), 27px);
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dungeon-stats-overlay {
+    left: 6px;
+    width: 44px;
+  }
+
   .app-shell.dungeon-mode .status-bar > div,
-  .app-shell.dungeon-mode .character-strip > div,
   .app-shell.arena-mode .status-bar > div,
   .app-shell.arena-mode .character-strip > div {
     padding: 3px;
   }
 
   .app-shell.dungeon-mode .status-bar strong,
-  .app-shell.dungeon-mode .character-strip strong,
   .app-shell.arena-mode .status-bar strong,
   .app-shell.arena-mode .character-strip strong {
     font-size: 10px;
   }
 
   .app-shell.dungeon-mode .status-bar span,
-  .app-shell.dungeon-mode .character-strip span,
   .app-shell.arena-mode .status-bar span,
   .app-shell.arena-mode .character-strip span {
     font-size: 8px;
@@ -2324,6 +2767,61 @@ select:focus-visible,
 
   .setup-selectors {
     grid-template-columns: 1fr;
+  }
+}
+
+.developer-card {
+  width: min(760px, calc(100vw - 24px));
+  max-height: min(88svh, 900px);
+  overflow-y: auto;
+}
+
+.developer-heading > span {
+  color: #dca65a;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+}
+
+.developer-section {
+  margin: 14px 0;
+  padding: 12px;
+  border: 1px solid rgba(220, 166, 90, 0.3);
+  background: rgba(220, 166, 90, 0.05);
+}
+
+.developer-section h3 {
+  margin: 0 0 8px;
+  color: #edc98e;
+}
+
+.developer-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(100px, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.developer-field,
+.developer-select {
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.developer-field input,
+.developer-select select {
+  width: 100%;
+  min-width: 0;
+}
+
+.developer-select {
+  margin: 8px 0;
+}
+
+@media (max-width: 560px) {
+  .developer-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

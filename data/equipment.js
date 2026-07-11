@@ -1,12 +1,12 @@
 (function () {
   window.HD_DATA = window.HD_DATA || {};
   const allJobs = window.HD_DATA.jobs.map((job) => job.id);
-  const bladeJobs = ["swordsman", "hunter", "archer", "spellblade", "scavenger", "handyman"];
+  const bladeJobs = ["swordsman", "hunter", "archer", "spellblade", "scavenger", "handyman", "ninja"];
   const maulJobs = ["swordsman", "heavy", "researcher", "scavenger", "handyman", "priest"];
-  const toolJobs = ["hunter", "archer", "researcher", "mage", "spellblade", "tourist", "psychic", "scavenger", "handyman", "priest"];
+  const toolJobs = ["hunter", "archer", "researcher", "mage", "spellblade", "tourist", "psychic", "scavenger", "handyman", "priest", "ninja"];
   const coatJobs = allJobs;
-  const greavesJobs = ["swordsman", "heavy", "spellblade", "scavenger", "handyman"];
-  const bootsJobs = ["hunter", "archer", "researcher", "mage", "spellblade", "tourist", "psychic", "handyman", "priest"];
+  const greavesJobs = ["swordsman", "heavy", "spellblade", "scavenger", "handyman", "ninja"];
+  const bootsJobs = ["hunter", "archer", "researcher", "mage", "spellblade", "tourist", "psychic", "handyman", "priest", "ninja"];
 
   window.HD_DATA.equipment = [
     {
@@ -220,6 +220,7 @@
   const baseCatalog = window.HD_DATA.equipment.slice();
   const materials = window.HD_DATA.materials.map((material) => material.id);
   const grades = ["粗製", "普及", "良質", "精巧", "名工", "希少", "秘宝", "英雄", "神話"];
+  const gradeShopMinimumFloors = [1, 1, 15, 25, 35, 45, 55, 70, 85];
   const resistanceAttributes = window.HD_DATA.attributes.filter((id) => !["slash", "blunt"].includes(id));
   baseCatalog.forEach((base, baseIndex) => {
     grades.forEach((grade, gradeIndex) => {
@@ -248,6 +249,7 @@
         resistances,
         acceleration: gradeIndex >= 5 && baseIndex % 4 === 0 ? 1 + Math.floor(gradeIndex / 3) : 0,
         hpRegen: gradeIndex >= 6 && baseIndex % 19 === 0 ? 1 + Math.floor((gradeIndex - 6) / 2) : 0,
+        shopMinFloor: gradeShopMinimumFloors[gradeIndex],
         recipe,
         description: `${base.description} ${grade}等級の派生装備。`,
       });
@@ -508,6 +510,302 @@
       description: "全属性を拒む零の境界を、着用者の周囲へ常時展開する王冠。",
     }
   );
+
+  window.HD_DATA.equipment.push({
+    id: "artifact_power_pole", name: "如意棒", slot: "weapon",
+    attack: 42, defense: 8, acceleration: 12, hpRegen: 2, attributeAttack: "blunt", attackAttributes: ["blunt", "steel"],
+    resistances: { blunt: 4, steel: 4, earth: 3 }, jobs: allJobs, recipe: null,
+    artifact: { tier: "cheat", label: "チートレベルのアーティファクト", guildPoints: 260, chestOnly: true },
+    description: "意志に応じて長さと重さを変える伝説の棒。名が「孫悟空」の者に握られた時だけ、測定不能の真価を解放する。",
+  });
+
+  // 既存の一点物を残したまま、各段階を三倍へ拡張する固定アーティファクト群。
+  const artifactTierLabels = Object.freeze({
+    joke: "ネタアーティファクト",
+    trash: "ゴミアーティファクト",
+    ordinary: "平凡アーティファクト",
+    useful: "使えるアーティファクト",
+    cheat: "チートレベルのアーティファクト",
+  });
+  const expandedArtifactSpecs = [
+    // ネタアーティファクト：利点は小さく、使い方より逸話が先に立つ。
+    {
+      id: "artifact_applauding_gauntlet", name: "拍手しかしない篭手", tier: "joke", gp: 5, slot: "accessory",
+      attack: 0, defense: 1, acceleration: 2, hpRegen: 0, attributeAttack: null, resistances: { steel: 1 },
+      curse: { name: "喝采強要", severity: 1, penalties: { attack: -2 }, description: "戦うべき時にも篭手が勝手に拍手を始める。" },
+      description: "誰の武勲かを問わず、危険な場面ほど盛大な拍手を送る篭手。",
+    },
+    {
+      id: "artifact_backward_compass", name: "帰路だけ指す羅針盤", tier: "joke", gp: 6, slot: "accessory",
+      attack: 0, defense: 0, acceleration: 3, hpRegen: 0, attributeAttack: null, resistances: { illusion: 1 },
+      curse: { name: "未練針", severity: 1, penalties: { acceleration: -2 }, description: "進もうとするたび、針が帰還を強く勧めてくる。" },
+      description: "目的地には沈黙し、帰り道だけは得意げに示す羅針盤。",
+    },
+    {
+      id: "artifact_bottomless_lunchbox", name: "底なし弁当箱", tier: "joke", gp: 6, slot: "accessory",
+      attack: 0, defense: 1, acceleration: 0, hpRegen: 2, attributeAttack: null, resistances: { poison: 1 },
+      curse: { name: "空腹保存", severity: 1, penalties: { maxHp: -5 }, description: "食べ物ではなく、持ち主の満腹感だけをしまい込む。" },
+      description: "蓋を開けるたび湯気は立つが、肝心の中身だけが見つからない。",
+    },
+    {
+      id: "artifact_overconfident_cape", name: "先走る英雄マント", tier: "joke", gp: 7, slot: "upper",
+      attack: 1, defense: 2, acceleration: 8, hpRegen: 0, attributeAttack: null, resistances: { wind: 1 },
+      curse: { name: "見切り発車", severity: 1, penalties: { defense: -4 }, description: "危険を確かめる前にマントだけが勇ましく翻る。" },
+      description: "着用者より半歩早く角を曲がり、勝手に決め姿勢を取るマント。",
+    },
+    {
+      id: "artifact_squeaky_sabaton", name: "絶叫する鉄靴", tier: "joke", gp: 7, slot: "feet",
+      attack: 0, defense: 3, acceleration: -1, hpRegen: 0, attributeAttack: null, resistances: { steel: 1, illusion: 1 },
+      curse: { name: "足音絶叫", severity: 1, penalties: { acceleration: -3 }, description: "一歩ごとに迷宮中へ響く甲高い悲鳴を上げる。" },
+      description: "蝶番へ油を差すと、今度は別の音程で鳴き始める鉄靴。",
+    },
+    {
+      id: "artifact_rainmaking_umbrella", name: "屋内雨降らし傘", tier: "joke", gp: 8, slot: "weapon",
+      attack: 2, defense: 1, acceleration: 1, hpRegen: 0, attributeAttack: "water", attackAttributes: ["water", "wind"], resistances: { water: 1 },
+      curse: { name: "局地豪雨", severity: 1, penalties: { defense: -2 }, description: "傘の内側だけへ冷たい雨を降らせ続ける。" },
+      description: "晴天にも洞窟にも雨雲を連れてくる、用途の逆転した古傘。",
+    },
+    {
+      id: "artifact_echoing_purse", name: "小銭を数える財布", tier: "joke", gp: 8, slot: "accessory",
+      attack: 0, defense: 0, acceleration: 1, hpRegen: 0, attributeAttack: null, resistances: { curse: 1 },
+      curse: { name: "残高朗読", severity: 1, penalties: { maxHp: -3 }, description: "所持金が変わるたび、財布が大声で残高を読み上げる。" },
+      description: "中身が空でも一枚ずつ数える音だけは律儀に続く財布。",
+    },
+    {
+      id: "artifact_misplaced_doorplate", name: "迷宮主の表札", tier: "joke", gp: 9, slot: "accessory",
+      attack: 0, defense: 2, acceleration: 0, hpRegen: 0, attributeAttack: null, resistances: { dark: 1, earth: 1 },
+      description: "どの扉へ掛けても『留守』とだけ表示される、迷宮主の古い表札。",
+    },
+
+    // ゴミアーティファクト：弱い基礎性能を強い欠点がさらに押し下げる。
+    {
+      id: "artifact_cracked_mirror_shield", name: "百裂の曇り鏡", tier: "trash", gp: 10, slot: "upper",
+      attack: 0, defense: 2, acceleration: -1, hpRegen: 0, attributeAttack: null, resistances: { illusion: 2, light: -2 },
+      curse: { name: "破像反射", severity: 2, penalties: { defense: -4 }, description: "映った傷を持ち主の身体へ丁寧に写し取る。" },
+      description: "盾としても鏡としても割れすぎている、重い曇り板。",
+    },
+    {
+      id: "artifact_rusted_anchor_blade", name: "錆海の錨剣", tier: "trash", gp: 11, slot: "weapon",
+      attack: 6, defense: 2, acceleration: -10, hpRegen: 0, attributeAttack: "blunt", attackAttributes: ["blunt", "steel"], resistances: { steel: 1 },
+      curse: { name: "海底固着", severity: 3, penalties: { attack: -4, acceleration: -5 }, description: "振るうたび見えない海底へ錨を下ろしてしまう。" },
+      description: "剣に削り直そうとして諦められた、赤錆だらけの小錨。",
+    },
+    {
+      id: "artifact_leaking_mana_boots", name: "魔力漏れの長靴", tier: "trash", gp: 12, slot: "feet",
+      attack: 0, defense: 2, acceleration: 4, hpRegen: -1, attributeAttack: null, resistances: { curse: -2, illusion: 1 },
+      curse: { name: "術漏れ", severity: 2, penalties: { maxHp: -8 }, description: "歩いた跡へ持ち主の生命力まで染み出していく。" },
+      description: "底の穴から淡い魔力が漏れ、足跡だけは美しく光る長靴。",
+    },
+    {
+      id: "artifact_hollow_bone_mail", name: "空洞骨の鎧", tier: "trash", gp: 13, slot: "lower",
+      attack: 0, defense: 5, acceleration: -7, hpRegen: 0, attributeAttack: null, resistances: { slash: -1, blunt: -1 },
+      curse: { name: "骨鳴り", severity: 2, penalties: { defense: -5 }, description: "衝撃を受ける前から骨が砕ける音を響かせる。" },
+      description: "軽量化のため中身を抜きすぎ、支えまで失った骨鎧。",
+    },
+    {
+      id: "artifact_ash_eating_ring", name: "灰喰らいの指輪", tier: "trash", gp: 14, slot: "accessory",
+      attack: 1, defense: 0, acceleration: 0, hpRegen: -1, attributeAttack: null, resistances: { fire: 2, water: -1 },
+      curse: { name: "燃え残り", severity: 2, penalties: { hpRegen: -2 }, description: "傷口を灰へ変えてから、ゆっくり食べ始める。" },
+      description: "焚き火の灰だけを好み、指まで煤色へ染める指輪。",
+    },
+    {
+      id: "artifact_broken_oath_badge", name: "折れた誓約章", tier: "trash", gp: 15, slot: "accessory",
+      attack: 0, defense: 1, acceleration: 0, hpRegen: 0, attributeAttack: null, resistances: { light: 1, curse: -2 },
+      curse: { name: "違約徴収", severity: 3, penalties: { attack: -3, defense: -3 }, description: "持ち主が知らない古い誓いの違約金を徴収する。" },
+      description: "誰の何の誓いだったか判別できない、真二つの徽章。",
+    },
+    {
+      id: "artifact_sinking_cloak", name: "沈み続ける外套", tier: "trash", gp: 16, slot: "upper",
+      attack: 0, defense: 4, acceleration: -8, hpRegen: 0, attributeAttack: null, resistances: { water: 1, wind: -2 },
+      curse: { name: "深度加算", severity: 3, penalties: { maxHp: -12 }, description: "乾いた場所でも着用者を深海の水圧で締め付ける。" },
+      description: "水を吸っていない時さえ、海底へ沈む重さを保つ外套。",
+    },
+    {
+      id: "artifact_chipped_executioner_axe", name: "刃欠け処刑斧", tier: "trash", gp: 17, slot: "weapon",
+      attack: 8, defense: 0, acceleration: -6, hpRegen: 0, attributeAttack: "blunt", attackAttributes: ["blunt", "slash"], resistances: {},
+      curse: { name: "未完執行", severity: 3, penalties: { attack: -5, maxHp: -6 }, description: "斬り損ねた一撃の痛みを使い手へ返し続ける。" },
+      description: "刃の大半を失い、処刑台より薪割り場が似合う大斧。",
+    },
+
+    // 平凡アーティファクト：癖は残るが、通常装備として十分に扱える。
+    {
+      id: "artifact_dawn_patrol_spear", name: "暁巡回の長槍", tier: "ordinary", gp: 23, slot: "weapon",
+      attack: 13, defense: 2, acceleration: 2, hpRegen: 0, attributeAttack: "slash", attackAttributes: ["slash", "light"], resistances: { light: 2, steel: 1 },
+      curse: { name: "夜明け待ち", severity: 1, penalties: { acceleration: -2 }, description: "日の差さない場所では穂先が眠たげに重くなる。" },
+      description: "城壁を巡った無名衛士の手入れが今も残る、長柄の槍。",
+    },
+    {
+      id: "artifact_riverstone_mail", name: "流紋石の胴衣", tier: "ordinary", gp: 26, slot: "upper",
+      attack: 0, defense: 10, acceleration: 1, hpRegen: 1, attributeAttack: null, resistances: { water: 2, blunt: 2 },
+      description: "川底で丸くなった護石を連ね、衝撃を素直に受け流す胴衣。",
+    },
+    {
+      id: "artifact_ember_keeper_boots", name: "残火守りの旅靴", tier: "ordinary", gp: 28, slot: "feet",
+      attack: 0, defense: 7, acceleration: 7, hpRegen: 1, attributeAttack: null, resistances: { fire: 2, ice: 1 },
+      curse: { name: "燻り足", severity: 1, penalties: { hpRegen: -1 }, description: "休むたび靴底の残火が足裏を焦がす。" },
+      description: "小さな火種を絶やさず、冷えた道でも歩調を保つ旅靴。",
+    },
+    {
+      id: "artifact_quiet_librarian_ring", name: "静謐司書の指輪", tier: "ordinary", gp: 29, slot: "accessory",
+      attack: 1, defense: 3, acceleration: 2, hpRegen: 0, attributeAttack: null, resistances: { illusion: 3, dark: 2 },
+      curse: { name: "私語厳禁", severity: 1, penalties: { attack: -2 }, description: "荒々しい動きをするたび、見えない司書に制止される。" },
+      description: "騒がしい幻惑を静め、思考へ図書館の静寂をもたらす指輪。",
+    },
+    {
+      id: "artifact_iron_vow_greaves", name: "鉄誓の脚甲", tier: "ordinary", gp: 33, slot: "lower",
+      attack: 0, defense: 13, acceleration: -1, hpRegen: 0, attributeAttack: null, resistances: { steel: 3, slash: 2 },
+      curse: { name: "不退誓約", severity: 2, penalties: { acceleration: -3 }, description: "後退を考えるだけで脚甲が地面へ食い込む。" },
+      description: "一歩を守り抜くという単純な誓いだけを刻んだ頑丈な脚甲。",
+    },
+    {
+      id: "artifact_crosswind_bow", name: "十字風の古弓", tier: "ordinary", gp: 34, slot: "weapon",
+      attack: 15, defense: 0, acceleration: 5, hpRegen: 0, attributeAttack: "wind", attackAttributes: ["wind", "thunder"], resistances: { wind: 2 },
+      description: "交差する二筋の風を弦へ乗せ、矢の軌道を穏やかに正す古弓。",
+    },
+    {
+      id: "artifact_wellkeeper_charm", name: "古井戸守りの護石", tier: "ordinary", gp: 36, slot: "accessory",
+      attack: 0, defense: 4, acceleration: 0, hpRegen: 2, attributeAttack: null, resistances: { water: 3, poison: 1 },
+      curse: { name: "渇き番", severity: 1, penalties: { maxHp: -6 }, description: "水を守る代わりに、持ち主の喉から潤いを徴収する。" },
+      description: "長く村井戸を清めてきた、素朴だが確かな守り石。",
+    },
+    {
+      id: "artifact_sunset_scout_coat", name: "夕映え斥候外套", tier: "ordinary", gp: 38, slot: "upper",
+      attack: 0, defense: 8, acceleration: 6, hpRegen: 0, attributeAttack: null, resistances: { dark: 2, wind: 2 },
+      curse: { name: "薄暮迷い", severity: 1, penalties: { defense: -2 }, description: "明るすぎる場所では外套の色が着用者を浮かび上がらせる。" },
+      description: "夕暮れの色へ溶け込み、斥候の足取りを軽くする外套。",
+    },
+
+    // 使えるアーティファクト：強い専門性と、呪耐性で抑えられる代償を持つ。
+    {
+      id: "artifact_thunderclap_halberd", name: "轟界の雷斧", tier: "useful", gp: 62, slot: "weapon",
+      attack: 32, defense: 5, acceleration: 10, hpRegen: 0, attributeAttack: "thunder", attackAttributes: ["thunder", "blunt", "steel"], resistances: { thunder: 4, steel: 2 },
+      curse: { name: "轟音脈", severity: 3, penalties: { maxHp: -14 }, description: "雷鳴のたび、使い手の心臓も同じ強さで打ち鳴らされる。" },
+      description: "雷撃と重量を一振りへ束ね、甲殻ごと戦場を揺らす長斧。",
+    },
+    {
+      id: "artifact_frostfire_hauberk", name: "氷炎反照鎧", tier: "useful", gp: 68, slot: "upper",
+      attack: 2, defense: 18, acceleration: 5, hpRegen: 2, attributeAttack: null, resistances: { fire: 4, ice: 4, water: 2 },
+      curse: { name: "熱差痙攣", severity: 3, penalties: { acceleration: -6 }, description: "氷と炎の境目で鎧が不規則に収縮する。" },
+      description: "炎を氷へ、冷気を熱へ返し、相反する攻撃を受け止める鎧。",
+    },
+    {
+      id: "artifact_voidstep_sandals", name: "虚歩の銀草履", tier: "useful", gp: 72, slot: "feet",
+      attack: 3, defense: 10, acceleration: 28, hpRegen: 0, attributeAttack: null, resistances: { dark: 4, illusion: 3 },
+      curse: { name: "足跡欠落", severity: 3, penalties: { maxHp: -18 }, description: "進んだ距離と共に、持ち主の存在感まで削り取る。" },
+      description: "床との間へ薄い虚空を挟み、摩擦を忘れて進む銀の草履。",
+    },
+    {
+      id: "artifact_seraphic_lens", name: "熾天観測眼", tier: "useful", gp: 78, slot: "accessory",
+      attack: 6, defense: 8, acceleration: 8, hpRegen: 1, attributeAttack: null, resistances: { light: 4, illusion: 4, dark: 2 }, trueSight: true,
+      description: "天上から借りた視野で、透明な気配と偽りの輪郭を見抜く単眼鏡。",
+    },
+    {
+      id: "artifact_earthblood_greaves", name: "地脈血統の脚甲", tier: "useful", gp: 80, slot: "lower",
+      attack: 2, defense: 22, acceleration: 4, hpRegen: 5, attributeAttack: null, resistances: { earth: 4, poison: 3, blunt: 2 },
+      curse: { name: "根付き", severity: 3, penalties: { hpRegen: -3 }, description: "癒やすたび、脚甲の根が持ち主へ深く入り込む。" },
+      description: "地脈の熱を脈動へ変え、傷を塞ぎながら足場を固める脚甲。",
+    },
+    {
+      id: "artifact_tidal_memory_blade", name: "潮騒記憶剣", tier: "useful", gp: 84, slot: "weapon",
+      attack: 29, defense: 4, acceleration: 12, hpRegen: 1, attributeAttack: "water", attackAttributes: ["water", "ice", "wind"], resistances: { water: 4, ice: 2 },
+      curse: { name: "海馬侵食", severity: 3, penalties: { attack: -7 }, description: "剣が覚えた海の記憶で、使い手の集中を洗い流す。" },
+      description: "寄せて返す三つの属性を刃へ宿し、耐性の隙間へ波を送る剣。",
+    },
+    {
+      id: "artifact_phoenix_ash_mantle", name: "不死鳥灰の肩衣", tier: "useful", gp: 90, slot: "upper",
+      attack: 3, defense: 15, acceleration: 10, hpRegen: 7, attributeAttack: null, resistances: { fire: 5, curse: 2, wind: 2 },
+      curse: { name: "再燃代謝", severity: 3, penalties: { maxHp: -20, hpRegen: -2 }, description: "再生の火が未来の生命力まで燃料にする。" },
+      description: "灰から熱を引き戻し、着用者の傷を何度でも焼き閉じる肩衣。",
+    },
+    {
+      id: "artifact_lawbreaker_seal", name: "法則破りの封印環", tier: "useful", gp: 96, slot: "accessory",
+      attack: 12, defense: 12, acceleration: 15, hpRegen: 2, attributeAttack: null, resistances: { curse: 4, steel: 4, illusion: 4 },
+      curse: { name: "反則罰", severity: 3, penalties: { defense: -8 }, description: "破った法則の反動だけは、装備者へ正しく請求される。" },
+      description: "局所的に迷宮の規則を緩め、攻守と行動を同時に引き上げる環。",
+    },
+
+    // チートレベル：法則外の性能と、重い呪いが同居する最上位品。
+    {
+      id: "artifact_starfall_greatsword", name: "星墜としの終剣", tier: "cheat", gp: 220, slot: "weapon",
+      attack: 82, defense: 14, acceleration: 20, hpRegen: 5, attributeAttack: "light", attackAttributes: ["light", "dark", "slash"], resistances: { light: 5, dark: 5, steel: 4 },
+      curse: { name: "落星余波", severity: 5, penalties: { attack: -12, maxHp: -35 }, description: "振り下ろすたび、使い手も星の落下へ巻き込まれる。" },
+      description: "夜空の終端を刃へ鍛え、光と闇ごと敵を地へ墜とす大剣。",
+    },
+    {
+      id: "artifact_worldroot_armor", name: "世界樹根の神鎧", tier: "cheat", gp: 250, slot: "upper",
+      attack: 10, defense: 72, acceleration: -8, hpRegen: 18, attributeAttack: null, resistances: { earth: 5, poison: "immune", acid: 5, blunt: 4 },
+      curse: { name: "大地定着", severity: 5, penalties: { acceleration: -22 }, description: "世界へ根を張るほど、装備者は一歩を失っていく。" },
+      description: "世界樹の根が攻撃を受けるたび成長し、破損を即座に塞ぐ神鎧。",
+    },
+    {
+      id: "artifact_infinite_horizon_boots", name: "無限地平の超越靴", tier: "cheat", gp: 275, slot: "feet",
+      attack: 8, defense: 18, acceleration: 65, hpRegen: 4, attributeAttack: null, resistances: { wind: "immune", thunder: 5, illusion: 5 },
+      curse: { name: "距離喪失", severity: 5, penalties: { maxHp: -45 }, description: "移動した距離の一部を、使い手の寿命で精算する。" },
+      description: "一歩の終点を地平線の先へ置き、時間より早く到達する靴。",
+    },
+    {
+      id: "artifact_sunmoon_orbit", name: "日月双環", tier: "cheat", gp: 310, slot: "accessory",
+      attack: 35, defense: 35, acceleration: 30, hpRegen: 10, attributeAttack: null, resistances: { light: 5, dark: 5, fire: 4, ice: 4 }, trueSight: true,
+      curse: { name: "蝕の均衡", severity: 5, penalties: { attack: -20, defense: -20 }, description: "日月が重なるたび、持ち主の力も互いに打ち消し合う。" },
+      description: "太陽と月を小さな軌道へ閉じ込め、昼夜の加護を同時に巡らせる双環。",
+    },
+    {
+      id: "artifact_abyssal_decree", name: "深淵勅令の黒杖", tier: "cheat", gp: 285, slot: "weapon",
+      attack: 75, defense: 18, acceleration: 24, hpRegen: 8, attributeAttack: "dark", attackAttributes: ["dark", "curse", "illusion"], resistances: { dark: "immune", curse: 5, illusion: 5 }, trueSight: true,
+      curse: { name: "深淵徴用", severity: 5, penalties: { maxHp: -30, hpRegen: -5 }, description: "深淵の力を借りるたび、持ち主の一部が徴用される。" },
+      description: "深淵へ命令を届かせ、闇と呪いと幻を一つの奔流にする黒杖。",
+    },
+    {
+      id: "artifact_heavenly_fortress", name: "天蓋絶対城塞", tier: "cheat", gp: 330, slot: "lower",
+      attack: 5, defense: 88, acceleration: -18, hpRegen: 20, attributeAttack: null, resistances: { slash: "immune", blunt: "immune", steel: 5, earth: 5 },
+      curse: { name: "籠城命令", severity: 5, penalties: { acceleration: -25 }, description: "城塞は生存を優先し、装備者の移動許可をほとんど出さない。" },
+      description: "腰から下へ小型城塞を展開し、物理攻撃を国境の外で止める脚鎧。",
+    },
+    {
+      id: "artifact_eternal_return_ring", name: "永劫回帰の指輪", tier: "cheat", gp: 340, slot: "accessory",
+      attack: 28, defense: 28, acceleration: 28, hpRegen: 16, attributeAttack: null, resistances: { poison: "immune", acid: 5, curse: 5, dark: 4 },
+      curse: { name: "回帰摩耗", severity: 5, penalties: { maxHp: -50 }, description: "傷を戻すたび、戻せない生命の器だけが摩耗する。" },
+      description: "身体を傷つく直前へ巻き戻し続ける、終わりを拒む指輪。",
+    },
+    {
+      id: "artifact_prismatic_sovereign", name: "万色統治の王衣", tier: "cheat", gp: 360, slot: "upper",
+      attack: 25, defense: 48, acceleration: 22, hpRegen: 12, attributeAttack: null,
+      resistances: Object.fromEntries(window.HD_DATA.attributes.map((id) => [id, id === "curse" ? 5 : 4])), trueSight: true,
+      curse: { name: "色彩収奪", severity: 5, penalties: { attack: -25, maxHp: -40 }, description: "全ての色を支配するため、着用者自身の色まで奪い取る。" },
+      description: "あらゆる属性を臣下として従え、攻撃を四色の壁で受け止める王衣。",
+    },
+    {
+      id: "artifact_causality_scissors", name: "因果断ちの双鋏", tier: "cheat", gp: 350, slot: "weapon",
+      attack: 95, defense: 12, acceleration: 32, hpRegen: 6, attributeAttack: "slash", attackAttributes: ["slash", "illusion", "curse"], resistances: { steel: 5, illusion: "immune", curse: 4 },
+      curse: { name: "因果逆流", severity: 5, penalties: { defense: -20, hpRegen: -6 }, description: "切断した因果の反対側が、使い手へ繋ぎ直される。" },
+      description: "結果へ至る途中を切り落とし、斬撃だけを敵の現在へ残す双鋏。",
+    },
+    {
+      id: "artifact_first_light_crown", name: "原初光の戴冠", tier: "cheat", gp: 380, slot: "accessory",
+      attack: 45, defense: 45, acceleration: 40, hpRegen: 15, attributeAttack: null,
+      resistances: Object.fromEntries(window.HD_DATA.attributes.map((id) => [id, ["light", "curse"].includes(id) ? "immune" : 3])), trueSight: true,
+      description: "世界最初の光を王冠へ留め、攻守・再生・視界の全てを限界外へ導く。",
+    },
+  ];
+  window.HD_DATA.equipment.push(...expandedArtifactSpecs.map((spec) => {
+    const { tier, gp, curse, ...item } = spec;
+    return {
+      ...item,
+      jobs: allJobs,
+      recipe: null,
+      artifact: { tier, label: artifactTierLabels[tier], guildPoints: gp, chestOnly: true },
+      ...(curse ? { curse: { id: `curse_${item.id}`, ...curse } } : {}),
+    };
+  }));
+
+  // 「すけべ」の性格と共鳴する艶装備。通常の装備性能は他の性格でもそのまま使える。
+  const risqueEquipmentIds = new Set([
+    "artifact_invisible_emperor_cloak", "artifact_moon_thread_coat", "artifact_shadow_step_boots",
+    "guild_wind_coat", "guild_prize_21", "guild_prize_23", "guild_prize_27",
+  ]);
+  window.HD_DATA.equipment.forEach((item) => {
+    if (risqueEquipmentIds.has(item.id)) item.risque = true;
+  });
 
   // 旧 attributeAttack を残したまま、全装備へ配列形式を保証する。
   const attackAttributePool = window.HD_DATA.attributes.slice();

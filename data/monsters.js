@@ -634,6 +634,47 @@
     });
   });
 
+  // 所持金を奪って遠方へ転移する盗賊系。倒せば奪われた金は全額回収できる。
+  const goldThiefTypes = [
+    ["coin_snatcher_imp", "銭さらい小鬼", "小", 3, "dark", "light", 0.05, 2, 8],
+    ["purse_cutting_marten", "財布裂きテン", "財", 12, "slash", "blunt", 0.06, 3, 9],
+    ["silver_mist_bandit", "銀霧の盗賊", "銀", 24, "illusion", "light", 0.07, 5, 10],
+    ["tax_collector_wraith", "冥府の徴税霊", "税", 38, "curse", "light", 0.08, 7, 11],
+    ["vault_boring_mole", "金庫穿ちモグラ", "穿", 52, "earth", "wind", 0.09, 9, 12],
+    ["gilded_shadow_fox", "金影の妖狐", "金", 67, "fire", "water", 0.1, 12, 13],
+    ["abyssal_pickpocket", "奈落の掏摸", "掏", 82, "dark", "light", 0.11, 15, 14],
+    ["world_coffer_eater", "世界金庫喰らい", "庫", 95, "curse", "light", 0.12, 18, 15],
+  ];
+  goldThiefTypes.forEach(([id, name, glyph, floor, attribute, weakness, rate, flat, escapeDistance], index) => {
+    window.HD_DATA.monsters.push({
+      id,
+      name,
+      glyph,
+      mapMarker: "盗",
+      floors: [floor, Math.min(99, floor + 1)],
+      hp: 18 + floor * 4 + index * 3,
+      attack: 4 + Math.floor(floor * 0.62),
+      defense: 1 + Math.floor(floor * 0.22),
+      acceleration: 4 + Math.floor(floor / 16),
+      attackAttribute: attribute,
+      weaknesses: [weakness],
+      resistances: { [attribute]: Math.min(4, 1 + Math.floor(floor / 28)) },
+      dangerous: null,
+      specialAttack: "gold_steal",
+      rareSpawn: true,
+      goldTheft: { rate, flat, max: 20 + floor, escapeDistance },
+      loot: [
+        { condition: "default", material: index % 2 ? "clean_pelt" : "broken_carapace" },
+        { condition: { lastAttribute: weakness }, material: index % 2 ? "fine_pelt" : "unbroken_horn" },
+      ],
+      research: {
+        1: `B${floor}F付近を徘徊する金品狙い。所持金を盗むと遠方へ転移する。`,
+        2: `${window.HD_DATA.attributeLabels[weakness]}属性が弱点。1回に所持金の約${Math.round(rate * 100)}%と${flat}Gを狙う。`,
+        3: "逃げた個体を倒せば、その個体に盗まれた金を全額回収できる。",
+      },
+    });
+  });
+
   const uniqueEpithetHeads = {
     fire: ["灰都を焼く", "千炉を呑む", "灼熱を戴く"], water: ["水底で嗤う", "七海を沈める", "泡沫を弔う"],
     thunder: ["天鼓を裂く", "迅雷を纏う", "雷雲を従える"], poison: ["万毒を宿す", "紫煙に潜む", "血潮を腐らす"],
@@ -665,6 +706,21 @@
   }
 
   window.HD_DATA.monsters.filter((monster) => monster.unique).forEach(addUniqueEpithet);
+
+  // ごく一部のダンジョンユニークだけが眷属を呼ぶ。既存の特殊行動割当は変えない。
+  const forcedSummoners = new Set([
+    "venom_widow_nazka", "thunder_emperor_barg", "curse_mask_mimei", "bone_lord_gazra",
+    "sunken_god_molok", "dungeon_heart_eve", "abyss_eye_zahar", "dungeon_lord_nox",
+  ]);
+  window.HD_DATA.monsters.filter((monster) => monster.unique && !monster.arenaOnly && monster.floors?.length).forEach((monster, index) => {
+    const hash = [...monster.id].reduce((sum, character) => sum + character.charCodeAt(0), index);
+    const generatedSummoner = monster.dungeonExpansion && hash % 13 === 0;
+    const abyssSummoner = monster.id.startsWith("abyss_unique_") && index % 3 === 0;
+    if (!forcedSummoners.has(monster.id) && !generatedSummoner && !abyssSummoner) return;
+    monster.summon = { every: 6, count: 1, maxAlive: 2, maxTotal: 4, pool: "floor_attribute" };
+    monster.research = monster.research || {};
+    monster.research[2] = `${monster.research[2] || ""} 戦闘中に同属性の眷属を召喚する。`.trim();
+  });
 
   const forcedInvisible = new Set(["curse_mask_mimei", "mirage_prince_nemu", "abyss_eye_zahar", "moon_eater_luna"]);
   window.HD_DATA.monsters.filter((monster) => !monster.arenaOnly && monster.floors?.length).forEach((monster) => {

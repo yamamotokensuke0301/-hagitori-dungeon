@@ -19,7 +19,7 @@
       timeStop: [0.64, 1.28], eat: [0.74, 0.3], feast: [0.6, 0.72], bountyCarry: [0.7, 0.78],
       anomaly: [0.6, 1.22], chaos: [0.42, 0.98], invisibleReveal: [0.66, 1.18], heal: [0.6, 1.4],
       corpse: [0.7, 0.32], harvest: [0.45, 0.72], craft: [0.74, 0.88], equip: [0.78, 0.72],
-      rest: [0.68, 1.2], victory: [0.66, 1.18], levelUp: [0.6, 1.32], death: [0.42, 1.15], flee: [0.8, 0.38],
+      rest: [0.68, 1.2], victory: [0.66, 1.18], levelUp: [0.58, 1.48], death: [0.42, 1.15], flee: [0.8, 0.38],
     });
 
     let activeLevel = 1;
@@ -297,10 +297,17 @@
         playArp([261.63, 329.63, 392, 523.25, 659.25], now + 0.006, 0.08, 0.062, out, { spread: 0.42, lastTail: 1.5 });
       }
       if (type === "levelUp") {
-        playTone(130.81, now, 0.84, 0.04, "sine", out, { attack: 0.025, sustain: 0.76, pan: 0, reverb: 0.16 });
-        playArp([261.63, 329.63, 392, 523.25], now + 0.008, 0.095, 0.05, out, { spread: 0.4, lastTail: 1.45 });
-        playTone(523.25, now + 0.34, 0.68, 0.036, "sine", out, { sustain: 0.72, pan: -0.14, reverb: 0.26 });
-        playTone(783.99, now + 0.46, 0.55, 0.024, "triangle", out, { pan: 0.2, reverb: 0.28 });
+        // 上昇する風圧、二段のアルペジオ、明るい終止和音で成長を強く印象づける。
+        playSweep(110, 880, now, 0.62, 0.038, "sine", out, { pan: -0.38, panEnd: 0.38, reverb: 0.26 });
+        playNoiseBand(now, 0.42, 0.026, out, 4200, 0.68, -0.42, { attack: 0.025, panEnd: 0.42, reverb: 0.14 });
+        playArp([261.63, 329.63, 392, 523.25, 659.25, 783.99], now + 0.025, 0.085, 0.058, out, { spread: 0.52, lastTail: 1.4, reverb: 0.24 });
+        playArp([523.25, 659.25, 783.99, 1046.5, 1318.51], now + 0.34, 0.072, 0.044, out, { spread: 0.58, lastTail: 1.65, reverb: 0.3 });
+        playMetal(1567.98, now + 0.67, 0.58, 0.032, out, -0.2);
+        playMetal(2093, now + 0.72, 0.54, 0.025, out, 0.24);
+        playTone(523.25, now + 0.69, 0.92, 0.028, "sine", out, { attack: 0.018, sustain: 0.78, pan: -0.28, reverb: 0.34 });
+        playTone(659.25, now + 0.69, 0.92, 0.026, "sine", out, { attack: 0.018, sustain: 0.78, pan: 0, reverb: 0.34 });
+        playTone(783.99, now + 0.69, 0.92, 0.024, "sine", out, { attack: 0.018, sustain: 0.78, pan: 0.28, reverb: 0.34 });
+        playTone(1567.98, now + 0.76, 0.78, 0.018, "triangle", out, { sustain: 0.7, pan: 0.1, reverb: 0.38 });
       }
       if (type === "death") {
         playTone(55, now, 0.34, 0.14, "sine", out);

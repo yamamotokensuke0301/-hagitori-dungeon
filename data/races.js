@@ -93,7 +93,36 @@
     const [strength, speed, dexterity, durability, luck] = values;
     window.HD_DATA.races.push({ id, name, description: `${name}固有の身体特性を持つ。`, stats: { strength, speed, dexterity, durability, luck }, acceleration, resistances, traits: [`${name}固有`, `加速度${acceleration}`, "属性適性あり"] });
   });
-  const invisibleSightRaces = new Set(["ghost", "android", "alien", "insectoid", "machine", "shadow", "celestial"]);
+  window.HD_DATA.races.push(
+    {
+      id: "high_elf",
+      name: "ハイエルフ",
+      description: "古い森の魔力を受け継ぐエルフの完全上位種。全能力と魔力感知に優れ、透明な存在も見抜く。",
+      stats: { strength: 0, speed: 4, dexterity: 5, durability: 0, luck: 4 },
+      acceleration: 5,
+      resistances: { poison: 2, wind: 4, illusion: 4, light: 3, curse: 2 },
+      traits: ["エルフの完全上位", "卓越した器用さと速度", "透明視認"],
+    },
+    {
+      id: "superhuman",
+      name: "超人",
+      description: "人間の限界を完全に越えた上位種。力・速さ・器用さ・耐久・運の全てが高い。",
+      stats: { strength: 6, speed: 5, dexterity: 4, durability: 6, luck: 3 },
+      acceleration: 6,
+      resistances: { slash: 3, blunt: 3, steel: 3, curse: 1, illusion: 1 },
+      traits: ["人間の完全上位", "人外の腕力と耐久", "高速行動"],
+    },
+    {
+      id: "slime",
+      name: "スライム",
+      description: "まだ何者にもなれていない純粋な粘体。毒は効かないが、全種族で最も弱い。",
+      stats: { strength: -6, speed: -4, dexterity: -3, durability: -5, luck: -3 },
+      acceleration: -4,
+      resistances: { poison: "immune", blunt: 2, acid: 1, fire: -3, ice: -2 },
+      traits: ["全種族中で最弱", "毒無効", "火と氷に弱い"],
+    },
+  );
+  const invisibleSightRaces = new Set(["ghost", "android", "alien", "insectoid", "machine", "shadow", "celestial", "high_elf"]);
   window.HD_DATA.races.forEach((race) => {
     if (!invisibleSightRaces.has(race.id)) return;
     race.canSeeInvisible = true;

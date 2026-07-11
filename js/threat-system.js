@@ -49,6 +49,7 @@
     let multiplier = 1;
     if (enemy.unique) multiplier *= 1.08;
     if (enemy.floorGuardian) multiplier *= 1.18;
+    if (enemy.summon) multiplier *= 1.18;
     if (enemy.invisible && !canSeeInvisible && !enemy.revealed) multiplier *= 1.06;
     if (enemy.specialAttack === "time_stop") multiplier *= 1.32;
     else if (enemy.specialAttack) multiplier *= 1.12;

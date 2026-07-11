@@ -3,6 +3,9 @@
 
   window.HD_DATA = window.HD_DATA || {};
   window.HD_DATA.personalities = [
+    { id: "ordinary", name: "ふつう", stats: { strength: 0, speed: 0, dexterity: 0, durability: 1, luck: 0 }, growth: { every: 5, order: ["strength", "speed", "dexterity", "durability", "luck"] }, description: "癖のない標準型。耐久力が少し高く、全能力が順番に伸びる。" },
+    { id: "lewd", name: "すけべ", stats: { strength: -1, speed: 1, dexterity: 1, durability: -1, luck: 1 }, growth: { every: 6, order: ["luck", "dexterity", "speed"] }, description: "欲望に正直。打たれ弱いが運・器用さ・素早さが伸び、♡印の艶装備で共鳴する。" },
+    { id: "lazy", name: "なまけもの", stats: { strength: 0, speed: -2, dexterity: -1, durability: 2, luck: 2 }, growth: { every: 6, order: ["durability", "luck"] }, description: "動きは遅く不器用だが、無理をしないぶん耐久力と運が高く伸びやすい。" },
     { id: "gentle", name: "おだやか", stats: { strength: -1, speed: 0, dexterity: 0, durability: 1, luck: 1 }, growth: { every: 5, order: ["durability", "luck"] }, description: "力は控えめ。耐久力と運が伸びやすい。" },
     { id: "brave", name: "ゆうかん", stats: { strength: 2, speed: 0, dexterity: 0, durability: 0, luck: -1 }, growth: { every: 5, order: ["strength"] }, description: "力が高く、レベル成長でも力を得やすい。" },
     { id: "careful", name: "しんちょう", stats: { strength: 0, speed: -1, dexterity: 0, durability: 2, luck: 0 }, growth: { every: 5, order: ["durability"] }, description: "動きは遅めだが、耐久力が着実に伸びる。" },

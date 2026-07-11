@@ -25,7 +25,7 @@
       stats: { strength: 1, speed: 2, dexterity: 3, durability: 0, luck: 1 },
       combat: { attackTrials: 4, attackMin: 3, attackMax: 10, accuracy: 0.82, evasion: 0.08, crit: 0.12 },
       skill: { id: "precise", name: "精密射撃", attribute: "slash", power: 1.25, tag: "precise" },
-      description: "射程4。命中と回避に優れ、素材を損ないにくい技巧派。",
+      description: "射程4。命中と回避に優れ、眠る敵への奇襲と、遺体を一度に剥ぎ尽くす作業を得意とする技巧派。",
     },
     {
       id: "archer",
@@ -125,7 +125,7 @@
       stats: { strength: 1, speed: 2, dexterity: 2, durability: 1, luck: 1 },
       combat: { attackTrials: 4, attackMin: 3, attackMax: 10, accuracy: 0.8, evasion: 0.07, crit: 0.09 },
       skill: { id: "field_appraisal", name: "現場鑑定", attribute: null, power: 0, tag: "observe", researchAmount: 1 },
-      description: "現場仕事に広く通じる。簡易調査、非常に大きな運搬余力、伸びやすい加速度を持つ。",
+      description: "現場仕事に広く通じる。剥ぎ取り回数+1、内壁の掘削、簡易調査、非常に大きな運搬余力、伸びやすい加速度を持つ。",
     },
     {
       id: "priest", name: "プリースト", hp: 32, attack: 4, defense: 1,
@@ -134,6 +134,16 @@
       combat: { attackTrials: 3, attackMin: 3, attackMax: 9, accuracy: 0.8, evasion: 0.04, crit: 0.1 },
       skill: { id: "healing_light", name: "癒光", attribute: null, power: 0, tag: "heal", cooldown: 8 },
       description: "射程4の光術と回復魔法「癒光」を扱う支援職。運が高いほど回復量が伸びる。",
+    },
+    {
+      id: "ninja", name: "忍者", hp: 38, attack: 8, defense: 3,
+      baseAttackAttribute: "slash", rangedRange: 5,
+      acceleration: 30, accelerationGrowthEvery: 3,
+      materialCapacity: 90, materialBurdenStep: 30,
+      stats: { strength: 4, speed: 8, dexterity: 6, durability: 2, luck: 3 },
+      combat: { attackTrials: 8, attackMin: 8, attackMax: 20, accuracy: 0.94, evasion: 0.2, crit: 0.25 },
+      skill: { id: "shadow_assassination", name: "影縫い暗殺", attribute: "dark", power: 2.2, tag: "precise" },
+      description: "最強格の高速職。射程5の忍具、初期加速度+30、3レベルごとの加速度成長で圧倒的な手数を得る。",
     },
   ];
 })();

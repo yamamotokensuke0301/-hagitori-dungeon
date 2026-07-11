@@ -11,7 +11,7 @@
       "cave_rat", "carapace_rat", "starter_mushroom", "starter_slime", "starter_moth", "starter_beetle",
       "starter_snake", "starter_frog", "starter_wisp", "starter_crab", "starter_gecko", "starter_puff",
     ];
-    return weightedIds(window.HD_DATA.monsters.filter((monster) => !monster.unique), floor);
+    return weightedIds(window.HD_DATA.monsters.filter((monster) => !monster.unique && !monster.rareSpawn), floor);
   };
   const uniquePool = (floor) => {
     if (floor === 1) return [];
@@ -63,5 +63,10 @@
   window.HD_DATA.floors.forEach((floor) => {
     floor.enemyCount = Math.max(18, Math.round(floor.enemyCount * 0.78));
     floor.spawnCap = floor.enemyCount + 10 + Math.floor(floor.floor / 12);
+    if (floor.floor < 100) floor.stairRange = [4, 6];
+    floor.rareMonsterPool = window.HD_DATA.monsters
+      .filter((monster) => monster.rareSpawn && monster.floors?.includes(floor.floor))
+      .map((monster) => monster.id);
+    floor.rareMonsterChance = floor.floor % 10 === 0 ? 0 : 0.07;
   });
 })();

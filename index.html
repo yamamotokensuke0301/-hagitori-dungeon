@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#0b0f0d">
     <meta name="description" content="倒し方で素材が変わる、スマートフォン向けターン制ローグライクRPG。地下100階の踏破を目指すブラウザゲーム。">
     <title>剥ぎ取りダンジョン</title>
-    <link rel="stylesheet" href="./css/style.css?v=20260711-harvest2">
+    <link rel="stylesheet" href="./css/style.css?v=20260711-developer-panel">
   </head>
   <body>
     <section id="titleScreen" class="title-screen" aria-label="ゲーム開始画面">
@@ -40,7 +40,7 @@
           <span>Lv</span>
           <strong id="levelText">1</strong>
         </div>
-        <button id="audioButton" class="audio-button" type="button" aria-label="音楽を切り替える">
+        <button id="audioButton" class="audio-button" type="button" aria-label="音楽を切り替える" aria-pressed="false">
           <span id="audioIcon">♪</span>
           <strong id="audioText">音楽</strong>
         </button>
@@ -83,16 +83,26 @@
           </div>
           <button id="returnTownButton" type="button">帰還</button>
         </div>
-        <div id="map" class="map" role="grid" aria-label="ダンジョンマップ"></div>
+        <div class="dungeon-projection">
+          <aside id="dungeonStatsOverlay" class="dungeon-stats-overlay" aria-label="探索中の能力値">
+            <div><span>力</span><strong id="dungeonStrengthText">0</strong></div>
+            <div><span>素早</span><strong id="dungeonSpeedText">0</strong></div>
+            <div><span>器用</span><strong id="dungeonDexterityText">0</strong></div>
+            <div><span>耐久</span><strong id="dungeonDurabilityText">0</strong></div>
+            <div><span>運</span><strong id="dungeonLuckText">0</strong></div>
+            <div><span>加速</span><strong id="dungeonAccelerationText">0</strong></div>
+          </aside>
+          <div id="map" class="map" role="grid" aria-label="ダンジョンマップ"></div>
+        </div>
         <div class="controls" aria-label="仮想8方向移動キー">
           <button type="button" data-move="up-left" aria-label="左上へ移動">↖</button>
-          <button type="button" data-move="up">▲</button>
+          <button type="button" data-move="up" aria-label="上へ移動">▲</button>
           <button type="button" data-move="up-right" aria-label="右上へ移動">↗</button>
-          <button type="button" data-move="left">◀</button>
-          <button type="button" id="waitButton">待</button>
-          <button type="button" data-move="right">▶</button>
+          <button type="button" data-move="left" aria-label="左へ移動">◀</button>
+          <button type="button" id="waitButton" aria-label="待機・探索・剥ぎ取り">待</button>
+          <button type="button" data-move="right" aria-label="右へ移動">▶</button>
           <button type="button" data-move="down-left" aria-label="左下へ移動">↙</button>
-          <button type="button" data-move="down">▼</button>
+          <button type="button" data-move="down" aria-label="下へ移動">▼</button>
           <button type="button" data-move="down-right" aria-label="右下へ移動">↘</button>
         </div>
         <div id="magicMoveControls" class="magic-move-controls hidden" aria-label="職業能力">
@@ -115,9 +125,27 @@
         <div id="materialsList" class="materials-list"></div>
       </section>
 
-      <section class="log-panel" role="log" aria-live="off" aria-label="戦闘ログ">
-        <div id="logList"></div>
+      <section class="log-panel" aria-labelledby="logPanelTitle">
+        <div class="log-panel-toolbar">
+          <span id="logPanelTitle">戦闘ログ</span>
+          <button id="openLogHistoryButton" type="button" aria-haspopup="dialog" aria-controls="logHistoryPanel">
+            全履歴 <span id="logHistoryCount" class="log-history-count">0</span>
+          </button>
+        </div>
+        <div id="logList" class="log-list" role="log" aria-live="off" aria-label="最新の戦闘ログ"></div>
         <div id="liveLogAnnouncer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+      </section>
+
+      <section id="logHistoryPanel" class="modal log-history-modal hidden" role="dialog" aria-modal="true" aria-labelledby="logHistoryTitle" aria-describedby="logHistoryDescription">
+        <div class="modal-card log-history-card">
+          <div class="log-history-heading">
+            <span>冒険記録</span>
+            <h2 id="logHistoryTitle">戦闘ログ全履歴</h2>
+            <p id="logHistoryDescription">保存中の記録を新しい順に表示します。</p>
+          </div>
+          <div id="logHistoryList" class="log-history-list" role="log" aria-live="off" aria-label="戦闘ログ全履歴" tabindex="0"></div>
+          <button id="closeLogHistoryButton" type="button">閉じる</button>
+        </div>
       </section>
 
       <section id="confirmPanel" class="modal hidden" aria-label="確認">
@@ -157,6 +185,15 @@
         </div>
       </section>
 
+      <section id="depthPickerPanel" class="modal depth-picker-modal hidden" role="dialog" aria-modal="true" aria-labelledby="depthPickerTitle">
+        <div class="modal-card depth-picker-card">
+          <h2 id="depthPickerTitle">出発階層を選ぶ</h2>
+          <p>撃破した十階層ごとの守護者に応じて、街から深層へ直接出発できる。</p>
+          <div id="depthPickerList" class="choice-grid depth-picker-list"></div>
+          <button id="depthPickerClose" type="button">戻る</button>
+        </div>
+      </section>
+
       <section id="monsterInfoPanel" class="modal monster-info-modal hidden" aria-label="モンスター情報">
         <div class="modal-card monster-info-card">
           <div id="monsterInfoContent"></div>
@@ -175,24 +212,47 @@
         <strong>YOU DIED</strong>
         <p id="deathReasonText"></p>
       </section>
+
+      <section id="deathReviewPanel" class="death-review-panel hidden" role="dialog" aria-modal="true" aria-labelledby="deathReviewTitle">
+        <div class="death-review-card">
+          <span>冒険記録</span>
+          <h2 id="deathReviewTitle">冒険者は倒れた</h2>
+          <p id="deathReviewReason"></p>
+          <div id="deathReviewLog" class="death-review-log" role="log" aria-label="死亡直前のログ" tabindex="0"></div>
+          <button id="continueAfterDeathButton" type="button">記録を閉じて次の冒険者へ</button>
+        </div>
+      </section>
+
+      <section id="developerPanel" class="modal developer-modal hidden" role="dialog" aria-modal="true" aria-labelledby="developerTitle">
+        <div class="modal-card developer-card">
+          <div class="developer-heading">
+            <span>DEBUG MODE</span>
+            <h2 id="developerTitle">バランス調整</h2>
+            <p>ここで行った変更は現在のセーブへ反映されます。</p>
+          </div>
+          <div id="developerPanelBody"></div>
+          <button id="closeDeveloperPanelButton" type="button">閉じる</button>
+        </div>
+      </section>
     </main>
 
-    <script src="./data/materials.js"></script>
-    <script src="./data/races.js?v=20260711-tactical4"></script>
-    <script src="./data/jobs.js?v=20260711-cleanup2"></script>
-    <script src="./data/personalities.js?v=20260710-personalities10"></script>
-    <script src="./data/equipment.js?v=20260711-harvest2"></script>
-    <script src="./data/treasures.js?v=20260711-harvest2"></script>
-    <script src="./data/monsters.js?v=20260711-harvest2"></script>
-    <script src="./data/floors.js?v=20260711-roster4"></script>
-    <script src="./js/unique-dialogue.js?v=20260711-voices4"></script>
-    <script src="./js/utils.js?v=20260711-cleanup2"></script>
-    <script src="./js/threat-system.js?v=20260711-tension2"></script>
-    <script src="./js/dungeon-generator.js?v=20260710-floor100-speed"></script>
-    <script src="./js/economy.js?v=20260711-harvest2"></script>
-    <script src="./js/character-system.js?v=20260711-tactical4"></script>
-    <script src="./js/bounty-system.js?v=20260711-bounty-module"></script>
-    <script src="./js/audio-effects.js?v=20260711-studio3"></script>
-    <script src="./js/main.js?v=20260711-harvest2"></script>
+    <script src="./data/materials.js?v=20260711-balance250"></script>
+    <script src="./data/races.js?v=20260711-balance250"></script>
+    <script src="./data/jobs.js?v=20260711-balance250"></script>
+    <script src="./data/personalities.js?v=20260711-balance250"></script>
+    <script src="./data/equipment.js?v=20260711-balance250"></script>
+    <script src="./data/treasures.js?v=20260711-balance250"></script>
+    <script src="./data/monsters.js?v=20260711-balance250"></script>
+    <script src="./data/floors.js?v=20260711-balance250"></script>
+    <script src="./js/unique-dialogue.js?v=20260711-balance250"></script>
+    <script src="./js/utils.js?v=20260711-balance250"></script>
+    <script src="./js/threat-system.js?v=20260711-balance250"></script>
+    <script src="./js/dungeon-generator.js?v=20260711-balance250"></script>
+    <script src="./js/artifact-generator.js?v=20260711-balance250"></script>
+    <script src="./js/economy.js?v=20260711-balance250"></script>
+    <script src="./js/character-system.js?v=20260711-balance250"></script>
+    <script src="./js/bounty-system.js?v=20260711-balance250"></script>
+    <script src="./js/audio-effects.js?v=20260711-balance250"></script>
+    <script src="./js/main.js?v=20260711-developer-panel"></script>
   </body>
 </html>

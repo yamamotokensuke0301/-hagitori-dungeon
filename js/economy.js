@@ -33,6 +33,11 @@
     return Math.max(1, Math.round(base * qualityMultiplier));
   }
 
+  function equipmentSellPrice(item, crafted) {
+    const qualityMultiplier = crafted ? 1 + Number(crafted.quality || 0) * 0.12 : 1;
+    return Math.max(5, Math.floor(shopItemPrice(item) * 0.45 * qualityMultiplier));
+  }
+
   function equipmentStats(item) {
     const parts = [];
     if (item.attack) parts.push(`攻撃${item.attack > 0 ? "+" : ""}${item.attack}`);
@@ -43,5 +48,5 @@
     return parts.join(" ") || "基礎数値補正なし";
   }
 
-  window.HD_ECONOMY = { materialSellPrice, treasureSellPrice, shopItemPrice, guildPointValue, equipmentStats };
+  window.HD_ECONOMY = { materialSellPrice, treasureSellPrice, shopItemPrice, equipmentSellPrice, guildPointValue, equipmentStats };
 })();
