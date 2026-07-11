@@ -153,5 +153,13 @@
       skill: { id: "full_bloom_command", name: "満開の花印", attribute: "poison", power: 0.8, tag: "flower_command" },
       description: "射程4。攻撃で花印を植え、確率で生きた魔物を使い捨ての花ペットへ変える特殊使役職。本人の戦闘力は低い。",
     },
+    {
+      id: "capoeirista", name: "カポエラ使い", hp: 36, attack: 6, defense: 1,
+      baseAttackAttribute: "blunt", acceleration: 8,
+      stats: { strength: 3, speed: 4, dexterity: 2, durability: 1, luck: 0 },
+      combat: { attackTrials: 5, attackMin: 4, attackMax: 11, accuracy: 0.8, evasion: 0.12, crit: 0.11 },
+      skill: { id: "ginga_inversion", name: "逆立ちジンガ", attribute: "blunt", power: 1.8, tag: "capoeira_stance" },
+      description: "逆立ちジンガで天地をひっくり返す珍職。状態中は斜めを含む8方向の移動入力が反転する代わり、通常攻撃が強烈な足技になる。",
+    },
   ];
 })();

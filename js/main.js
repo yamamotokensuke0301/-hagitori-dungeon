@@ -3,7 +3,7 @@
 
   const SAVE_KEY = "hagitori-dungeon-save-v1";
   const AUDIO_KEY = "hagitori-audio-enabled-v4";
-  const APP_VERSION = "Prototype 3.1.0";
+  const APP_VERSION = "Prototype 3.2.0";
   const MAP_SIZE_RANGE = Object.freeze([36, 60]);
   const VIEW_SIZE = 13;
   const MAX_FLOOR = 100;
@@ -18,6 +18,8 @@
   const RESEARCH_PAGE_SIZE = 30;
   const LOG_HISTORY_LIMIT = 60;
   const INN_COST = 10;
+  const DRINK_COST = 1;
+  const DRUNKEN_FIST_POWER = 3.6;
   const SAITAMA_ONE_PUNCH_CHANCE = 0.08;
   const RIMURU_FLOOR_WIPE_CHANCE = 0.025;
   const RIMURU_SLIME_STAT_BONUS = 150;
@@ -56,7 +58,7 @@
     uniqueMultiplier: 1.5, colorStep: 0.2, maxLuckBonus: 0.5, luckDivisor: 200,
   });
   const PHASING_UNIQUE_ATTRIBUTES = Object.freeze(["dark", "curse", "illusion"]);
-  const DUNGEON_LIGHT_RADIUS = Object.freeze({ near: 3.25, mid: 5.6 });
+  const DUNGEON_LIGHT_RADIUS = Object.freeze({ near: 2.25, mid: 4.6 });
   const EMPTY_TELEPORT_COOLDOWNS = Object.freeze({ short: 0, long: 0 });
   const RESEARCH_LEVEL_LABELS = Object.freeze(["未解析", "目撃", "能力判明", "特性判明", "素材判明", "完全解析"]);
   const SPECIAL_ATTACK_LABELS = Object.freeze({
@@ -68,6 +70,14 @@
     devour: "素材・遺体捕食",
     time_stop: "時間停止",
     gold_steal: "所持金強奪・逃走転移",
+  });
+  const EQUIPMENT_ROLES = Object.freeze({
+    basic: { label: "基礎装備", short: "基礎" },
+    specialized: { label: "特化装備", short: "特化" },
+    conditional: { label: "条件装備", short: "条件" },
+    core: { label: "ビルド中核装備", short: "中核" },
+    novelty: { label: "珍品", short: "珍品" },
+    final: { label: "最終候補", short: "最終" },
   });
   const INN_ADVICES = Object.freeze([
     "倒し方で剥ぎ取れる素材が変わる。最後に使った属性や職業技を意識するといい。",
@@ -116,7 +126,41 @@
     "十階ごとの深度標は、その冒険者が倒れれば失われる。次の命へ道そのものは譲れない。",
     "調査記録と街の流通は次の冒険者へ残る。死んでも、知識まで無駄になるわけじゃない。",
   ]);
+  const TAVERN_SNACK_INGREDIENTS = Object.freeze([
+    ["枝豆", "青い香り"], ["鶏皮", "濃い脂"], ["砂肝", "こりこりした歯応え"], ["山芋", "ほくほくした甘み"], ["川海老", "香ばしい殻"],
+    ["燻製卵", "燻煙の香り"], ["角切りチーズ", "まろやかな塩気"], ["干し肉", "噛むほど出る旨味"], ["蛸足", "弾む歯応え"], ["茸", "森の香り"],
+  ]);
+  const TAVERN_SNACK_STYLES = Object.freeze([
+    ["炙り", "香ばしい"], ["塩焼き", "塩辛い"], ["香草和え", "爽やかな"], ["黒胡椒炒め", "刺激的な"], ["味噌漬け", "濃厚な"],
+    ["蜂蜜煮", "甘じょっぱい"], ["にんにく焼き", "力強い"], ["唐辛子和え", "猛烈に辛い"], ["酢漬け", "酸っぱい"], ["迷宮香辛料まぶし", "正体不明の"],
+  ]);
+  const TAVERN_SNACKS = Object.freeze(TAVERN_SNACK_INGREDIENTS.flatMap(([ingredient, texture], ingredientIndex) => (
+    TAVERN_SNACK_STYLES.map(([style, flavor], styleIndex) => Object.freeze({
+      id: `snack_${ingredientIndex}_${styleIndex}`,
+      name: `${ingredient}の${style}`,
+      flavor: `${flavor}${texture}`,
+      price: 1 + ((ingredientIndex * 3 + styleIndex) % 5),
+      stat: ["strength", "speed", "dexterity", "durability", "luck"][(ingredientIndex + styleIndex) % 5],
+    }))
+  )));
+  const SNACK_PERSONALITY_COMMENTS = Object.freeze({
+    ordinary: (snack) => `うん、${snack.name}。こういうのでいいんだよ。`,
+    lewd: (snack) => `この${snack.flavor}感じ……酒より危ない想像が膨らむな。`,
+    lazy: (snack) => `${snack.name}、寝たまま食べられたら満点なんだけどなあ。`,
+    gentle: (snack) => `丁寧な味だね。${snack.name}を作った人にも一杯おごりたいな。`,
+    brave: (snack) => `うまい！ ${snack.name}を平らげたら、次は竜でも持ってこい！`,
+    careful: (snack) => `${snack.flavor}……毒気なし。火の通りもよし。いただこう。`,
+    quick: (snack) => `うまっ！ ${snack.name}、もう一皿！ 早く！`,
+    skillful: (snack) => `この切り幅と火入れ……${snack.name}、店主は相当な手練れだ。`,
+    lucky: (snack) => `最後の一切れが一番大きい。今日も運が向いてるな。`,
+    stubborn: (snack) => `${snack.name}か。流行りの盛り付けは好かんが、味は認める。`,
+    hasty: (snack) => `熱っ！ でも待てない！ ${snack.name}は熱いうちが勝負だ！`,
+    calm: (snack) => `${snack.flavor}余韻が酒を引き立てる。悪くない選択だ。`,
+    whimsical: (snack) => `今日は${snack.name}が運命の味。明日は知らないけど。`,
+    glutton: (snack) => `${snack.name}！ この${snack.flavor}感じ、まだ五皿はいける！`,
+  });
   let recentInnAdviceIndexes = [];
+  let tavernSnackMenu = [];
   const DATA = window.HD_DATA;
   const ATTRIBUTE_IDS_BY_LABEL = Object.freeze(Object.fromEntries(
     Object.entries(DATA.attributeLabels).map(([id, label]) => [label, id]),
@@ -202,12 +246,18 @@
   const races = byId(DATA.races);
   const personalities = byId(DATA.personalities);
   const monsters = byId(DATA.monsters);
+  const monstersBySpecies = DATA.monsters.reduce((groups, monster) => {
+    if (!groups[monster.speciesId]) groups[monster.speciesId] = [];
+    groups[monster.speciesId].push(monster);
+    return groups;
+  }, {});
   const ARENA_ROSTER = DATA.monsters.filter((monster) => monster.arenaOnly).sort((a, b) => a.arenaRank - b.arenaRank);
   const ARENA_BATTLE_COUNT = ARENA_ROSTER.length;
   const materials = byId(DATA.materials);
   const equipment = byId(DATA.equipment);
   const spells = byId(DATA.spells || []);
   const treasureItems = byId(DATA.treasureItems || []);
+  const equipmentSets = byId(DATA.equipmentSets || []);
   const floorByNumber = Object.fromEntries(DATA.floors.map((floor) => [floor.floor, floor]));
   const bountyTargets = BOUNTY.targets(DATA);
 
@@ -268,6 +318,7 @@
     researchView: document.querySelector("#researchView"),
     researchResultCount: document.querySelector("#researchResultCount"),
     shopView: document.querySelector("#shopView"),
+    junkDealerView: document.querySelector("#junkDealerView"),
     guildView: document.querySelector("#guildView"),
     arenaView: document.querySelector("#arenaView"),
     floorName: document.querySelector("#floorNameText"),
@@ -379,6 +430,7 @@
         titles: [],
         guildDonatedEquipmentIds: [],
         compendiumEquipmentUnlocked: false,
+        beginnerCourseStatus: "unoffered",
         awaitingCreation: true,
         shop: { soldMaterials: {}, inventory: [] },
       },
@@ -418,11 +470,15 @@
       craftedDetails: {},
       gold: 0,
       guildPoints: 0,
+      junkTokens: 0,
       arenaBestRound: 0,
       bountyCorpses: [],
       scavengerNutrition: 0,
       temporaryDebuffs: {},
       slowTurns: 0,
+      intoxicationDrinks: 0,
+      intoxicationTurns: 0,
+      snackBuff: null,
       materials: {},
       items: {},
       learnedSpells: [],
@@ -526,6 +582,9 @@
       ? [...new Set(saved.meta.guildDonatedEquipmentIds.filter((id) => equipment[id] && !equipment[id].artifact && !PROTECTED_EQUIPMENT_IDS.has(id)))]
       : [];
     saved.meta.awaitingCreation = Boolean(saved.meta.awaitingCreation);
+    saved.meta.beginnerCourseStatus = ["unoffered", "declined", "partial", "completed"].includes(saved.meta.beginnerCourseStatus)
+      ? saved.meta.beginnerCourseStatus
+      : "unoffered";
     if (!saved.adventurer.raceId || !races[saved.adventurer.raceId]) saved.adventurer.raceId = "human";
     if (!saved.adventurer.jobId || !jobs[saved.adventurer.jobId]) saved.adventurer.jobId = "swordsman";
     if (!saved.adventurer.personalityId || !personalities[saved.adventurer.personalityId]) saved.adventurer.personalityId = "gentle";
@@ -540,11 +599,24 @@
     saved.adventurer.materials = saved.adventurer.materials || {};
     saved.adventurer.gold = Math.max(0, Number(saved.adventurer.gold || 0));
     saved.adventurer.guildPoints = Math.max(0, Number(saved.adventurer.guildPoints || 0));
+    saved.adventurer.junkTokens = Math.max(0, Math.floor(Number(saved.adventurer.junkTokens || 0)));
     saved.adventurer.arenaBestRound = clamp(Number(saved.adventurer.arenaBestRound || 0), 0, ARENA_BATTLE_COUNT);
     saved.adventurer.bountyCorpses = Array.isArray(saved.adventurer.bountyCorpses) ? saved.adventurer.bountyCorpses : [];
     saved.adventurer.scavengerNutrition = Math.max(0, Number(saved.adventurer.scavengerNutrition || 0));
     saved.adventurer.temporaryDebuffs = saved.adventurer.temporaryDebuffs || {};
     saved.adventurer.slowTurns = Math.max(0, Number(saved.adventurer.slowTurns || 0));
+    saved.adventurer.intoxicationDrinks = Math.max(0, Math.floor(Number(saved.adventurer.intoxicationDrinks || 0)));
+    saved.adventurer.intoxicationTurns = Math.max(0, Math.floor(Number(saved.adventurer.intoxicationTurns || 0)));
+    if (saved.adventurer.snackBuff && typeof saved.adventurer.snackBuff === "object") {
+      const validSnackStats = new Set(["strength", "speed", "dexterity", "durability", "luck"]);
+      if (!validSnackStats.has(saved.adventurer.snackBuff.stat)) saved.adventurer.snackBuff = null;
+      else saved.adventurer.snackBuff = {
+        stat: saved.adventurer.snackBuff.stat,
+        amount: clamp(Math.floor(Number(saved.adventurer.snackBuff.amount || 0)), 1, 5),
+        turns: Math.max(0, Math.floor(Number(saved.adventurer.snackBuff.turns || 0))),
+        snackName: String(saved.adventurer.snackBuff.snackName || "つまみ").slice(0, 40),
+      };
+    } else saved.adventurer.snackBuff = null;
     saved.adventurer.items = saved.adventurer.items && typeof saved.adventurer.items === "object" ? saved.adventurer.items : {};
     const jobIds = DATA.jobs.map((job) => job.id);
     const randomArtifactEntries = Object.entries(saved.adventurer.randomArtifacts || {})
@@ -796,10 +868,10 @@
     if (state.adventurer.inDungeon) view = "dungeon";
     if (view === "dungeon" && !state.adventurer.inDungeon) view = "town";
     currentView = view;
-    ["town", "dungeon", "home", "research", "shop", "guild", "arena"].forEach((name) => {
+    ["town", "dungeon", "home", "research", "shop", "junkDealer", "guild", "arena"].forEach((name) => {
       document.querySelector(`#${name}View`).classList.toggle("hidden", name !== view);
     });
-    const activeTab = ["home", "shop"].includes(view) ? "town" : view;
+    const activeTab = ["home", "shop", "junkDealer"].includes(view) ? "town" : view;
     els.tabs.forEach((button) => {
       const active = button.dataset.view === activeTab;
       button.classList.toggle("active", active);
@@ -807,6 +879,55 @@
       else button.removeAttribute("aria-current");
     });
     render();
+    if (view === "guild") offerBeginnerCourse();
+  }
+
+  const BEGINNER_COURSE_LESSONS = Object.freeze([
+    { title: "初心者講座 1/6・生還", text: "迷宮では欲張らず、危険を感じたら帰還してください。死亡すると冒険者の資産と深度標は失われますが、調査記録や街の流通は次の冒険者へ残ります。" },
+    { title: "初心者講座 2/6・調査", text: "魔物は戦う、攻撃を受ける、剥ぎ取ることで調査が進みます。調査度が上がると能力、弱点、危険技、素材条件が順に判明します。" },
+    { title: "初心者講座 3/6・属性", text: "攻撃属性は敵の弱点と耐性で威力が変わります。装備の赤い負耐性は被害を増やしますが、同属性の免疫装備があれば負耐性を完全に塞げます。" },
+    { title: "初心者講座 4/6・装備パズル", text: "装備は攻撃力だけで選ばないでください。大きな長所には弱点があり、別部位の耐性・免疫・固有連携で穴を埋めることが重要です。自宅で変更後の合計耐性を確認できます。" },
+    { title: "初心者講座 5/6・セット装備", text: "組物は2・3・4部位で段階的に効果が発動します。四部位完成は強力ですが、固定アーティファクトを一枠入れて弱点を塞ぐ構成も有効です。" },
+    { title: "初心者講座 6/6・街の活用", text: "素材を商店へ流すと装備が入荷します。ガラクタはGにするか、ガラクタマニアの偏愛札へ換えて珍素材を狙えます。宿の酒や職業には危険な裏技も隠れています。" },
+  ]);
+
+  function offerBeginnerCourse() {
+    if (state.adventurer.inDungeon || state.meta.beginnerCourseStatus !== "unoffered" || pendingConfirm) return;
+    state.meta.beginnerCourseStatus = "partial";
+    saveGame();
+    askConfirm(
+      "冒険者ギルド初心者講座",
+      "受付係「初めての方へ、全6項目の初心者講座があります。受講は任意で、断っても不利益はありません。受けますか？」",
+      () => showBeginnerCourseLesson(0),
+      () => {
+        state.meta.beginnerCourseStatus = "declined";
+        log("ギルドの初心者講座は受けず、自分の判断で冒険へ進むことにした。");
+        saveGame();
+      },
+      { ok: "講座を受ける", cancel: "今回は受けない" },
+    );
+  }
+
+  function showBeginnerCourseLesson(index) {
+    const lesson = BEGINNER_COURSE_LESSONS[index];
+    if (!lesson) {
+      state.meta.beginnerCourseStatus = "completed";
+      log("冒険者ギルドの初心者講座を修了した。受付係「知識より生還が大事です。ご武運を」");
+      playSfx("researchUp");
+      saveGame();
+      return;
+    }
+    askConfirm(
+      lesson.title,
+      lesson.text,
+      () => showBeginnerCourseLesson(index + 1),
+      () => {
+        state.meta.beginnerCourseStatus = "partial";
+        log(`初心者講座を${index + 1}項目目で切り上げた。受講した内容は冒険記録へ残った。`);
+        saveGame();
+      },
+      { ok: index === BEGINNER_COURSE_LESSONS.length - 1 ? "修了する" : "次へ", cancel: "ここで終える" },
+    );
   }
 
   function render() {
@@ -818,17 +939,19 @@
       : currentView === "arena" && state.arena
         ? `修練場 第${state.arena.round}戦`
         : "街";
-    els.job.textContent = adv.jobId === "scavenger"
+    const intoxicationLabel = intoxicated() ? drunkenFistActive() ? `・酔拳${adv.intoxicationTurns}` : `・酩酊${adv.intoxicationTurns}` : "";
+    const snackBuffLabel = adv.snackBuff?.turns > 0 ? `・満腹${statLabel(adv.snackBuff.stat)}+${adv.snackBuff.amount}(${adv.snackBuff.turns})` : "";
+    els.job.textContent = (adv.jobId === "scavenger"
       ? `${jobs[adv.jobId].name}・摂食${adv.scavengerNutrition || 0}`
       : adv.jobId === "flower_tamer" && adv.inDungeon
         ? `${jobs[adv.jobId].name}・花ペット${activeFlowerPets().length}/${flowerPetLimit()}`
-        : jobs[adv.jobId].name;
+        : jobs[adv.jobId].name) + intoxicationLabel + snackBuffLabel;
     els.race.textContent = `${personalities[adv.personalityId].name}な${races[adv.raceId].name}${adv.name}`;
     els.hp.textContent = adv.hp;
     els.maxHp.textContent = stats.maxHp;
     updateHpFill(els.playerHpFill, adv.hp, stats.maxHp);
     els.level.textContent = adv.level;
-    els.level.parentElement.title = adv.level >= MAX_LEVEL ? "最大レベル" : `経験値 ${adv.experience}/${experienceToNext(adv.level)}`;
+    els.level.parentElement.title = adv.level >= MAX_LEVEL ? "最大レベル" : `経験値 ${adv.experience}/${experienceToNext(adv.level)}（種族補正×${raceExperienceMultiplier().toFixed(2)}）`;
     [
       [els.strength, els.dungeonStrength, stats.strength],
       [els.speed, els.dungeonSpeed, stats.speed],
@@ -857,6 +980,7 @@
       renderHome();
       renderResearch();
       renderShop();
+      renderJunkDealer();
       renderGuild();
       renderArena();
     }
@@ -918,6 +1042,50 @@
     return item.jobs.map((id) => jobs[id]?.name || id).join("・");
   }
 
+  function equipmentRole(item) {
+    const numericResistances = Object.values(item?.resistances || {}).filter((value) => value !== "immune").map(Number);
+    const hasImmunity = Object.values(item?.resistances || {}).includes("immune");
+    const hasDrawback = [item?.attack, item?.defense, item?.acceleration, item?.hpRegen, ...numericResistances]
+      .some((value) => Number(value || 0) < 0) || Boolean(item?.curse);
+    const artifactTier = item?.artifact?.tier;
+    if (["joke", "trash"].includes(artifactTier) || item?.risque) {
+      return { id: "novelty", tag: "珍品", reason: "常識的な性能評価から外れた効果や収集価値を持つ" };
+    }
+    if (item?.masterOnly || item?.completionOnly || artifactTier === "cheat" || Number(item?.shopMinFloor || 0) >= 85) {
+      return { id: "final", tag: "最終", reason: "最深層や最終ビルドでも主力候補になる格を持つ" };
+    }
+    if (item?.setId) return { id: "conditional", tag: "組物", reason: "同じセットの装備数に応じて段階効果を発動する" };
+    const attackAttributes = equipmentAttackAttributes(item);
+    if (item?.trueSight || item?.guildCost || hasImmunity || attackAttributes.length >= 2
+      || Number(item?.hpRegen || 0) >= 2 || ["useful", "ordinary"].includes(artifactTier)) {
+      return { id: "core", tag: item?.trueSight ? "看破核" : hasImmunity ? "免疫核" : "複合核", reason: item?.trueSight
+        ? "透明看破を軸に探索と戦闘の組み立てを変える"
+        : "複数の性能を結び、ビルドの中心として働く" };
+    }
+    if (hasDrawback || Number(item?.jobs?.length || DATA.jobs.length) <= 2) {
+      return { id: "conditional", tag: hasDrawback ? "代償" : "職限", reason: hasDrawback
+        ? "明確な代償を受け入れた時に性能を引き出せる"
+        : "限られた職業で真価を発揮する" };
+    }
+    const resistancePeak = Math.max(0, ...numericResistances);
+    if (item?.attributeAttack || resistancePeak >= 2 || Math.abs(Number(item?.acceleration || 0)) >= 3
+      || Number(item?.hpRegen || 0) !== 0 || Object.keys(item?.resistances || {}).length >= 2) {
+      const resistanceFocus = Object.entries(item?.resistances || {})
+        .filter(([, value]) => value !== "immune" && Number(value) === resistancePeak)
+        .map(([id]) => id)[0];
+      const tag = item?.attributeAttack ? `${attr(item.attributeAttack)}攻`
+        : Math.abs(Number(item?.acceleration || 0)) >= 3 ? "加速"
+          : Number(item?.hpRegen || 0) !== 0 ? "再生"
+            : resistanceFocus ? `${attr(resistanceFocus)}耐` : "特化";
+      return { id: "specialized", tag, reason: item?.attributeAttack
+        ? `${attr(item.attributeAttack)}属性の攻撃運用へ明確に特化する`
+        : "特定の能力または耐性を重点的に伸ばす" };
+    }
+    return { id: "basic", tag: "基礎", reason: "癖が少なく、基礎能力を素直に底上げする" };
+  }
+
+  window.HD_EQUIPMENT_ROLES = Object.freeze({ definitions: EQUIPMENT_ROLES, classify: equipmentRole });
+
   function researchStatusText(level) {
     const normalized = clamp(Math.floor(Number(level || 0)), 0, MAX_RESEARCH_LEVEL);
     const maxLabel = normalized === MAX_RESEARCH_LEVEL ? " MAX" : "";
@@ -972,6 +1140,10 @@
     else parts.push("予兆を伴う固有危険技は持たない");
     if (monster.specialAttack) parts.push(`さらに${SPECIAL_ATTACK_LABELS[monster.specialAttack] || monster.specialAttack}を行う`);
     if (monster.summon) parts.push(`長期戦では眷属を最大${monster.summon.maxTotal}体まで召喚する`);
+    if (monster.dragonBreath) parts.push(`竜息階位${monster.dragonBreath.rank}。一度の放射で${monster.dragonBreath.trials}回の命中判定を行う超火力ブレス`);
+    if (monster.divineInvulnerability) parts.push(`${monster.divineInvulnerability.every}行動ごとに「${monster.divineInvulnerability.name}」を展開し、次の${monster.divineInvulnerability.charges}回のプレイヤー攻撃を完全無効化する`);
+    if (monster.demonicWard) parts.push(`悪魔障壁により${monster.demonicWard.attributes.map(attrHtml).join("・")}耐性を最低${monster.demonicWard.tier}まで引き上げている`);
+    if (monster.rapidRegeneration) parts.push(`世界ターンごとに最大HPの約${Math.round(monster.rapidRegeneration.rate * 100)}%を急速回復する。火で2ターン停止、毒で3ターン半減、会心で1ターン停止できる`);
     const acceleration = Number(monster.acceleration || 0);
     if (acceleration >= 20) parts.push("非常に素早く、連続行動へ入りやすい");
     else if (acceleration >= 8) parts.push("行動速度が高い");
@@ -1085,6 +1257,17 @@
   // Town and facility views.
   function renderTown() {
     const adv = state.adventurer;
+    if (!tavernSnackMenu.length) refreshTavernSnackMenu();
+    const drinkRisk = acuteAlcoholRisk(adv.intoxicationDrinks + 1);
+    const alcoholStatus = adv.intoxicationTurns > 0
+      ? drunkenFistActive() ? `酔拳状態・残り${adv.intoxicationTurns}世界ターン` : `酩酊状態・残り${adv.intoxicationTurns}世界ターン`
+      : "しらふ";
+    const snackBuffStatus = adv.snackBuff?.turns > 0
+      ? ` / 満腹効果 ${statLabel(adv.snackBuff.stat)}+${adv.snackBuff.amount}・残り${adv.snackBuff.turns}世界ターン`
+      : "";
+    const snackButtons = tavernSnackMenu.map((snack) => (
+      `<button type="button" data-tavern-snack="${snack.id}" ${adv.gold < snack.price ? "disabled" : ""}><strong>${snack.name}</strong><small>${snack.price}G・${snack.flavor}</small></button>`
+    )).join("");
     const jobButtons = DATA.jobs
       .map((job) => {
         const selected = job.id === adv.jobId ? "selected" : "";
@@ -1099,13 +1282,23 @@
       <div class="town-grid">
         <article class="town-card inn-card">
           <h2>宿屋「眠り鹿」</h2>
-          <p>10Gで一晩休み、HPと一時的な能力低下を完全に回復する。主人から冒険の助言も聞ける。</p>
+          <p>10Gで一晩休み、HPと一時的な能力低下を完全に回復する。酒は一杯1G。飲むたび主人から攻略話を聞けるが、飲み過ぎは命に関わる。</p>
+          <p><strong>${alcoholStatus}</strong>${snackBuffStatus} / 次の一杯の急性中毒死リスク ${Math.round(drinkRisk * 1000) / 10}%</p>
+          <div class="inline-actions"><button type="button" id="drinkInnButton" ${adv.gold < DRINK_COST ? "disabled" : ""}>1Gで一杯飲む</button>
           <button type="button" id="restInnButton" ${adv.gold < INN_COST ? "disabled" : ""}>${INN_COST}Gで休む</button>
+          </div>
+          <h3>今夜のつまみ</h3>
+          <div class="tavern-snack-menu">${snackButtons}</div>
         </article>
         <article class="town-card">
           <h2>商店</h2>
           <p>素材を流通させると装備品が入荷する。宝箱の魔法書やガラクタも買い取る。</p>
           <button type="button" id="openShopButton">品物を売る・装備品を買う</button>
+        </article>
+        <article class="town-card junk-dealer-card">
+          <h2>ガラクタマニア「珍品偏愛堂」</h2>
+          <p>ガラクタを偏愛札へ換え、通常の市場には出ない超レア・ウルトラレア素材と交換する専門店。</p>
+          <button type="button" id="openJunkDealerButton">ガラクタを鑑定・交換する</button>
         </article>
         <article class="town-card">
           <h2>転職所</h2>
@@ -1128,8 +1321,11 @@
     `;
 
     document.querySelector("#restInnButton").addEventListener("click", restAtInn);
+    document.querySelector("#drinkInnButton").addEventListener("click", drinkAtInn);
+    document.querySelectorAll("[data-tavern-snack]").forEach((button) => button.addEventListener("click", () => eatTavernSnack(button.dataset.tavernSnack)));
     document.querySelector("#openHomeButton").addEventListener("click", () => switchView("home"));
     document.querySelector("#openShopButton").addEventListener("click", () => switchView("shop"));
+    document.querySelector("#openJunkDealerButton").addEventListener("click", () => switchView("junkDealer"));
     document.querySelector("#openDeveloperPanelButton").addEventListener("click", openDeveloperPanel);
     document.querySelector("#newAdventurerButton").addEventListener("click", () => {
       askConfirm("新しい冒険者", "調査記録を残して、現在の冒険者を作り直します。", () => {
@@ -1254,6 +1450,16 @@
     }).join("");
     const slotLabels = { weapon: "武器", upper: "上半身防具", lower: "下半身防具", feet: "足回り", accessory: "アクセサリ" };
     const owned = adv.ownedEquipment.map((id) => equipment[id]).filter(Boolean);
+    const ownedIds = new Set(owned.map((item) => item.id));
+    const activeSetById = Object.fromEntries((stats.activeEquipmentSets || []).map((set) => [set.id, set]));
+    const setBoard = (DATA.equipmentSets || []).map((set) => {
+      const ownedCount = set.itemIds.filter((id) => ownedIds.has(id)).length;
+      if (!ownedCount) return "";
+      const activeSet = activeSetById[set.id];
+      const equippedCount = activeSet?.count || 0;
+      const bonuses = set.bonuses.map((bonus) => `<li class="${equippedCount >= bonus.pieces ? "active" : "inactive"}"><strong>${bonus.pieces}部位</strong> ${bonus.text}</li>`).join("");
+      return `<article class="equipment-set-card ${equippedCount >= 2 ? "active" : ""}"><div><span>所持${ownedCount}/4・装備${equippedCount}/4</span><h3>${set.name}</h3></div><ul>${bonuses}</ul></article>`;
+    }).join("") || "<p>セット装備はまだ持っていない。</p>";
     const homeSorters = {
       name: (a, b) => a.name.localeCompare(b.name, "ja"),
       attack: (a, b) => (b.attack || 0) - (a.attack || 0),
@@ -1274,10 +1480,15 @@
         return `<article class="equipment-card ${crafted ? "crafted-equipment" : ""} ${artifact ? "artifact-card" : ""}">
           <strong>${crafted ? `${crafted.qualityName}・` : ""}${equipmentDisplayName(item)}${equippedSlots.length ? "（装備中）" : ""}</strong>
           ${artifact ? `<span class="artifact-tier">${artifact.label}</span>` : ""}
+          ${item.setId ? `<span class="equipment-set-label">組物：${equipmentSets[item.setId]?.name || item.setId}</span>` : ""}
           ${item.risque ? '<span class="risque-label">艶装備</span>' : ""}
           ${item.curse ? `<span class="cursed-label">呪われている</span>` : ""}
           <div class="equipment-actions">${buttons}</div>
           <p>${ECONOMY.equipmentStats(item)}${equipmentAttackAttributes(item).length ? ` / 攻撃属性:${formatAttackAttributes(equipmentAttackAttributes(item))}` : ""}${formatResistances(item.resistances) ? ` / 耐性:${formatResistances(item.resistances)}` : ""}</p>
+          ${item.puzzleEffects?.length ? item.puzzleEffects.map((effect) => {
+            const status = equipmentPuzzleStatus(stats, effect, adv);
+            return `<p class="equipment-puzzle-effect ${status.active ? "active" : "inactive"}"><strong>${status.active ? "発動中" : "未発動"}</strong> ${effect.text}<br><small>${status.progress}</small></p>`;
+          }).join("") : ""}
           ${item.curse ? `<p class="curse-summary">呪い: ${formatCursePenalty(item.curse)}（現在の呪耐性で${Math.round((stats.cursePenaltyRate ?? 1) * 100)}%適用）</p>` : ""}
           ${crafted ? `<p class="crafted-detail">銘「${crafted.mark}」— ${crafted.flavor}<br>${formatCraftBonus(crafted)}</p>` : ""}
         </article>`;
@@ -1308,7 +1519,7 @@
     const cursePenaltyText = Object.entries(stats.cursePenalties || {}).filter(([, value]) => value).map(([key, value]) => `${statLabel(key)}${value}`).join("・");
     els.homeView.innerHTML = `
       <section class="home-profile">
-        <div class="home-profile-heading"><div><span>冒険者情報</span><h2>${personalities[adv.personalityId].name}な${races[adv.raceId].name}${escapeHtml(adv.name)}</h2><p>Lv${adv.level} ${jobs[adv.jobId].name} / 経験値 ${adv.level >= MAX_LEVEL ? "MAX" : `${adv.experience}/${experienceToNext(adv.level)}`}</p></div><strong>HP ${adv.hp}/${stats.maxHp}</strong></div>
+        <div class="home-profile-heading"><div><span>冒険者情報</span><h2>${personalities[adv.personalityId].name}な${races[adv.raceId].name}${escapeHtml(adv.name)}</h2><p>Lv${adv.level} ${jobs[adv.jobId].name} / 経験値 ${adv.level >= MAX_LEVEL ? "MAX" : `${adv.experience}/${experienceToNext(adv.level)}`} / 種族育成補正×${raceExperienceMultiplier().toFixed(2)}</p></div><strong>HP ${adv.hp}/${stats.maxHp}</strong></div>
         <div class="adventure-objective ${finalObjectiveComplete ? "completed" : ""}">
           <span>${finalObjectiveComplete ? "旅の目的・達成済み" : "旅の目的"}</span>
           <strong>ダンジョン地下100階にいる「太古からの闇キキルクルス」を倒す</strong>
@@ -1335,6 +1546,7 @@
       </section>
       <section class="inventory-section"><h2>魔法書とガラクタ</h2><p>魔法職は魔法書を読むと1冊消費して魔法を習得できる。読まずに商店へ売ることもできる。</p><div class="treasure-sell-list">${inventoryCards}</div></section>
       <section class="inventory-section"><h2>習得魔法</h2><div class="spell-list">${learnedCards}</div></section>
+      <section class="equipment-set-board"><div><h2>セット装備</h2><p>2・3・4部位で効果が段階的に発動する。緑色が現在発動中。</p></div><div class="equipment-set-grid">${setBoard}</div></section>
       <section class="resistance-board"><div><h2>装備中の合計耐性</h2><p>同じ属性を重ねて耐性5を作る。呪耐性はアーティファクトのペナルティも軽減する。</p></div><div class="resistance-total-grid">${resistanceBoard}</div></section><div class="equipment-sortbar"><label>並び順<select id="homeSortSelect">
       <option value="name" ${homeSort === "name" ? "selected" : ""}>名前順</option>
       <option value="attack" ${homeSort === "attack" ? "selected" : ""}>攻撃力順</option>
@@ -1704,6 +1916,62 @@
     return ECONOMY.materialSellPrice(DATA, materialId);
   }
 
+  function junkTokenValue(item) {
+    const tierMultiplier = item?.junkTier === "legend" ? 2 : item?.junkTier === "ultra_luxury" ? 1.5 : item?.junkTier === "luxury" ? 1.25 : 1;
+    return Math.max(1, Math.ceil(Number(item?.sellPrice || 1) * tierMultiplier / 8));
+  }
+
+  function junkMaterialCost(material) {
+    return material?.rarity === "ultra" ? 600 : 120;
+  }
+
+  function renderJunkDealer() {
+    const adv = state.adventurer;
+    const ownedJunk = (DATA.junkItems || []).filter((item) => getItemCount(item.id) > 0)
+      .sort((a, b) => junkTokenValue(b) - junkTokenValue(a));
+    const rareMaterials = DATA.materials.filter((material) => ["super", "ultra"].includes(material.rarity))
+      .sort((a, b) => junkMaterialCost(a) - junkMaterialCost(b) || a.name.localeCompare(b.name, "ja"));
+    els.junkDealerView.innerHTML = `
+      <section class="junk-dealer-header"><div><span>ガラクタマニア</span><h2>珍品偏愛堂</h2><p>「金じゃない。用途の分からなさにこそ価値がある」</p></div><strong>偏愛札 ${adv.junkTokens}</strong></section>
+      <button type="button" id="closeJunkDealerButton">街へ戻る</button>
+      <section class="shop-section"><h2>ガラクタを鑑定へ出す</h2><p class="guild-guidance">商店でGに換える代わりに偏愛札へ交換する。高級品ほど査定倍率が高い。</p>
+        <div class="treasure-sell-list">${ownedJunk.length ? ownedJunk.map((item) => `<article class="inventory-card"><div><strong>${item.name}</strong><small>${treasureTierLabel(item)} / 所持${getItemCount(item.id)} / 1個${junkTokenValue(item)}札</small></div><button type="button" data-appraise-junk-one="${item.id}">1個交換</button><button type="button" data-appraise-junk-all="${item.id}">全部交換</button></article>`).join("") : "<p>鑑定に出せるガラクタを持っていない。</p>"}</div>
+      </section>
+      <section class="shop-section"><h2>珍素材との交換</h2><p class="guild-guidance">超レア素材は120札、ウルトラレア素材は600札。在庫は無制限だが必要札は重い。</p>
+        <div class="card-list">${rareMaterials.map((material) => { const cost = junkMaterialCost(material); return `<article class="recipe-card"><h2>${material.name}</h2><p>${material.description}</p><button type="button" data-junk-material="${material.id}" ${adv.junkTokens < cost ? "disabled" : ""}>${cost}札で交換</button></article>`; }).join("")}</div>
+      </section>`;
+    document.querySelector("#closeJunkDealerButton")?.addEventListener("click", () => switchView("town"));
+    document.querySelectorAll("[data-appraise-junk-one]").forEach((button) => button.addEventListener("click", () => appraiseJunk(button.dataset.appraiseJunkOne, 1)));
+    document.querySelectorAll("[data-appraise-junk-all]").forEach((button) => button.addEventListener("click", () => appraiseJunk(button.dataset.appraiseJunkAll, getItemCount(button.dataset.appraiseJunkAll))));
+    document.querySelectorAll("[data-junk-material]").forEach((button) => button.addEventListener("click", () => exchangeJunkMaterial(button.dataset.junkMaterial)));
+  }
+
+  function appraiseJunk(itemId, amount) {
+    const item = treasureItems[itemId];
+    const count = Math.min(getItemCount(itemId), Math.max(0, Math.floor(Number(amount || 0))));
+    if (item?.type !== "junk" || !count) return;
+    const tokens = junkTokenValue(item) * count;
+    addItem(itemId, -count);
+    state.adventurer.junkTokens += tokens;
+    log(`ガラクタマニアが「${item.name}」${count}個を偏愛札${tokens}枚で引き取った。`);
+    playSfx("coinSell");
+    saveGame();
+    render();
+  }
+
+  function exchangeJunkMaterial(materialId) {
+    const material = materials[materialId];
+    if (!material || !["super", "ultra"].includes(material.rarity)) return;
+    const cost = junkMaterialCost(material);
+    if (state.adventurer.junkTokens < cost) return;
+    state.adventurer.junkTokens -= cost;
+    addMaterial(materialId, 1);
+    log(`偏愛札${cost}枚を「${material.name}」と交換した。ガラクタマニアは別れを惜しんで泣いた。`);
+    playSfx("craft");
+    saveGame();
+    render();
+  }
+
   function renderGuild() {
     const adv = state.adventurer;
     const equippedIds = new Set(Object.values(adv.equipment).filter(Boolean));
@@ -1816,9 +2084,11 @@
     const arenaHealCooldown = Number(arena.healCooldown || 0);
     const arenaSkillDisabled = currentJob.skill.tag === "heal"
       && (arenaHealCooldown > 0 || state.adventurer.hp >= getPlayerStats().maxHp);
-    const arenaSkillLabel = currentJob.skill.tag === "heal" && arenaHealCooldown > 0
-      ? `${currentJob.skill.name} ${arenaHealCooldown}`
-      : `技・${currentJob.skill.name}`;
+    const arenaSkillLabel = currentJob.skill.tag === "capoeira_stance"
+      ? capoeiraActive(arena) ? "カポエラ解除" : `技・${currentJob.skill.name}`
+      : currentJob.skill.tag === "heal" && arenaHealCooldown > 0
+        ? `${currentJob.skill.name} ${arenaHealCooldown}`
+        : `技・${currentJob.skill.name}`;
     const cellsHtml = Array.from({ length: arena.size * arena.size }, (_, index) => {
       const x = index % arena.size;
       const y = Math.floor(index / arena.size);
@@ -1826,7 +2096,7 @@
       const player = arena.player.x === x && arena.player.y === y;
       const foe = enemy.alive && enemy.x === x && enemy.y === y;
       if (obstacle) return `<span class="arena-cell arena-pillar" aria-label="柱">◆</span>`;
-      if (player) return `<span class="arena-cell arena-player" aria-label="冒険者">@</span>`;
+      if (player) return `<span class="arena-cell arena-player${capoeiraActive(arena) ? " capoeira-inverted" : ""}" aria-label="冒険者${capoeiraActive(arena) ? "・カポエラ状態" : ""}">@</span>`;
       if (foe) {
         const markerData = monsters[enemy.id] || enemy;
         const markerStyle = `--arena-marker-hue:${Number(markerData.arenaMarkerHue || 18)};--arena-marker-accent-hue:${Number(markerData.arenaMarkerAccentHue || 36)};--arena-marker-family-hue:${Number(markerData.arenaMarkerFamilyHue || 18)}`;
@@ -1878,7 +2148,10 @@
       arenaMove(dx, dy);
     }));
     document.querySelector("[data-arena-enemy]")?.addEventListener("click", () => arenaAttack("attack", true));
-    document.querySelector("#arenaSkillButton")?.addEventListener("click", () => arenaAttack("skill", false));
+    document.querySelector("#arenaSkillButton")?.addEventListener("click", () => {
+      if (currentJob.skill.tag === "capoeira_stance") toggleCapoeiraStance(arena, "arena");
+      else arenaAttack("skill", false);
+    });
     document.querySelector("[data-arena-guard]")?.addEventListener("click", arenaGuard);
     document.querySelector("#arenaNextButton")?.addEventListener("click", nextArenaRound);
     document.querySelector("#arenaRetireButton")?.addEventListener("click", retireArena);
@@ -1936,6 +2209,8 @@
     const arena = state.arena;
     const enemy = arena?.enemy;
     if (!enemy?.alive || arena.awaitingNext) return;
+    [dx, dy] = capoeiraDirection(dx, dy, arena);
+    [dx, dy] = intoxicatedDirection(dx, dy);
     const x = arena.player.x + dx;
     const y = arena.player.y + dy;
     if (arenaBlocked(arena, x, y)) {
@@ -2000,12 +2275,17 @@
     arena.actionProgress += 1;
     if (arena.actionProgress >= playerActions) {
       arena.actionProgress = 0;
+      tickIntoxication();
+      tickSnackBuff();
       arena.healCooldown = Math.max(0, Number(arena.healCooldown || 0) - 1);
       const enemyActions = Math.min(4, 1 + Math.floor(Math.max(0, enemy.acceleration || 0) / 12));
       for (let index = 0; index < enemyActions && state.arena && state.adventurer.hp > 0 && enemy.alive && enemy.hp > 0; index += 1) {
         if (arenaEnemyAct(arena, enemy) === "telegraphed") break;
       }
-      if (state.arena && state.adventurer.hp > 0) applyRegeneration();
+      if (state.arena && state.adventurer.hp > 0) {
+        applyEnemyRapidRegeneration([enemy]);
+        applyRegeneration();
+      }
     }
     if (state.arena && (!enemy.alive || enemy.hp <= 0)) {
       winArenaRound();
@@ -2252,6 +2532,7 @@
       <p>力${formatStatValue(preview.strength)} 素早さ${formatStatValue(preview.speed)} 器用さ${formatStatValue(preview.dexterity)} 耐久力${formatStatValue(preview.durability)} 運${formatStatValue(preview.luck)}</p>
       <p>加速度 ${formatStatValue(race.acceleration || 0)} / 世界1ターンの行動回数 ${1 + Math.floor((race.acceleration || 0) / 10)}</p>
       <p>種族耐性 ${formatResistances(race.resistances) || "なし"}</p>
+      <p>成長難度 必要経験値×${Number(race.experienceMultiplier || 1).toFixed(2)}（強い種族ほどレベルアップが遅い）</p>
       <p>HP ${preview.maxHp} / 攻撃試行 ${job.combat.attackTrials} 回 / 命中 ${Math.round(job.combat.accuracy * 100)}%</p>
       <p>${race.description}</p>
       <p>性格成長: ${personality.description}</p>
@@ -2263,7 +2544,7 @@
   function openSetupPicker(type) {
     if (!pendingSetup) return;
     const configs = {
-      race: { items: DATA.races, selected: "raceId", title: "種族を選ぶ", detail: (item) => item.traits.join("、") },
+      race: { items: DATA.races, selected: "raceId", title: "種族を選ぶ", detail: (item) => `${item.traits.join("、")}／成長難度×${Number(item.experienceMultiplier || 1).toFixed(2)}` },
       job: { items: DATA.jobs, selected: "jobId", title: "職業を選ぶ", detail: (item) => `${item.description}／装備:${jobEquipmentHint(item.id)}` },
       personality: { items: DATA.personalities, selected: "personalityId", title: "性格を選ぶ", detail: (item) => item.description },
     };
@@ -2441,6 +2722,7 @@
     const trapByPos = new Map((state.dungeon.traps || []).filter((trap) => trap.discovered && !trap.disarmed).map((trap) => [`${trap.x},${trap.y}`, trap]));
     const excavatedByPos = new Set((state.dungeon.excavatedTiles || []).map((tile) => `${tile.x},${tile.y}`));
     const alwaysLitTiles = window.HD_DUNGEON.alwaysLitTileKeys(state.dungeon);
+    const lightRadius = currentDungeonLightRadius();
     const center = Math.floor(VIEW_SIZE / 2);
 
     for (let vy = 0; vy < VIEW_SIZE; vy += 1) {
@@ -2460,11 +2742,12 @@
         cell.className = "cell";
         const lightDistance = Math.hypot(x - state.dungeon.player.x, y - state.dungeon.player.y);
         const alwaysLit = alwaysLitTiles.has(key);
-        cell.classList.add(alwaysLit ? "light-room" : lightDistance <= DUNGEON_LIGHT_RADIUS.near ? "light-near" : lightDistance <= DUNGEON_LIGHT_RADIUS.mid ? "light-mid" : "light-far");
+        cell.classList.add(alwaysLit ? "light-room" : lightDistance <= lightRadius.near ? "light-near" : lightDistance <= lightRadius.mid ? "light-mid" : "light-far");
         const discoveredFeature = specialRoomFeatures().find((feature) => feature.room.discovered && specialRoomContains(feature.room, { x, y }));
         if (discoveredFeature) cell.classList.add(`room-${discoveredFeature.id}`);
         if (state.dungeon.player.x === x && state.dungeon.player.y === y) {
           cell.classList.add("tile-player");
+          if (capoeiraActive(state.dungeon)) cell.classList.add("capoeira-inverted");
           if (state.dungeon.map[y]?.[x] === "wall") cell.classList.add("tile-phasing-wall");
           cell.textContent = "@";
         } else if (enemy) {
@@ -2542,9 +2825,11 @@
     const healCooldown = Number(state.dungeon.healCooldown || 0);
     const healingSkill = jobSkill.tag === "heal";
     els.jobSkill.disabled = healingSkill && (healCooldown > 0 || state.adventurer.hp >= getPlayerStats().maxHp);
-    els.jobSkill.textContent = healingSkill && healCooldown > 0
-      ? `${jobSkill.name} ${healCooldown}`
-      : jobSkillTargetArmed ? "技の対象を選択" : `技・${jobSkill.name}`;
+    els.jobSkill.textContent = jobSkill.tag === "capoeira_stance"
+      ? capoeiraActive(state.dungeon) ? "カポエラ解除" : `技・${jobSkill.name}`
+      : healingSkill && healCooldown > 0
+        ? `${jobSkill.name} ${healCooldown}`
+        : jobSkillTargetArmed ? "技の対象を選択" : `技・${jobSkill.name}`;
     els.jobSkill.classList.toggle("selected", jobSkillTargetArmed);
     if (els.activeSpell) {
       els.activeSpell.disabled = !canCastLearnedSpell;
@@ -2553,6 +2838,81 @@
     }
     els.timeStop.textContent = state.dungeon.timeStopCooldown > 0 ? `時間停止 ${state.dungeon.timeStopCooldown}` : "時間停止";
     els.shortTeleport.classList.toggle("selected", shortTeleportArmed);
+  }
+
+  function currentDungeonLightRadius() {
+    if (state.adventurer.jobId === "ninja") return { near: 0, mid: 0 };
+    const bonus = state.adventurer.jobId === "handyman" ? 1 : 0;
+    return { near: DUNGEON_LIGHT_RADIUS.near + bonus, mid: DUNGEON_LIGHT_RADIUS.mid + bonus };
+  }
+
+  function capoeiraActive(host = state.arena || state.dungeon) {
+    return state.adventurer.jobId === "capoeirista" && Boolean(host?.capoeiraActive);
+  }
+
+  function capoeiraDirection(dx, dy, host = state.arena || state.dungeon) {
+    return capoeiraActive(host) ? [-dx, -dy] : [dx, dy];
+  }
+
+  function intoxicated() {
+    return Number(state.adventurer.intoxicationTurns || 0) > 0;
+  }
+
+  function drunkenFistActive() {
+    return intoxicated() && state.adventurer.jobId === "heavy" && !state.adventurer.equipment.weapon;
+  }
+
+  function intoxicatedDirection(dx, dy) {
+    if (!intoxicated() || drunkenFistActive()) return [dx, dy];
+    const drinks = Math.max(1, Number(state.adventurer.intoxicationDrinks || 1));
+    const wobbleChance = Math.min(0.85, 0.3 + drinks * 0.07);
+    if (Math.random() >= wobbleChance) return [dx, dy];
+    const directions = Object.values(DIRECTION_VECTORS).filter(([x, y]) => x !== dx || y !== dy);
+    const [wobbleX, wobbleY] = pick(directions);
+    log(`酩酊で足がもつれ、進む向きが${directionLabel(wobbleX, wobbleY)}へ逸れた！`);
+    return [wobbleX, wobbleY];
+  }
+
+  function tickIntoxication() {
+    const adv = state.adventurer;
+    if (Number(adv.intoxicationTurns || 0) <= 0) return;
+    const wasDrunkenFist = drunkenFistActive();
+    adv.intoxicationTurns -= 1;
+    if (adv.intoxicationTurns > 0) return;
+    adv.intoxicationTurns = 0;
+    adv.intoxicationDrinks = 0;
+    log(wasDrunkenFist ? "酒気が抜け、酔拳の冴えが消えた。" : "ようやく酔いが醒め、足取りが元へ戻った。");
+  }
+
+  function tickSnackBuff() {
+    const buff = state.adventurer.snackBuff;
+    if (!buff || Number(buff.turns || 0) <= 0) return;
+    buff.turns -= 1;
+    if (buff.turns > 0) return;
+    log(`「${buff.snackName}」の満腹効果が切れ、${statLabel(buff.stat)}が元へ戻った。`);
+    state.adventurer.snackBuff = null;
+  }
+
+  function directionLabel(dx, dy) {
+    return `${dy < 0 ? "上" : dy > 0 ? "下" : ""}${dx < 0 ? "左" : dx > 0 ? "右" : ""}` || "その場";
+  }
+
+  function toggleCapoeiraStance(host, scene) {
+    if (!host || state.adventurer.jobId !== "capoeirista") return;
+    host.capoeiraActive = !host.capoeiraActive;
+    jobSkillTargetArmed = false;
+    log(host.capoeiraActive
+      ? "逆立ちジンガ！ 天地も前後も裏返った。8方向の入力が逆転し、両脚が凶器と化す！"
+      : "カポエラ状態を解き、天地と移動感覚が元へ戻った。");
+    playSfx(host.capoeiraActive ? "critical" : "step");
+    if (scene === "arena") advanceArenaWorld();
+    else {
+      advanceWorldIfDue();
+      if (state.dungeon && state.adventurer.inDungeon) {
+        saveGame();
+        render();
+      }
+    }
   }
 
   function buildMapCells() {
@@ -2601,12 +2961,82 @@
     state.adventurer.hp = maxHp;
     state.adventurer.temporaryDebuffs = {};
     state.adventurer.slowTurns = 0;
+    state.adventurer.intoxicationDrinks = 0;
+    state.adventurer.intoxicationTurns = 0;
+    state.adventurer.snackBuff = null;
+    const advice = pickInnAdvice();
+    log(`宿屋で${INN_COST}Gを払い一晩休んだ。HPと一時的な能力低下が完全に回復した。宿の主人「${advice}」`);
+    playSfx("rest");
+    saveGame();
+    render();
+  }
+
+  function acuteAlcoholRisk(drinks) {
+    const excess = Math.max(0, Number(drinks || 0) - 3);
+    return Math.min(0.22, excess * excess * 0.004);
+  }
+
+  function refreshTavernSnackMenu() {
+    const candidates = TAVERN_SNACKS.slice();
+    tavernSnackMenu = [];
+    while (tavernSnackMenu.length < 5 && candidates.length) {
+      const index = Math.floor(Math.random() * candidates.length);
+      tavernSnackMenu.push(candidates.splice(index, 1)[0]);
+    }
+  }
+
+  function eatTavernSnack(snackId) {
+    startAudioFromGesture();
+    const snack = TAVERN_SNACKS.find((item) => item.id === snackId);
+    const adv = state.adventurer;
+    if (!snack || adv.inDungeon || adv.gold < snack.price || !tavernSnackMenu.some((item) => item.id === snackId)) return;
+    adv.gold -= snack.price;
+    const comment = (SNACK_PERSONALITY_COMMENTS[adv.personalityId] || SNACK_PERSONALITY_COMMENTS.ordinary)(snack);
+    log(`${snack.price}Gで「${snack.name}」を食べた。${adv.name}「${comment}」`);
+    if (adv.personalityId === "glutton") {
+      const baseAmount = snack.price >= 4 ? 3 : 2;
+      const sameStat = adv.snackBuff?.turns > 0 && adv.snackBuff.stat === snack.stat;
+      adv.snackBuff = {
+        stat: snack.stat,
+        amount: sameStat ? Math.min(5, Math.max(baseAmount, Number(adv.snackBuff.amount || 0) + 1)) : baseAmount,
+        turns: Math.min(30, (sameStat ? Number(adv.snackBuff.turns || 0) : 0) + 10 + snack.price),
+        snackName: snack.name,
+      };
+      log(`食いしん坊の満腹効果！ ${statLabel(adv.snackBuff.stat)}+${adv.snackBuff.amount}が${adv.snackBuff.turns}世界ターン続く。`);
+      playSfx("levelStatUp");
+    }
+    refreshTavernSnackMenu();
+    playSfx("select");
+    saveGame();
+    render();
+  }
+
+  function pickInnAdvice() {
     const adviceIndexes = INN_ADVICES.map((_, index) => index);
     const freshIndexes = adviceIndexes.filter((index) => !recentInnAdviceIndexes.includes(index));
     const adviceIndex = pick(freshIndexes.length ? freshIndexes : adviceIndexes);
     recentInnAdviceIndexes = [adviceIndex, ...recentInnAdviceIndexes].slice(0, 6);
-    const advice = INN_ADVICES[adviceIndex];
-    log(`宿屋で${INN_COST}Gを払い一晩休んだ。HPと一時的な能力低下が完全に回復した。宿の主人「${advice}」`);
+    return INN_ADVICES[adviceIndex];
+  }
+
+  function drinkAtInn() {
+    startAudioFromGesture();
+    const adv = state.adventurer;
+    if (adv.inDungeon || adv.gold < DRINK_COST) return;
+    adv.gold -= DRINK_COST;
+    adv.intoxicationDrinks = Math.max(0, Number(adv.intoxicationDrinks || 0)) + 1;
+    adv.intoxicationTurns = Math.max(0, Number(adv.intoxicationTurns || 0)) + 5 + adv.intoxicationDrinks * 2;
+    const risk = acuteAlcoholRisk(adv.intoxicationDrinks);
+    log(`宿屋で酒を一杯飲んだ（累計${adv.intoxicationDrinks}杯）。宿の主人「${pickInnAdvice()}」`);
+    if (risk > 0) log(`喉の奥が灼け、脈が乱れる。現在の急性アルコール中毒死リスクは${Math.round(risk * 1000) / 10}%。`);
+    if (Math.random() < risk) {
+      log("杯が指から落ちた。酔いではない。身体が酒を毒として拒絶し、呼吸が止まる――。");
+      die("宿屋での急性アルコール中毒");
+      return;
+    }
+    log(drunkenFistActive()
+      ? `武器を持たぬバーサーカーの足腰に酒気が巡った。超強力な打撃「酔拳」が${adv.intoxicationTurns}世界ターン続く！`
+      : `酩酊状態になった。移動がふらつく状態が${adv.intoxicationTurns}世界ターン続く。宿泊すれば即座に醒める。`);
     playSfx("rest");
     saveGame();
     render();
@@ -3074,6 +3504,8 @@
     startAudioFromGesture();
     if (pendingConfirm) return;
     if (!state.adventurer.inDungeon || !state.dungeon) return;
+    [dx, dy] = capoeiraDirection(dx, dy, state.dungeon);
+    [dx, dy] = intoxicatedDirection(dx, dy);
     if (shortTeleportArmed) {
       shortTeleport(dx, dy);
       return;
@@ -3555,12 +3987,13 @@
       if (annihilateDungeonFloor()) return { skipWorldAdvance: true };
     }
     const profile = getPlayerBattleProfile(enemy, mode, learnedSpell);
+    const divineShielded = Number(enemy.divineInvulnerabilityCharges || 0) > 0;
     if (thiefSleepAmbush) {
       profile.hitChance = Math.max(profile.hitChance, 0.96);
       profile.critChance = Math.max(profile.critChance, 0.3);
     }
     const outcome = rollAttackSequence(profile, (raw) => {
-      const resistedDamage = damageAfterDefense(raw, profile.attributes, enemy);
+      const resistedDamage = divineShielded ? 0 : damageAfterDefense(raw, profile.attributes, enemy);
       const damage = resistedDamage <= 0
         ? 0
         : Math.max(1, Math.round(resistedDamage * (thiefSleepAmbush ? THIEF_SLEEP_AMBUSH_MULTIPLIER : 1)));
@@ -3573,14 +4006,31 @@
       skill: mode === "spell" && learnedSpell ? `spell:${learnedSpell.id}` : mode === "skill" ? job.skill.tag : null,
       sleepAmbush: thiefSleepAmbush,
     };
+    if (divineShielded) {
+      enemy.divineInvulnerabilityCharges = Math.max(0, enemy.divineInvulnerabilityCharges - 1);
+      log(`${enemy.name}の神域が攻撃という出来事そのものを拒絶した。残る不可侵${enemy.divineInvulnerabilityCharges}回。`);
+    }
     log(`${profile.label}。${profile.attackTrials}回試行、${outcome.hitCount}ヒット、合計${outcome.total}ダメージ。`);
     if (outcome.critCount) log(`会心${outcome.critCount}回。`);
+    if (enemy.rapidRegeneration && outcome.hitCount > 0 && enemy.hp > 0) {
+      if (profile.attributes.includes("fire")) {
+        enemy.regenerationSuppressedTurns = Math.max(2, Number(enemy.regenerationSuppressedTurns || 0));
+        log(`火属性が${enemy.name}の再生創を焼き塞いだ。急速再生を2世界ターン封印！`);
+      } else if (outcome.critCount > 0) {
+        enemy.regenerationSuppressedTurns = Math.max(1, Number(enemy.regenerationSuppressedTurns || 0));
+        log(`会心が${enemy.name}の再生器官を砕いた。急速再生を1世界ターン封印！`);
+      }
+      if (profile.attributes.includes("poison")) {
+        enemy.regenerationWeakenedTurns = Math.max(3, Number(enemy.regenerationWeakenedTurns || 0));
+        log(`毒属性が${enemy.name}の再生循環へ混入した。3世界ターン、回復量半減！`);
+      }
+    }
     if (outcome.hitCount) {
       playCombatSfx(profile.attribute, false);
       if (outcome.critCount) playSfx("critical");
     } else playSfx("warning");
     markResearch(enemy.id, 2);
-    if (outcome.hitCount > 0 && enemy.hp > 0 && tryFlowerCharm(enemy, mode)) return;
+    if (outcome.total > 0 && enemy.hp > 0 && tryFlowerCharm(enemy, mode)) return;
     const milestoneSpoken = speakByHp(enemy);
     if (!milestoneSpoken && enemy.hp > 0) {
       uniqueSpeak(enemy, outcome.hitCount ? "hit" : "evade", { chance: outcome.hitCount ? 0.72 : 0.82 });
@@ -3608,7 +4058,7 @@
     }
     const stats = getPlayerStats();
     const weakenedBonus = Math.max(0, 1 - enemy.hp / Math.max(1, enemy.maxHp)) * FLOWER_TAMER_CONFIG.weakenedBonus;
-    const baseChance = FLOWER_TAMER_CONFIG.baseCharmChance + stats.luck * FLOWER_TAMER_CONFIG.luckFactor
+    const baseChance = FLOWER_TAMER_CONFIG.baseCharmChance + stats.flowerCharmChanceBonus + stats.luck * FLOWER_TAMER_CONFIG.luckFactor
       + stats.dexterity * FLOWER_TAMER_CONFIG.dexterityFactor + state.adventurer.level * FLOWER_TAMER_CONFIG.levelFactor + weakenedBonus;
     const skillBonus = mode === "skill" ? FLOWER_TAMER_CONFIG.skillBonus : 0;
     const colorPenalty = Number(enemy.colorTierIndex || 0) * FLOWER_TAMER_CONFIG.colorPenalty;
@@ -3623,7 +4073,8 @@
     enemy.flowerMaster = state.adventurer.name;
     enemy.flowerPetTurns = Math.min(FLOWER_TAMER_CONFIG.maxDuration, FLOWER_TAMER_CONFIG.baseDuration
       + Math.floor(stats.luck / FLOWER_TAMER_CONFIG.luckDurationEvery)
-      + Math.floor(state.adventurer.level / FLOWER_TAMER_CONFIG.levelDurationEvery));
+      + Math.floor(state.adventurer.level / FLOWER_TAMER_CONFIG.levelDurationEvery)
+      + stats.flowerPetDurationBonus);
     enemy.asleep = false;
     enemy.telegraphed = false;
     enemy.telegraphedAttribute = null;
@@ -3821,6 +4272,13 @@
     if (enemy.hp <= 0) return;
     ensureUniqueEncounterSpeech(enemy);
     enemy.turns += 1;
+    if (enemy.divineInvulnerability && enemy.turns % enemy.divineInvulnerability.every === 0
+      && Number(enemy.divineInvulnerabilityCharges || 0) <= 0) {
+      enemy.divineInvulnerabilityCharges = enemy.divineInvulnerability.charges;
+      log(`${enemy.name}が「${enemy.divineInvulnerability.name}」を展開。次の${enemy.divineInvulnerabilityCharges}回、あらゆる攻撃を無効化する！`);
+      playSfx("light");
+      return;
+    }
     const specialInterval = enemy.specialAttack === "gold_steal" ? 3 : 4;
     if (enemy.specialAttack && enemy.turns % specialInterval === 0 && useEnemySpecial(enemy)) return;
     if (enemy.telegraphed) {
@@ -3828,7 +4286,7 @@
       uniqueSpeak(enemy, "dangerousRelease", { chance: 0.82 });
       const dangerousAttribute = enemy.telegraphedAttribute || chooseEnemyAttackAttribute(enemy, enemy.dangerous.attribute);
       enemy.telegraphedAttribute = null;
-      enemyAttack(enemy, enemy.dangerous.name, dangerousAttribute, enemy.dangerous.power, { trials: 1, hitBonus: 0.08, critChance: 0.1 });
+      enemyAttack(enemy, enemy.dangerous.name, dangerousAttribute, enemy.dangerous.power, { trials: enemy.dragonBreath?.trials || 1, hitBonus: 0.08, critChance: 0.1 });
       return;
     }
     if (trySummonMinions(enemy)) return;
@@ -4150,9 +4608,14 @@
     return true;
   }
 
-  function experienceToNext(level) {
+  function raceExperienceMultiplier(raceId = state.adventurer.raceId) {
+    return Math.max(0.5, Number(races[raceId]?.experienceMultiplier || 1));
+  }
+
+  function experienceToNext(level, raceId = state.adventurer.raceId) {
     if (level >= MAX_LEVEL) return 0;
-    return Math.floor(18 + level * 11 + Math.pow(level, 1.42) * 3.5);
+    const base = 18 + level * 11 + Math.pow(level, 1.42) * 3.5;
+    return Math.ceil(base * raceExperienceMultiplier(raceId));
   }
 
   function ensureJobProgress(jobId = state.adventurer.jobId) {
@@ -4413,8 +4876,9 @@
     const techniqueMultiplier = skillfulKill ? EXCEPTIONAL_LOOT_CONFIG.skillfulMultiplier : 1;
     const luckMultiplier = 1 + Math.min(EXCEPTIONAL_LOOT_CONFIG.maxLuckBonus,
       Math.max(0, Number(getPlayerStats().luck || 0)) / EXCEPTIONAL_LOOT_CONFIG.luckDivisor);
-    const ultraChance = EXCEPTIONAL_LOOT_CONFIG.ultraChance * colorMultiplier * uniqueMultiplier * techniqueMultiplier * luckMultiplier;
-    const superChance = EXCEPTIONAL_LOOT_CONFIG.superChance * colorMultiplier * uniqueMultiplier * techniqueMultiplier * luckMultiplier;
+    const equipmentMultiplier = getPlayerStats().exceptionalLootMultiplier;
+    const ultraChance = EXCEPTIONAL_LOOT_CONFIG.ultraChance * colorMultiplier * uniqueMultiplier * techniqueMultiplier * luckMultiplier * equipmentMultiplier;
+    const superChance = EXCEPTIONAL_LOOT_CONFIG.superChance * colorMultiplier * uniqueMultiplier * techniqueMultiplier * luckMultiplier * equipmentMultiplier;
     const roll = Math.random();
     if (roll < ultraChance) return enemy.exceptionalLoot.ultra;
     if (roll < ultraChance + superChance) return enemy.exceptionalLoot.super;
@@ -4558,6 +5022,7 @@
     const grownStats = { ...baseStats };
     STAT_KEYS.forEach((key) => { grownStats[key] = Number(baseStats[key] || 0) + Number(levelBonuses[key] || 0); });
     STAT_KEYS.forEach((key) => { grownStats[key] += Number(adv.temporaryDebuffs?.[key] || 0); });
+    if (adv.snackBuff?.turns > 0 && STAT_KEYS.includes(adv.snackBuff.stat)) grownStats[adv.snackBuff.stat] += Number(adv.snackBuff.amount || 0);
     STAT_KEYS.forEach((key) => { grownStats[key] += Number(adv.debugBonuses?.[key] || 0); });
     if (adv.slowTurns > 0) grownStats.speed -= 2;
     const foodGrowth = adv.jobId === "scavenger" ? scavengerGrowth(Number(adv.scavengerNutrition || 0)) : scavengerGrowth(0);
@@ -4603,6 +5068,10 @@
       accuracy: clamp(job.combat.accuracy + (grownStats.dexterity * 0.018) + (grownStats.speed * 0.008) + (grownStats.luck * 0.004), 0.1, 0.96),
       evasion: clamp(job.combat.evasion + (grownStats.speed * 0.015) + (grownStats.dexterity * 0.006), 0.01, 0.38),
       critChance: clamp(job.combat.crit + (grownStats.luck * 0.012) + (grownStats.dexterity * 0.006), 0, 0.38),
+      researchEvidenceMultiplier: 1,
+      flowerCharmChanceBonus: 0,
+      flowerPetDurationBonus: 0,
+      exceptionalLootMultiplier: 1,
       risqueSynergyCount,
       powerPoleAwakened,
       rimuruSlimeAwakened,
@@ -4641,10 +5110,12 @@
         stats.resistances[id] = combineResistance(stats.resistances[id], value);
       });
     });
+    stats.activeEquipmentSets = applyEquipmentSetBonuses(stats, equipped.map((entry) => entry.item));
     DATA.attributes.forEach((id) => {
       if (stats.resistances[id] !== "immune") stats.resistances[id] = clamp(Number(stats.resistances[id] || 0), -4, 5);
     });
     if (rimuruSlimeAwakened) DATA.attributes.forEach((id) => { stats.resistances[id] = "immune"; });
+    equipped.forEach(({ item }) => (item.puzzleEffects || []).forEach((effect) => applyEquipmentPuzzleEffect(stats, effect, adv)));
     stats.attackAttribute = stats.attackAttributes[0] || job.baseAttackAttribute;
     stats.cursePenaltyRate = DATA.resistanceMultipliers[stats.resistances.curse || 0] ?? 1;
     stats.cursePenalties = {};
@@ -4669,6 +5140,12 @@
     stats.defense = Math.max(0, Math.round(stats.defense));
     stats.attackMin = Math.max(1, Math.round(stats.attackMin));
     stats.attackMax = Math.max(stats.attackMin, Math.round(stats.attackMax));
+    stats.critChance = clamp(stats.critChance, 0, 0.6);
+    if (drunkenFistActive()) {
+      stats.evasion = clamp(stats.evasion + 0.2, 0.01, 0.58);
+      stats.critChance = clamp(stats.critChance + 0.24, 0, 0.72);
+      stats.acceleration += 12;
+    }
     const materialCount = Object.values(adv.materials).reduce((sum, count) => sum + Number(count || 0), 0);
     const materialCapacity = Number(job.materialCapacity || 30);
     const burdenStep = Number(job.materialBurdenStep || 15);
@@ -4681,25 +5158,116 @@
     return stats;
   }
 
+  function applyEquipmentSetBonuses(stats, equippedItems) {
+    const equippedIds = new Set((equippedItems || []).map((item) => item.id));
+    return (DATA.equipmentSets || []).map((set) => {
+      const count = set.itemIds.filter((id) => equippedIds.has(id)).length;
+      const activeBonuses = set.bonuses.filter((bonus) => count >= bonus.pieces);
+      activeBonuses.forEach((bonus) => {
+        stats.attack += Number(bonus.attack || 0);
+        stats.attackMin += Number(bonus.attack || 0);
+        stats.attackMax += Number(bonus.attack || 0);
+        stats.defense += Number(bonus.defense || 0);
+        stats.acceleration += Number(bonus.acceleration || 0);
+        stats.hpRegen += Number(bonus.hpRegen || 0);
+        (bonus.attackAttributes || []).forEach((attribute) => {
+          if (!stats.attackAttributes.includes(attribute)) stats.attackAttributes.push(attribute);
+        });
+        Object.entries(bonus.resistances || {}).forEach(([attribute, value]) => {
+          stats.resistances[attribute] = combineResistance(stats.resistances[attribute], value);
+        });
+      });
+      return { ...set, count, activeBonuses };
+    }).filter((set) => set.count > 0);
+  }
+
+  function resistanceAtLeast(value, threshold) {
+    return value === "immune" || Number(value || 0) >= Number(threshold || 0);
+  }
+
+  function applyPuzzleStatBonuses(stats, effect) {
+    const attack = Number(effect.attack || 0);
+    stats.attack += attack;
+    stats.attackMin += Math.floor(attack / 2);
+    stats.attackMax += attack;
+    stats.defense += Number(effect.defense || 0);
+    stats.acceleration += Number(effect.acceleration || 0);
+    stats.hpRegen += Number(effect.hpRegen || 0);
+    stats.critChance += Number(effect.crit || 0);
+    stats.luck += Number(effect.luck || 0);
+  }
+
+  function applyEquipmentPuzzleEffect(stats, effect, adventurer) {
+    const status = equipmentPuzzleStatus(stats, effect, adventurer);
+    const active = status.active;
+    if (effect.type === "research") {
+      stats.researchEvidenceMultiplier *= Number(effect.multiplier || 1);
+      return;
+    }
+    if (effect.type === "flower") {
+      stats.flowerCharmChanceBonus += Number(effect.chance || 0);
+      stats.flowerPetDurationBonus += Number(effect.duration || 0);
+      return;
+    }
+    if (effect.type === "rareLoot") {
+      if (active) stats.exceptionalLootMultiplier *= Number(effect.multiplier || 1);
+      return;
+    }
+    if (active) applyPuzzleStatBonuses(stats, effect);
+  }
+
+  function equipmentPuzzleStatus(stats, effect, adventurer = state.adventurer) {
+    if (effect.type === "resistance") {
+      const current = stats.resistances[effect.attribute];
+      return { active: resistanceAtLeast(current, effect.threshold), progress: `${attr(effect.attribute)}耐性 ${current === "immune" ? "免疫" : current}/${effect.threshold}` };
+    }
+    if (effect.type === "resistancePair") {
+      const parts = effect.attributes.map((id, index) => `${attr(id)}${stats.resistances[id] === "immune" ? "免疫" : stats.resistances[id]}/${effect.thresholds[index]}`);
+      return { active: effect.attributes.every((id, index) => resistanceAtLeast(stats.resistances[id], effect.thresholds[index])), progress: parts.join("・") };
+    }
+    if (effect.type === "acceleration") return { active: stats.acceleration >= effect.threshold, progress: `加速度 ${stats.acceleration}/${effect.threshold}` };
+    if (effect.type === "lowHp") {
+      const percent = Math.round(Number(adventurer.hp || 0) / Math.max(1, stats.maxHp) * 100);
+      return { active: percent <= effect.rate * 100, progress: `現在HP ${percent}% / 条件${Math.round(effect.rate * 100)}%以下` };
+    }
+    if (effect.type === "vulnerability") {
+      const count = Object.values(stats.resistances).filter((value) => value !== "immune" && Number(value) < 0).length;
+      return { active: count >= effect.count, progress: `負の耐性 ${count}/${effect.count}` };
+    }
+    if (effect.type === "resistanceDiversity") {
+      const count = Object.values(stats.resistances).filter((value) => resistanceAtLeast(value, effect.threshold)).length;
+      return { active: count >= effect.count, progress: `耐性${effect.threshold}以上 ${count}/${effect.count}属性` };
+    }
+    if (effect.type === "rareLoot") {
+      const current = stats.resistances[effect.attribute];
+      return { active: resistanceAtLeast(current, effect.threshold), progress: `${attr(effect.attribute)}耐性 ${current === "immune" ? "免疫" : current}/${effect.threshold}` };
+    }
+    if (["research", "flower"].includes(effect.type)) return { active: true, progress: "装備中は常時発動" };
+    return { active: false, progress: "条件不明" };
+  }
+
   function getPlayerBattleProfile(enemy, mode, learnedSpell = null) {
     const adv = state.adventurer;
     const job = jobs[adv.jobId] || jobs.swordsman;
     const stats = getPlayerStats();
     const spellMode = mode === "spell" && learnedSpell;
-    const skillPower = spellMode ? Math.max(1, Number(learnedSpell.power || 1)) : mode === "skill" ? Math.max(1, job.skill.power || 1) : 1;
+    const drunkenFist = mode === "attack" && drunkenFistActive();
+    const capoeiraKick = !drunkenFist && mode === "attack" && capoeiraActive(state.arena || state.dungeon);
+    const skillPower = drunkenFist ? DRUNKEN_FIST_POWER : capoeiraKick ? Math.max(1, Number(job.skill.power || 1.8)) : spellMode ? Math.max(1, Number(learnedSpell.power || 1)) : mode === "skill" ? Math.max(1, job.skill.power || 1) : 1;
     const attributes = spellMode
       ? [learnedSpell.attribute]
-      : mode === "skill" && job.skill.attribute ? [job.skill.attribute] : (stats.attackAttributes?.length ? stats.attackAttributes.slice() : [stats.attackAttribute || job.baseAttackAttribute]);
+      : drunkenFist || capoeiraKick ? ["blunt"]
+        : mode === "skill" && job.skill.attribute ? [job.skill.attribute] : (stats.attackAttributes?.length ? stats.attackAttributes.slice() : [stats.attackAttribute || job.baseAttackAttribute]);
     const attribute = attributes[0];
     const attackTrials = mode === "skill" || spellMode
       ? Math.max(1, Math.ceil(stats.attackTrials * 0.6))
       : stats.attackTrials;
     const attackMin = Math.max(1, Math.round(stats.attackMin * skillPower));
     const attackMax = Math.max(attackMin, Math.round(stats.attackMax * skillPower));
-    const hitChance = clamp((mode === "skill" || spellMode ? stats.accuracy + 0.08 : stats.accuracy) - (enemy ? (enemy.evasion || 0) : 0), 0.1, 0.98);
-    const critChance = clamp(stats.critChance + (mode === "skill" ? 0.05 : spellMode ? 0.03 : 0), 0, 0.6);
+    const hitChance = drunkenFist ? Math.max(0.94, clamp(stats.accuracy - (enemy ? (enemy.evasion || 0) : 0), 0.1, 0.98)) : clamp((mode === "skill" || spellMode ? stats.accuracy + 0.08 : stats.accuracy) - (enemy ? (enemy.evasion || 0) : 0), 0.1, 0.98);
+    const critChance = clamp(stats.critChance + (drunkenFist ? 0.12 : mode === "skill" ? 0.05 : spellMode ? 0.03 : 0), 0, drunkenFist ? 0.82 : 0.6);
     return {
-      label: spellMode ? `${spellbookRankLabel(learnedSpell.rank)}魔法「${learnedSpell.name}」` : mode === "skill" ? job.skill.name : `${job.name}の連撃`,
+      label: drunkenFist ? "酔拳・八仙酔打" : capoeiraKick ? "逆立ち旋風脚" : spellMode ? `${spellbookRankLabel(learnedSpell.rank)}魔法「${learnedSpell.name}」` : mode === "skill" ? job.skill.name : `${job.name}の連撃`,
       attribute,
       attributes,
       attackTrials,
@@ -4761,7 +5329,7 @@
     }));
   }
 
-  const RESEARCH_EVIDENCE_THRESHOLDS = [0, 1, 35, 100, 220, 400];
+  const RESEARCH_EVIDENCE_THRESHOLDS = [0, 1, 30, 85, 180, 320];
   const RESEARCH_EVENT_EVIDENCE = [0, 1, 1, 2, 3, 5];
 
   function markResearch(monsterId, level, options = {}) {
@@ -4770,12 +5338,19 @@
     const nextLevel = clamp(Math.floor(Number(level || 0)), 0, MAX_RESEARCH_LEVEL);
     if (nextLevel <= 0) return;
     rec.seen = true;
+    let gainedEvidence = 0;
     if (options.force) rec.evidence = RESEARCH_EVIDENCE_THRESHOLDS[nextLevel];
-    else rec.evidence = Math.min(
-      RESEARCH_EVIDENCE_THRESHOLDS[MAX_RESEARCH_LEVEL],
-      Number(rec.evidence || 0) + Math.max(0, Number(options.evidence ?? RESEARCH_EVENT_EVIDENCE[nextLevel])),
-    );
+    else {
+      rec.milestones = rec.milestones && typeof rec.milestones === "object" ? rec.milestones : {};
+      const firstMilestone = !rec.milestones[nextLevel];
+      rec.milestones[nextLevel] = true;
+      const depthMultiplier = 1 + Math.min(0.5, monsterNativeFloor(monsters[monsterId]) / 200);
+      gainedEvidence = Math.max(0, Math.round(Number(options.evidence ?? RESEARCH_EVENT_EVIDENCE[nextLevel])
+        * getPlayerStats().researchEvidenceMultiplier * depthMultiplier * (firstMilestone ? 2 : 1)));
+      rec.evidence = Math.min(RESEARCH_EVIDENCE_THRESHOLDS[MAX_RESEARCH_LEVEL], Number(rec.evidence || 0) + gainedEvidence);
+    }
     rec.level = RESEARCH_EVIDENCE_THRESHOLDS.reduce((result, threshold, index) => rec.evidence >= threshold ? index : result, 0);
+    if (!options.force && gainedEvidence > 0) spreadSpeciesResearch(monsterId, gainedEvidence);
     if (previousLevel < MAX_RESEARCH_LEVEL && rec.level >= MAX_RESEARCH_LEVEL) reconcileResearchCompletion(true);
   }
 
@@ -4786,7 +5361,22 @@
     const minimumEvidence = RESEARCH_EVIDENCE_THRESHOLDS[rec.level];
     rec.evidence = clamp(Math.floor(Number(rec.evidence ?? minimumEvidence)), minimumEvidence, RESEARCH_EVIDENCE_THRESHOLDS[MAX_RESEARCH_LEVEL]);
     rec.seen = Boolean(rec.seen || rec.level > 0);
+    rec.milestones = rec.milestones && typeof rec.milestones === "object" ? rec.milestones : {};
     return rec;
+  }
+
+  function spreadSpeciesResearch(monsterId, gainedEvidence) {
+    const source = monsters[monsterId];
+    const shared = Math.max(1, Math.floor(gainedEvidence * 0.12));
+    const peers = (monstersBySpecies[source?.speciesId] || [])
+      .filter((monster) => monster.id !== monsterId && state.meta.research[monster.id]?.seen && getResearch(monster.id).level < MAX_RESEARCH_LEVEL)
+      .sort((left, right) => getResearch(left.id).evidence - getResearch(right.id).evidence)
+      .slice(0, 2);
+    peers.forEach((monster) => {
+      const record = getResearch(monster.id);
+      record.evidence = Math.min(RESEARCH_EVIDENCE_THRESHOLDS[MAX_RESEARCH_LEVEL], record.evidence + shared);
+      record.level = RESEARCH_EVIDENCE_THRESHOLDS.reduce((result, threshold, index) => record.evidence >= threshold ? index : result, 0);
+    });
   }
 
   function getMaterialCount(id) {
@@ -4831,6 +5421,7 @@
   }
 
   function treasureTierLabel(item) {
+    if (item?.junkTier === "legend") return "レジェンドガラクタ";
     if (item?.junkTier === "ultra_luxury") return "超高級ガラクタ";
     if (item?.junkTier === "luxury") return "高級ガラクタ";
     return item?.type === "junk" ? "ガラクタ" : "";
@@ -4842,7 +5433,7 @@
   }
 
   function statLabel(key) {
-    return ({ attack: "攻撃", defense: "防御", acceleration: "加速", maxHp: "最大HP", hpRegen: "再生" })[key] || key;
+    return ({ strength: "力", speed: "素早さ", dexterity: "器用さ", durability: "耐久力", luck: "運", attack: "攻撃", defense: "防御", acceleration: "加速", maxHp: "最大HP", hpRegen: "再生" })[key] || key;
   }
 
   function formatResistances(resistances) {
@@ -4911,12 +5502,17 @@
     if (rec.level >= 3) {
       known.push(`<div class="monster-info-row"><span>弱点</span><strong>${enemy.weaknesses.map(attr).join("・") || "なし"}</strong></div>`);
       known.push(`<div class="monster-info-row"><span>耐性</span><strong>${formatResistances(enemy.resistances) || "なし"}</strong></div>`);
+      if (enemy.rapidRegeneration) known.push(`<div class="monster-info-row"><span>急速再生</span><strong>世界ターンごとにHP${Math.ceil(enemy.maxHp * enemy.rapidRegeneration.rate)}回復 / 火で2ターン停止・毒で3ターン半減・会心で1ターン停止</strong></div>`);
+      if (enemy.rapidRegeneration) known.push(`<div class="monster-info-row"><span>急速再生</span><strong>世界ターンごとにHP${enemy.rapidRegeneration.amount}回復</strong></div>`);
       const attackPool = enemyAttackAttributePool(enemy);
       known.push(`<div class="monster-info-row"><span>攻撃候補</span><strong>${attackPool.map(attrHtml).join("・")}</strong></div>`);
       if (enemyTacticalIntelligence(enemy) > 0) known.push(`<div class="monster-info-row"><span>戦術知性</span><strong>耐性の薄い属性を狙う確率 約${Math.round(enemyTacticalIntelligence(enemy) * 100)}%</strong></div>`);
       known.push(`<div class="monster-info-row"><span>危険技</span><strong>${enemy.dangerous ? `${enemy.dangerous.name}（${attrHtml(enemy.dangerous.attribute)}）` : "なし"}</strong></div>`);
       if (enemy.specialAttack) known.push(`<div class="monster-info-row"><span>特殊行動</span><strong>${SPECIAL_ATTACK_LABELS[enemy.specialAttack] || enemy.specialAttack}</strong></div>`);
       if (enemy.summon) known.push(`<div class="monster-info-row"><span>召喚</span><strong>${enemy.summon.every}行動ごと / 同時${enemy.summon.maxAlive}体まで</strong></div>`);
+      if (enemy.dragonBreath) known.push(`<div class="monster-info-row"><span>竜息</span><strong>威力${enemy.dragonBreath.power} × ${enemy.dragonBreath.trials}回判定</strong></div>`);
+      if (enemy.divineInvulnerability) known.push(`<div class="monster-info-row"><span>神域</span><strong>${enemy.divineInvulnerability.every}行動ごと / ${enemy.divineInvulnerability.charges}回完全無効</strong></div>`);
+      if (enemy.demonicWard) known.push(`<div class="monster-info-row"><span>悪魔障壁</span><strong>${enemy.demonicWard.attributes.map(attrHtml).join("・")}耐性${enemy.demonicWard.tier}以上</strong></div>`);
     }
     if (rec.level >= 4) {
       known.push(`<div class="monster-loot-info"><span>剥ぎ取り候補</span><p>${lootCandidateNames(enemy).join("・") || "なし"}</p></div>`);
@@ -4983,7 +5579,7 @@
     const skill = job?.skill;
     if (enemy?.flowerPet) return { skill, range: Number(job?.rangedRange || 1), available: false, reason: "使役中の花ペット" };
     if (!skill || !state.dungeon) return { skill, range: 0, available: false, reason: "ダンジョン内でのみ使用できる" };
-    if (skill.tag === "heal") return { skill, range: 0, available: false, reason: "敵を対象にしない技" };
+    if (["heal", "capoeira_stance"].includes(skill.tag)) return { skill, range: 0, available: false, reason: "敵を対象にしない技" };
     const rangedRange = Number(job.rangedRange || 0);
     const range = skill.tag === "observe" ? Math.max(4, rangedRange) : Math.max(1, rangedRange);
     const distance = chebyshevDistance(enemy, state.dungeon.player);
@@ -5146,7 +5742,29 @@
         }
       }
     }
+    applyEnemyRapidRegeneration(activeEnemies);
     applyRegeneration();
+  }
+
+  function applyEnemyRapidRegeneration(enemies) {
+    (enemies || []).forEach((enemy) => {
+      if (!enemy?.alive || enemy.flowerPet || !enemy.rapidRegeneration || enemy.hp <= 0) return;
+      const injured = enemy.hp < enemy.maxHp;
+      if (Number(enemy.regenerationSuppressedTurns || 0) > 0) {
+        enemy.regenerationSuppressedTurns -= 1;
+        const nearby = state.arena || (state.dungeon && chebyshevDistance(enemy, state.dungeon.player) <= 6);
+        if (injured && nearby) log(`${enemy.name}の急速再生は封じられている。傷口から火花だけが散った。`);
+        return;
+      }
+      const weakened = Number(enemy.regenerationWeakenedTurns || 0) > 0;
+      if (weakened) enemy.regenerationWeakenedTurns -= 1;
+      if (!injured) return;
+      const amount = Math.max(1, Math.ceil(enemy.maxHp * Number(enemy.rapidRegeneration.rate || 0) * (weakened ? 0.5 : 1)));
+      const healed = Math.min(amount, enemy.maxHp - enemy.hp);
+      enemy.hp += healed;
+      const nearby = state.arena || (state.dungeon && chebyshevDistance(enemy, state.dungeon.player) <= 6);
+      if (nearby) log(`${enemy.name}の急速再生。傷が逆再生し、HPを${healed}回復した！${weakened ? " 毒により回復量半減。" : ""}`);
+    });
   }
 
   function applyRegeneration() {
@@ -5183,6 +5801,8 @@
     state.dungeon.timeStopCooldown = Math.max(0, Number(state.dungeon.timeStopCooldown || 0) - 1);
     state.dungeon.healCooldown = Math.max(0, Number(state.dungeon.healCooldown || 0) - 1);
     state.adventurer.slowTurns = Math.max(0, Number(state.adventurer.slowTurns || 0) - 1);
+    tickIntoxication();
+    tickSnackBuff();
     if (state.dungeon.timeStopTurns > 0) {
       state.dungeon.timeStopTurns -= 1;
       applyRegeneration();
@@ -5492,6 +6112,10 @@
   els.jobSkill?.addEventListener("click", () => {
     const skill = jobs[state.adventurer.jobId]?.skill;
     if (!skill || !state.dungeon) return;
+    if (skill.tag === "capoeira_stance") {
+      toggleCapoeiraStance(state.dungeon, "dungeon");
+      return;
+    }
     if (skill.tag === "heal") {
       jobSkillTargetArmed = false;
       useDungeonHealingMagic();

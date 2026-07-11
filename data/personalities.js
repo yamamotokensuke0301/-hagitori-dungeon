@@ -16,5 +16,6 @@
     { id: "hasty", name: "せっかち", stats: { strength: 0, speed: 2, dexterity: 1, durability: -2, luck: 0 }, growth: { every: 6, order: ["speed", "dexterity"] }, description: "かなり脆いが、素早さと器用さが伸びる。" },
     { id: "calm", name: "れいせい", stats: { strength: 0, speed: -1, dexterity: 1, durability: 0, luck: 1 }, growth: { every: 6, order: ["dexterity", "luck"] }, description: "素早さより、器用さと運を重視する。" },
     { id: "whimsical", name: "きまぐれ", stats: { strength: -1, speed: 1, dexterity: -1, durability: 1, luck: 1 }, growth: { every: 4, order: ["luck", "speed", "durability", "dexterity", "strength"] }, description: "初期能力も追加成長も偏りが巡る、読みにくい性格。" },
+    { id: "glutton", name: "食いしん坊", stats: { strength: 1, speed: -1, dexterity: 0, durability: 1, luck: 0 }, growth: { every: 5, order: ["durability", "strength", "luck"] }, description: "食への執念が力になる。宿のつまみを食べると料理に応じた能力が一時的に上昇する。" },
   ];
 })();

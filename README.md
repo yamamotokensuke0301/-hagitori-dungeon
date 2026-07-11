@@ -1,6 +1,6 @@
 # Hagitori Dungeon
 
-Current version: **Prototype 3.1.0**
+Current version: **Prototype 3.2.0**
 
 『剥ぎ取りダンジョン』は、地下100階対応を前提にしたスマートフォン向けターン制ローグライクRPGのブラウザプロトタイプです。
 

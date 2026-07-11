@@ -124,6 +124,14 @@
   );
   const invisibleSightRaces = new Set(["ghost", "android", "alien", "insectoid", "machine", "shadow", "celestial", "high_elf"]);
   window.HD_DATA.races.forEach((race) => {
+    const statPower = Object.values(race.stats).reduce((sum, value) => sum + Number(value || 0), 0);
+    const resistancePower = Object.values(race.resistances || {}).reduce((sum, value) => {
+      if (value === "immune") return sum + 4;
+      return sum + Number(value || 0) * 0.35;
+    }, 0);
+    race.powerRating = Number((statPower + Number(race.acceleration || 0) * 0.75 + resistancePower).toFixed(2));
+    race.experienceMultiplier = Math.max(0.75, Math.min(1.8, Math.round((1 + race.powerRating * 0.025) * 20) / 20));
+    race.traits.push(`必要経験値×${race.experienceMultiplier.toFixed(2)}`);
     if (!invisibleSightRaces.has(race.id)) return;
     race.canSeeInvisible = true;
     race.traits.push("透明な魔物を視認できる");

@@ -41,11 +41,11 @@
 }
 ```
 
-現行は13職。`ninja` は `acceleration: 30` と `accelerationGrowthEvery: 3` を持つ最強格高速職で、`hunter`（表示名「盗賊」）は睡眠中の敵に3倍の寝込み襲撃を行う。
+現行は15職。`ninja` は `acceleration: 30` と `accelerationGrowthEvery: 3` を持つ最強格高速職で、`hunter`（表示名「盗賊」）は睡眠中の敵に3倍の寝込み襲撃を行う。`capoeirista` はカポエラ状態中に8方向の入力を反転し、通常攻撃を威力1.8倍の打属性足技へ変える。
 
 ## 種族
 
-`data/races.js` の `races` に、五能力、加速度、耐性、透明視認などを定義する。現行は30種族。`high_elf` は `elf`、`superhuman` は `human` の意図的な完全上位で、`slime` は能力値合計と加速度が最低の最弱種族である。`slime` と名前 `リムル` の組み合わせによる最強化は、保存データを変形せず `getPlayerStats()` の派生補正として適用する。
+`data/races.js` の `races` に、五能力、加速度、耐性、透明視認などを定義する。現行は30種族。能力値・加速度・耐性から `powerRating` と `experienceMultiplier` を算出し、強い種族ほど職業レベルの必要経験値が増える。`high_elf` は `elf`、`superhuman` は `human` の意図的な完全上位で、`slime` は能力値合計と加速度が最低の最弱種族である。`slime` と名前 `リムル` の組み合わせによる最強化は、保存データを変形せず `getPlayerStats()` の派生補正として適用する。
 
 ## モンスター
 
@@ -178,6 +178,8 @@ dangerous: {
 `slot` は `weapon`、`upper`、`lower`、`feet`、`accessory` のいずれか。`attackAttributes` は0個以上の攻撃属性を持てる配列で、複数ある場合は攻撃対象へ最も有効な属性のダメージを採用する。全装備に配列形式を正規化し、旧 `attributeAttack` は先頭属性として互換維持する。
 
 流通装備の任意フィールド `shopMinFloor` は、その装備が素材売却によって入荷できる最小到達階層を示す。派生等級1・2は1、等級3〜9は順に15、25、35、45、55、70、85を持つ。条件を満たした入荷済みIDと素材売却履歴は `meta.shop` に保存し、冒険者死亡後も維持する。
+
+生成系列装備は任意の `equipmentArchetype` で猛攻・城塞・疾風・再生・多相・背水の強偏差原型を示す。セット構成品は `setId` を持ち、`equipmentSets` の `itemIds` と対応する。各セットの `bonuses` は `{ pieces, attack?, defense?, acceleration?, hpRegen?, attackAttributes?, resistances?, text }` 形式で、必要部位数を満たした段階まで累積適用する。装備監査では `setId` も用途の一部として完全一致判定へ含める。
 
 固定アーティファクトは `data/equipment.js` に63種類あり、全て `artifact.chestOnly: true` の一点物として扱う。UIでは名称先頭へ黒星`★`を付ける。通常箱は1%、宝物庫箱は5%で固定品を抽選する。商店売却は不可で、装備から外した状態なら `artifact.guildPoints` を基準にギルドへ納品できる。発見済みIDは冒険者の `discoveredArtifacts` に残り、ギルド納品後も同じ一点物を再抽選しない。`curse.penalties` は装備中だけ適用し、呪耐性のダメージ倍率と同じ係数で軽減する。呪免疫ならペナルティは0になる。任意の `risque: true` は♡印の艶装備を表し、性格 `lewd` の装備数に応じた共鳴補正へ使う。
 

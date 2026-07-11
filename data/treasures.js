@@ -109,6 +109,84 @@
     { id: "junk_ultra_universe_box", type: "junk", junkTier: "ultra_luxury", name: "♛未使用宇宙の化粧箱", sellPrice: 12000, rarityWeight: 0.04, minFloor: 99, stackable: true, description: "中身は空。正確には、まだ何も始まっていない完全な空が詰まっている。" },
   ];
 
+  const expandedJunkSubjects = [
+    ["片方だけ拍手する手袋", "もう片方を待たず、夜中に一度だけ乾いた拍手をする。"],
+    ["迷子になった玄関マット", "踏むと知らない家へ帰ってきた気分になる。"],
+    ["決して沸かない薬缶", "火に掛けると中の水が冷静さを取り戻す。"],
+    ["逆さに育った鉢植え", "根が空を求め、葉が土へ潜ろうとしている。"],
+    ["嘘だけ映す手鏡", "持ち主が一番信じたい顔を映してしまう。"],
+    ["休日を主張する歯車", "平日には回るが、迷宮暦の祝日は頑として動かない。"],
+    ["一段足りない梯子", "どこへ掛けても最後の一歩だけ届かない。"],
+    ["雨音を忘れた傘", "濡れは防ぐが、雨粒がすべて無音になる。"],
+    ["寝返りを打つ枕石", "眠る者より先に快適な位置を探し続ける。"],
+    ["勝手に閉店する看板", "客が来るたび『本日休業』へ裏返る。"],
+    ["余白を食べる栞", "本へ挟むと文字ではなく余白だけが少し減る。"],
+    ["出口を嫌う蝶番", "扉を開けるほど入口側へ戻そうと軋む。"],
+    ["音痴な音叉", "叩くたび本人だけは正しいと思っている音を出す。"],
+    ["昨日を温める湯たんぽ", "抱くと過ぎた冬の記憶だけがぬくもる。"],
+    ["持ち主を値踏みする秤", "物を載せても、針は持ち主の未練の重さを示す。"],
+  ];
+  const expandedJunkConditions = [
+    ["半透明の", "向こう側は見えるが、見られたくない部分だけ曇る"],
+    ["妙に礼儀正しい", "触れるたび小さく会釈する"],
+    ["月曜だけ重い", "週の始まりを誰より深刻に受け止めている"],
+    ["勇者のお下がりを自称する", "英雄譚の肝心な部分だけ記憶が曖昧だ"],
+    ["三秒先から届いた", "今起きる小さな失敗だけ先に知っている"],
+    ["猫にだけ高価に見える", "猫が前を通ると王冠のような威厳を放つ"],
+  ];
+  expandedJunkSubjects.forEach(([subject, description], subjectIndex) => {
+    expandedJunkConditions.forEach(([condition, oddity], conditionIndex) => {
+      const depth = 1 + ((subjectIndex * 7 + conditionIndex * 5) % 99);
+      junkItems.push({
+        id: `junk_expanded_${subjectIndex + 1}_${conditionIndex + 1}`,
+        type: "junk",
+        name: `${condition}${subject}`,
+        sellPrice: 3 + depth * 3 + conditionIndex * 2,
+        rarityWeight: Math.max(0.85, 22 - depth * 0.2),
+        minFloor: depth,
+        stackable: true,
+        description: `${description}${oddity}という、用途不明の珍品。`,
+      });
+    });
+  });
+
+  const additionalLuxuryJunk = [
+    ["junk_luxury_moonlit_violin", "◇月光伯の無弦ヴァイオリン", 2050, 34, "弦はないが、月明かりが差すと宮廷舞曲を奏でる。"],
+    ["junk_luxury_mermaid_mirror", "◇人魚女王の真珠手鏡", 2380, 40, "海を離れてなお、鏡面には深海の宮殿が揺れる。"],
+    ["junk_luxury_giant_cufflink", "◇巨人皇帝の片袖留め", 2700, 46, "人間には盾ほど大きいが、細工は髪の毛より精密。"],
+    ["junk_luxury_phantom_carpet", "◇幽王宮の透過絨毯", 3150, 52, "床へ敷くと絨毯だけが一階下へ落ちていく。"],
+    ["junk_luxury_sun_chalice", "◇太陽神殿の夕映え杯", 3600, 58, "注いだ水が夕焼け色に染まり、味だけ朝露になる。"],
+    ["junk_luxury_dwarven_clock", "◇鉱山王の純金鳩時計", 4200, 64, "時刻になると鳩ではなく小さな坑夫が出て休憩を要求する。"],
+    ["junk_luxury_fairy_chandelier", "◇妖精宮の携帯シャンデリア", 4850, 70, "掌に載る大きさで、百人分の舞踏会を照らす。"],
+    ["junk_luxury_witch_teaset", "◇大魔女の逆流茶器", 5500, 76, "飲み終えた紅茶が注ぎ口から勝手に戻ってくる。"],
+    ["junk_luxury_star_atlas", "◇星侯爵の銀河革地図", 6300, 84, "開くたび星座の領地境界が書き換わる。"],
+    ["junk_luxury_dragon_throne_leg", "◇竜帝玉座の黄金脚一本", 7200, 92, "一本だけでも座る者のいない威圧感を放っている。"],
+  ];
+  additionalLuxuryJunk.forEach(([id, name, sellPrice, minFloor, description], index) => junkItems.push({ id, type: "junk", junkTier: "luxury", name, sellPrice, rarityWeight: 0.28 - index * 0.018, minFloor, stackable: true, description }));
+
+  const additionalUltraJunk = [
+    ["junk_ultra_unwritten_epic", "♛まだ書かれていない英雄叙事詩", 13500, 72, "頁を開く者の未来を主人公にするが、第一章で必ず筆が止まる。"],
+    ["junk_ultra_heaven_key", "♛天国の勝手口の合鍵", 15000, 75, "正門を通れない者向けらしいが、肝心の勝手口が見つからない。"],
+    ["junk_ultra_hell_receipt", "♛地獄全階層の完済証明書", 16800, 78, "あらゆる罪の支払い済み印がある。名義だけが空欄。"],
+    ["junk_ultra_first_lie", "♛世界で最初につかれた嘘の標本", 19000, 81, "封印瓶の中で今も真実らしい顔をしている。"],
+    ["junk_ultra_zero_shadow", "♛光が生まれる前の原初影", 21500, 84, "照らしても消えず、暗闇では逆に白く浮かぶ。"],
+    ["junk_ultra_fate_eraser", "♛運命台帳専用の消しゴム", 24500, 87, "一度使われた跡があるが、何が消えたかは誰も思い出せない。"],
+    ["junk_ultra_god_spare_halo", "♛神が忘れた予備の後光", 28000, 90, "背負うと荘厳だが、少しだけ左へ傾いている。"],
+    ["junk_ultra_eternity_wrapper", "♛永遠を包んでいた包装紙", 32000, 93, "中身より長く残る保証書が裏面に貼られている。"],
+    ["junk_ultra_world_seed_shell", "♛孵化済み世界卵の殻", 37000, 96, "内側に見知らぬ大陸の痕跡がこびりついている。"],
+    ["junk_ultra_creator_lunchbox", "♛創造神の食べ残し弁当箱", 44000, 99, "隅に残った一粒が惑星らしい軌道で回っている。"],
+  ];
+  additionalUltraJunk.forEach(([id, name, sellPrice, minFloor, description], index) => junkItems.push({ id, type: "junk", junkTier: "ultra_luxury", name, sellPrice, rarityWeight: 0.038 - index * 0.0032, minFloor, stackable: true, description }));
+
+  const legendJunk = [
+    ["junk_legend_deleted_tomorrow", "♚削除された明日そのもの", 120000, 96, "存在しないはずの一日が、薄い暦の形で折り畳まれている。"],
+    ["junk_legend_creator_nameplate", "♚創造主が辞職時に外した名札", 180000, 97, "裏面には『後任募集中、経験不問』と刻まれている。"],
+    ["junk_legend_universe_receipt", "♚全宇宙返品時の控え", 260000, 98, "返品理由は『思っていた色と違う』。再購入期限は永遠に過ぎている。"],
+    ["junk_legend_last_save", "♚世界終了直前の最後のセーブデータ", 380000, 99, "読み込める機械はないが、中から冒険者を呼ぶ声がする。"],
+    ["junk_legend_nothing_fragment", "♚無が割れた時に出た破片", 600000, 100, "何もないはずなのに重く、観測するほど周囲の存在感を奪う。"],
+  ];
+  legendJunk.forEach(([id, name, sellPrice, minFloor, description], index) => junkItems.push({ id, type: "junk", junkTier: "legend", name, sellPrice, rarityWeight: 0.004 - index * 0.00065, minFloor, stackable: true, description }));
+
   window.HD_DATA.spellbookRanks = spellbookRanks;
   window.HD_DATA.spellbookRanksById = rankById;
   window.HD_DATA.spells = spells;

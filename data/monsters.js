@@ -846,6 +846,45 @@
     monster.attack = Math.max(1, Math.round(monster.attack * color.multiplier));
     monster.defense = Math.max(0, Math.round(monster.defense * color.multiplier));
     if (monster.dangerous) monster.dangerous.power = Math.max(1, Math.round(monster.dangerous.power * color.multiplier));
+    if (species.id === "dragon") {
+      const breathTitles = ["白煙の竜息", "蒼圧ブレス", "翠嵐竜息", "黄金雷界ブレス", "紅蓮滅界ブレス", "紫冥終葬ブレス", "虹天創滅ブレス"];
+      const breathPower = Math.max(20, Math.round(monster.attack * (1.8 + colorIndex * 0.22) + nativeFloor * (0.7 + colorIndex * 0.08)));
+      const trials = colorIndex >= 6 ? 3 : colorIndex >= 4 ? 2 : 1;
+      monster.dragonBreath = { power: breathPower, trials, rank: colorIndex + 1 };
+      monster.dangerous = {
+        every: colorIndex >= 4 ? 2 : 3,
+        telegraph: `${monster.name}が肺腑へ周囲の魔力を吸い込み、鱗の隙間から世界を焼く光が漏れた。`,
+        name: breathTitles[colorIndex],
+        attribute: monster.attackAttribute,
+        power: breathPower,
+      };
+    }
+    if (species.id === "angel") {
+      monster.divineInvulnerability = {
+        every: colorIndex >= 5 ? 3 : colorIndex >= 3 ? 4 : 5,
+        charges: colorIndex >= 4 ? 2 : 1,
+        name: colorIndex >= 6 ? "原初神域・不可侵天" : colorIndex >= 4 ? "熾天神域" : "白翼の聖域",
+      };
+    }
+    if (species.id === "demon") {
+      const resistanceFloor = Math.min(5, 3 + Math.floor(colorIndex / 2));
+      const fortified = [monster.attackAttribute, monster.dangerous?.attribute || "curse"];
+      if (colorIndex >= 4) fortified.push("illusion");
+      fortified.forEach((attribute) => {
+        const current = monster.resistances?.[attribute];
+        if (current !== "immune") monster.resistances[attribute] = Math.max(Number(current || 0), resistanceFloor);
+      });
+      monster.demonicWard = { attributes: [...new Set(fortified)], tier: resistanceFloor };
+    }
+    const rapidRegenerationEligible = monster.unique
+      && (nativeFloor >= 45 || colorIndex >= 5 || species.rank >= 12);
+    if (rapidRegenerationEligible) {
+      const rate = Math.min(0.14, 0.035 + nativeFloor * 0.00065 + colorIndex * 0.006 + Math.max(0, species.rank - 10) * 0.004);
+      monster.rapidRegeneration = {
+        rate: Number(rate.toFixed(3)),
+        amount: Math.max(1, Math.ceil(monster.hp * rate)),
+      };
+    }
   }
 
   window.HD_DATA.monsters.forEach(classifyMonster);

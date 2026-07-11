@@ -44,7 +44,7 @@ const mainSource = read("js/main.js");
 const dungeonGeneratorSource = read("js/dungeon-generator.js");
 const indexSource = read("index.html");
 assert(!/\.enemy-fire\s*\{[^}]*background/.test(styleSource), "monster attribute color still changes the background");
-assert(mainSource.includes("RESEARCH_EVIDENCE_THRESHOLDS = [0, 1, 35, 100, 220, 400]") && mainSource.includes("RESEARCH_EVENT_EVIDENCE = [0, 1, 1, 2, 3, 5]"), "research progression is no longer using the harsh evidence curve");
+assert(mainSource.includes("RESEARCH_EVIDENCE_THRESHOLDS = [0, 1, 30, 85, 180, 320]") && mainSource.includes("function spreadSpeciesResearch") && mainSource.includes("firstMilestone ? 2 : 1"), "long-term research progression does not include milestones and species sharing");
 assert(mainSource.includes("function colorizeResearchAttributes") && mainSource.includes("function embellishedResearchNote") && styleSource.includes(".research-note-label"), "colored theatrical research notes are missing");
 assert(mainSource.includes("弱点属性") && mainSource.includes("耐性属性") && mainSource.includes("monster.weaknesses.map(attrHtml)"), "explicit colored research affinities are missing");
 assert(indexSource.includes('id="deathCryText"') && mainSource.includes("function chooseDeathCry") && mainSource.includes("DEATH_CRY_PERSONALITY"), "player death-cry variation is missing");
@@ -81,6 +81,9 @@ assert(indexSource.includes('id="logHistoryList"') && indexSource.includes('aria
 assert(styleSource.includes(".log-history-card") && styleSource.includes(".log-history-list") && styleSource.includes("overscroll-behavior: contain"), "log-history dialog cannot scroll safely on short screens");
 assert(mainSource.includes("LOG_HISTORY_LIMIT = 60") && mainSource.includes("function openLogHistory") && mainSource.includes("function closeLogHistory"), "bounded log-history behavior is missing");
 assert(mainSource.includes('id="shopCompatibilitySelect"') && mainSource.includes("!shopCompatibleOnly || item.jobs.includes(adv.jobId)"), "shop current-job compatibility filter is missing");
+assert(mainSource.includes("function equipmentRole(item)") && mainSource.includes("window.HD_EQUIPMENT_ROLES"), "internal equipment role classification is missing");
+assert(!mainSource.includes('id="shopEquipmentRoleSelect"') && !mainSource.includes('id="homeEquipmentRoleSelect"') && !styleSource.includes(".equipment-role-tag"), "internal equipment roles leaked into player-facing UI");
+assert(mainSource.includes('`${attr(item.attributeAttack)}攻`') && mainSource.includes('`${attr(resistanceFocus)}耐`'), "equipment specialization tags do not expose their focus");
 assert(mainSource.includes('playSfx("levelStatUp")') && mainSource.includes("data-level-stat"), "sequential level-up stat presentation is missing");
 assert(mainSource.includes("const growthStepDelay = 750") && mainSource.includes("const unchangedStepDelay = 480") && mainSource.includes('entry.difference > 0 ? "will-rise" : "unchanged"'), "level-up stat presentation is not using growth-aware cadence");
 assert(mainSource.includes('class="stat-gain">+${entry.difference}') && styleSource.includes(".level-up-stat.will-rise.revealed .stat-gain"), "level-up stat point gains are not visually exposed");
@@ -92,7 +95,19 @@ assert(!mainSource.includes("残り${corpse.harvestsRemaining}回"), "harvest co
 assert(mainSource.includes("TRAP_FLOOR_CHANCE = 0.42") && mainSource.includes("Math.random() < TRAP_FLOOR_CHANCE"), "trap floor chance was not doubled to 42%");
 assert(mainSource.includes("TRAP_COUNT_MULTIPLIER = 4") && mainSource.includes("* TRAP_COUNT_MULTIPLIER"), "trap count was not increased to four times the original");
 assert(mainSource.includes("Math.hypot(x - state.dungeon.player.x, y - state.dungeon.player.y)"), "dungeon light distance is not circular");
-assert(mainSource.includes("DUNGEON_LIGHT_RADIUS") && mainSource.includes("near: 3.25, mid: 5.6"), "dungeon light radius was not widened by one tile");
+assert(mainSource.includes("DUNGEON_LIGHT_RADIUS") && mainSource.includes("near: 2.25, mid: 4.6"), "dungeon light radius is not using the reduced range");
+assert(mainSource.includes('jobId === "ninja") return { near: 0, mid: 0 }') && mainSource.includes('jobId === "handyman" ? 1 : 0'), "job-specific dungeon light ranges are missing");
+assert(mainSource.includes("function capoeiraDirection") && mainSource.includes("return capoeiraActive(host) ? [-dx, -dy] : [dx, dy]") && mainSource.includes('capoeiraKick ? "逆立ち旋風脚"'), "capoeira inversion or kick behavior is missing");
+assert(styleSource.includes(".capoeira-inverted") && styleSource.includes("transform: rotate(180deg)"), "capoeira player marker is not inverted");
+assert(mainSource.includes("DRINK_COST = 1") && mainSource.includes("function drinkAtInn") && mainSource.includes("function acuteAlcoholRisk"), "inn drinking and alcohol poisoning risk are missing");
+assert(mainSource.includes("function intoxicatedDirection") && mainSource.includes("function tickIntoxication"), "drunken movement or duration is missing");
+assert(mainSource.includes("DRUNKEN_FIST_POWER = 3.6") && mainSource.includes('state.adventurer.jobId === "heavy" && !state.adventurer.equipment.weapon') && mainSource.includes("酔拳・八仙酔打"), "bare-handed berserker drunken fist is missing or not top tier");
+assert(mainSource.includes("TAVERN_SNACK_INGREDIENTS") && mainSource.includes("TAVERN_SNACK_STYLES") && mainSource.includes("function eatTavernSnack"), "random tavern snack system is missing");
+assert(mainSource.includes("TAVERN_SNACKS.find") && mainSource.includes("SNACK_PERSONALITY_COMMENTS[adv.personalityId]"), "snacks do not use personality-specific comments");
+assert(mainSource.includes('adv.personalityId === "glutton"') && mainSource.includes("function tickSnackBuff") && mainSource.includes("grownStats[adv.snackBuff.stat]"), "glutton snack stat buff is missing");
+assert(indexSource.includes('id="junkDealerView"') && mainSource.includes("function renderJunkDealer") && mainSource.includes("function appraiseJunk") && mainSource.includes("function exchangeJunkMaterial"), "junk dealer store is missing");
+assert(mainSource.includes('material?.rarity === "ultra" ? 600 : 120') && mainSource.includes('item?.junkTier === "legend" ? 2') && mainSource.includes('item?.junkTier === "ultra_luxury" ? 1.5'), "junk dealer rarity exchange rates are invalid");
+assert(styleSource.includes(".tavern-snack-menu"), "tavern snack menu styling is missing");
 assert(mainSource.includes("MAP_SIZE_RANGE = Object.freeze([36, 60])") && mainSource.includes("rand(minimumSize, MAP_SIZE_RANGE[1])"), "dungeon map size does not vary from 36 to 60");
 assert(styleSource.includes(".cell.light-room") && mainSource.includes("alwaysLitTiles") && dungeonGeneratorSource.includes("alwaysLitTileKeys"), "always-lit rooms and their first corridor tile are not rendered above dungeon darkness");
 assert(!dungeonGeneratorSource.includes("corridorWidth"), "two-tile corridor generation remains enabled");
@@ -153,11 +168,13 @@ assert(window.HD_UTILS.chebyshevDistance({ x: 0, y: 0 }, { x: -3, y: 2 }) === 3,
 assert(!window.HD_UTILS.hasLineOfSight({ x: 0, y: 0 }, { x: 4, y: 0 }, (x) => x === 2), "shared line of sight ignored an intermediate blocker");
 assert(window.HD_UTILS.hasLineOfSight({ x: 0, y: 0 }, { x: 2, y: 0 }, (x) => x === 2), "shared line of sight treated the target as an intermediate blocker");
 assert(window.HD_DATA.races.length === 30, "race roster must contain 30 races");
+assert(window.HD_DATA.races.every((race) => Number.isFinite(race.powerRating) && race.experienceMultiplier >= 0.75 && race.experienceMultiplier <= 1.8), "race growth difficulty is missing or out of range");
 const highElfRace = window.HD_DATA.races.find((race) => race.id === "high_elf" && race.name === "ハイエルフ");
 const superhumanRace = window.HD_DATA.races.find((race) => race.id === "superhuman" && race.name === "超人");
 const weakestSlimeRace = window.HD_DATA.races.find((race) => race.id === "slime" && race.name === "スライム");
 assert(highElfRace?.canSeeInvisible && highElfRace.acceleration === 5 && highElfRace.stats.dexterity === 5, "high elf race traits are invalid");
 assert(superhumanRace?.stats.strength === 6 && superhumanRace.stats.durability === 6 && superhumanRace.resistances.blunt === 3, "superhuman race traits are invalid");
+assert(highElfRace.experienceMultiplier > window.HD_DATA.races.find((race) => race.id === "elf").experienceMultiplier && superhumanRace.experienceMultiplier > window.HD_DATA.races.find((race) => race.id === "human").experienceMultiplier && weakestSlimeRace.experienceMultiplier < 1, "stronger races do not take longer to level");
 assert(["strength", "speed", "dexterity", "durability", "luck"].every((key) => highElfRace.stats[key] >= window.HD_DATA.races.find((race) => race.id === "elf").stats[key]), "high elf is not a complete upgrade over elf");
 assert(["strength", "speed", "dexterity", "durability", "luck"].every((key) => superhumanRace.stats[key] > window.HD_DATA.races.find((race) => race.id === "human").stats[key]), "superhuman is not a complete upgrade over human");
 const raceStatTotal = (race) => Object.values(race.stats).reduce((sum, value) => sum + value, 0);
@@ -182,6 +199,8 @@ assert(window.HD_DATA.monsters.length === 985, "monster count changed");
 assert(window.HD_DATA.equipment.length === 2707, "equipment count changed");
 assert(window.HD_DATA.equipment.every((item) => Array.isArray(item.attackAttributes)), "equipment attackAttributes were not normalized");
 assert(window.HD_DATA.equipment.some((item) => item.attackAttributes.length >= 2), "multi-attribute equipment is missing");
+const puzzleEquipment = window.HD_DATA.equipment.filter((item) => item.puzzleEffects?.length);
+assert(puzzleEquipment.length === 17 && puzzleEquipment.every((item) => item.description.includes("連携効果")), "hand-authored equipment puzzle set is incomplete");
 const chestArtifacts = window.HD_DATA.equipment.filter((item) => item.artifact?.chestOnly);
 assert(chestArtifacts.length === 63, "fixed artifact catalog must contain 63 items");
 assert(["joke", "trash", "ordinary", "useful"].every((tier) => chestArtifacts.filter((item) => item.artifact.tier === tier).length === 12) && chestArtifacts.filter((item) => item.artifact.tier === "cheat").length === 15, "fixed artifact tiers were not tripled");
@@ -198,16 +217,39 @@ assert(window.HD_DATA.spells.length === 15 && window.HD_DATA.spellbooks.length =
 assert(window.HD_DATA.spells.every((spell) => spell.range >= 1 && spell.range <= 6), "a spell range exceeds the visible targeting radius");
 assert(window.HD_DATA.personalities.some((item) => item.id === "ordinary" && item.name === "ふつう"), "ordinary personality is missing");
 assert(window.HD_DATA.personalities.some((item) => item.id === "lewd" && item.name === "すけべ"), "lewd personality is missing");
+assert(window.HD_DATA.personalities.some((item) => item.id === "glutton" && item.name === "食いしん坊" && item.stats.strength === 1), "glutton personality is missing");
 assert(window.HD_DATA.personalities.some((item) => item.id === "lazy" && item.name === "なまけもの"), "lazy personality is missing");
 assert(window.HD_DATA.personalities.every((item) => Object.values(item.stats).reduce((sum, value) => sum + value, 0) === 1), "personality starting-stat budget changed");
-assert(window.HD_DATA.jobs.length === 14, "job roster must contain 14 jobs");
+assert(window.HD_DATA.jobs.length === 15, "job roster must contain 15 jobs");
+assert(window.HD_DATA.equipment.filter((item) => item.equipmentArchetype).length >= 2000, "generated equipment does not have strong archetype variance");
+assert(new Set(window.HD_DATA.equipment.map((item) => item.equipmentArchetype).filter(Boolean)).size === 6, "equipment archetype variety changed");
+const archetypedEquipment = window.HD_DATA.equipment.filter((item) => item.equipmentArchetype);
+assert(archetypedEquipment.filter((item) => Object.values(item.resistances || {}).some((value) => value !== "immune" && Number(value) < 0)).length >= 1700, "negative equipment resistances are not widespread enough");
+assert(archetypedEquipment.filter((item) => Object.values(item.resistances || {}).some((value) => value !== "immune" && Number(value) <= -2)).length >= 800, "severe equipment weaknesses are too rare");
+assert(window.HD_DATA.attributes.every((attribute) => window.HD_DATA.equipment.filter((item) => item.resistances?.[attribute] === "immune").length >= 18), "an attribute lacks enough immunity equipment to cover build weaknesses");
+assert(mainSource.includes('if (a === "immune" || b === "immune") return "immune"'), "immunity does not override combined negative resistance");
+const fixedArtifactSupports = window.HD_DATA.equipment.filter((item) => item.attributePuzzleSupport);
+assert(fixedArtifactSupports.length === 39, "fixed artifact attribute-puzzle support count changed");
+assert(window.HD_DATA.attributes.every((attribute) => fixedArtifactSupports.filter((item) => item.resistances?.[attribute] === "immune").length >= 2), "fixed artifacts do not cover every attribute with immunity");
+assert(fixedArtifactSupports.filter((item) => item.artifact.tier === "cheat").every((item) => window.HD_DATA.attributes.every((attribute) => item.resistances[attribute] === "immune" || Number(item.resistances[attribute]) >= 2)), "cheat artifacts lack the all-attribute resistance foundation");
+assert(window.HD_DATA.equipmentSets.length === 25 && window.HD_DATA.equipmentSets.every((set) => set.itemIds.length === 4 && set.bonuses.map((bonus) => bonus.pieces).join(",") === "2,3,4"), "equipment set catalog is missing or malformed");
+assert(window.HD_DATA.equipmentSets.every((set) => set.itemIds.every((id) => window.HD_DATA.equipment.find((item) => item.id === id)?.setId === set.id)), "equipment set membership is incomplete");
+assert(mainSource.includes("function applyEquipmentSetBonuses") && mainSource.includes("stats.activeEquipmentSets"), "equipment set bonuses are not applied to player stats");
+assert(styleSource.includes(".equipment-set-card") && styleSource.includes(".equipment-set-label"), "equipment set UI styling is missing");
+assert(mainSource.includes("BEGINNER_COURSE_LESSONS") && mainSource.includes("function offerBeginnerCourse") && mainSource.includes("function showBeginnerCourseLesson"), "optional first-guild beginner course is missing");
 assert(window.HD_DATA.jobs.some((job) => job.id === "flower_tamer" && job.skill.tag === "flower_command"), "flower tamer job is missing");
+assert(window.HD_DATA.jobs.some((job) => job.id === "capoeirista" && job.skill.tag === "capoeira_stance" && job.skill.power >= 1.8), "capoeira job is missing or its kick is too weak");
 const ninjaJob = window.HD_DATA.jobs.find((job) => job.id === "ninja" && job.name === "忍者");
 assert(ninjaJob?.acceleration === 30 && ninjaJob.accelerationGrowthEvery === 3 && ninjaJob.stats.speed === 8 && ninjaJob.rangedRange === 5, "ninja strongest-class profile is invalid");
 assert(window.HD_DATA.equipment.find((item) => item.id === "rusty_knife").jobs.includes("ninja") && window.HD_DATA.equipment.find((item) => item.id === "cloth").jobs.includes("ninja"), "ninja cannot use starter equipment");
 assert(["iron_sword", "crafted_beast_tool", "carapace_armor", "ward_fire_stride"].every((id) => window.HD_DATA.equipment.find((item) => item.id === id)?.jobs.includes("ninja")), "ninja regular blade/tool/leg/foot equipment compatibility is incomplete");
 assert(window.HD_DATA.floors.slice(0, 99).every((floor) => floor.stairRange[0] === 4 && floor.stairRange[1] === 6), "normal stair count was not increased to 4-6");
-assert(window.HD_DATA.junkItems.length === 55, "junk catalog count changed");
+assert(window.HD_DATA.junkItems.length === 170, "junk catalog count changed");
+assert(window.HD_DATA.junkItems.filter((item) => !item.junkTier).length === 135, "normal junk catalog must be tripled to 135");
+assert(window.HD_DATA.junkItems.filter((item) => item.junkTier === "luxury").length === 15, "luxury junk catalog must be tripled to 15");
+assert(window.HD_DATA.junkItems.filter((item) => item.junkTier === "ultra_luxury").length === 15, "ultra-luxury junk catalog must be tripled to 15");
+assert(window.HD_DATA.junkItems.filter((item) => item.junkTier === "legend").length === 5, "legend junk tier is missing");
+assert(new Set(window.HD_DATA.junkItems.map((item) => item.name)).size === window.HD_DATA.junkItems.length, "junk names are duplicated");
 assert(new Set(window.HD_DATA.monsters.map((monster) => monster.id)).size === window.HD_DATA.monsters.length, "monster id collision");
 assert(new Set(window.HD_DATA.monsters.filter((monster) => monster.unique).map((monster) => monster.name)).size === 580, "unique monster name collision");
 assert(window.HD_DATA.monsters.every((monster) => window.HD_DATA.attributes.includes(monster.attackAttribute)), "monster has an invalid attack attribute");
@@ -221,6 +263,15 @@ assert(window.HD_DATA.monsters.every((monster) => (
   [1, 2, 3, 4, 5].every((level) => typeof monster.research[level] === "string")
 )), "a monster is missing a research stage");
 const uniqueMonsters = window.HD_DATA.monsters.filter((monster) => monster.unique);
+const rapidlyRegeneratingUniques = uniqueMonsters.filter((monster) => monster.rapidRegeneration);
+assert(rapidlyRegeneratingUniques.length >= 100 && rapidlyRegeneratingUniques.every((monster) => monster.rapidRegeneration.amount > 0 && monster.rapidRegeneration.rate <= 0.14), "strong unique rapid regeneration is missing or invalid");
+const trueDragons = window.HD_DATA.monsters.filter((monster) => monster.speciesId === "dragon");
+assert(trueDragons.length >= 7 && trueDragons.every((monster) => monster.dragonBreath?.power > monster.attack && /ブレス|竜息/.test(monster.dangerous?.name)), "dragon breath progression is missing");
+assert(trueDragons.filter((monster) => monster.colorTier === "rainbow").every((monster) => monster.dragonBreath.trials === 3), "rainbow dragons do not use triple breath attacks");
+const hostileAngels = window.HD_DATA.monsters.filter((monster) => monster.speciesId === "angel");
+assert(hostileAngels.length >= 7 && hostileAngels.every((monster) => monster.divineInvulnerability?.charges >= 1), "enemy-only angel invulnerability is missing");
+const hostileDemons = window.HD_DATA.monsters.filter((monster) => monster.speciesId === "demon");
+assert(hostileDemons.length >= 7 && hostileDemons.every((monster) => monster.demonicWard?.tier >= 3), "enemy demon elemental wards are missing");
 const goldThiefMonsters = window.HD_DATA.monsters.filter((monster) => monster.specialAttack === "gold_steal");
 assert(goldThiefMonsters.length === 8 && goldThiefMonsters.every((monster) => monster.rareSpawn && monster.goldTheft?.escapeDistance >= 8), "gold-stealing teleport monster roster is invalid");
 assert(window.HD_DATA.floors.every((floor) => !floor.monsterPool.some((id) => goldThiefMonsters.some((monster) => monster.id === id))), "gold thief leaked into the high-density normal pool");
@@ -649,6 +700,20 @@ var document = {
         return element;
       });
     }
+    if (selector === "[data-tavern-snack]") {
+      const html = elements.get("#townView")?.innerHTML || "";
+      const ids = [];
+      const pattern = /data-tavern-snack="([^"]+)"/g;
+      let match;
+      while ((match = pattern.exec(html))) ids.push(match[1]);
+      return ids.map((id) => {
+        const key = `dynamic:tavern-snack:${id}`;
+        if (!elements.has(key)) elements.set(key, new FakeElement());
+        const element = elements.get(key);
+        element.dataset.tavernSnack = id;
+        return element;
+      });
+    }
     return [];
   },
   createElement() {
@@ -740,6 +805,13 @@ window.clearInterval = function () {};
 
 eval(read("js/main.js"));
 
+const equipmentRoleCounts = window.HD_DATA.equipment.reduce((counts, item) => {
+  const roleId = window.HD_EQUIPMENT_ROLES.classify(item).id;
+  counts[roleId] = Number(counts[roleId] || 0) + 1;
+  return counts;
+}, {});
+assert(["basic", "specialized", "conditional", "core", "novelty", "final"].every((id) => equipmentRoleCounts[id] > 0), "equipment role classification left an empty category");
+
 const compactLogHtml = elements.get("#logList").innerHTML;
 assert((compactLogHtml.match(/<p\b/g) || []).length === 8, "town log no longer keeps its compact eight-entry view");
 assert(compactLogHtml.includes("&lt;strong&gt;最新の記録&lt;/strong&gt;") && !compactLogHtml.includes("<strong>最新の記録</strong>"), "compact log did not escape saved HTML");
@@ -781,6 +853,7 @@ assert(!viewTabs.some((tab) => tab.dataset.view === "home"), "duplicate home tab
 assert(!elements.get("#homeView").classList.contains("hidden"), "home view did not open from town");
 assert(elements.get("#townView").classList.contains("hidden"), "town view remained visible over home");
 const homeHtml = elements.get("#homeView").innerHTML;
+assert(homeHtml.includes("セット装備") && homeHtml.includes("2・3・4部位"), "home equipment set activation board is missing");
 assert(homeHtml.includes("通常攻撃期待値"), "home combat expectation is missing");
 assert(homeHtml.includes("初級魔法書「火の粉弾」"), "spellbook shelf is missing");
 assert(homeHtml.includes("習得魔法"), "learned spell section is missing");
@@ -792,6 +865,8 @@ elements.get("#saveBackstoryButton").listeners.click();
 assert(elements.get("#homeView").innerHTML.includes("自分で書き直した生い立ち。"), "edited backstory was not saved at home");
 
 viewTabs.find((tab) => tab.dataset.view === "guild").listeners.click();
+assert(elements.get("#confirmTitle").textContent === "冒険者ギルド初心者講座" && elements.get("#confirmOk").textContent === "講座を受ける" && elements.get("#confirmCancel").textContent === "今回は受けない", "first guild visit did not offer the optional beginner course");
+elements.get("#confirmCancel").listeners.click();
 assert(elements.get("#guildView").innerHTML.includes("報酬受取"), "guild reward claim section is missing");
 assert(elements.get("#guildView").innerHTML.includes("合計400Gを受け取る"), "pending guild reward is missing");
 assert(elements.get("#guildView").innerHTML.includes("★王様の透明外套"), "artifact guild turn-in is missing");
@@ -800,9 +875,18 @@ assert(elements.get("#goldText").textContent === 400, "guild reward claim did no
 assert(elements.get("#guildView").innerHTML.includes("受取可能な報酬はない"), "claimed guild reward remained pending");
 
 viewTabs.find((tab) => tab.dataset.view === "town").listeners.click();
+elements.get("#openJunkDealerButton").listeners.click();
+assert(elements.get("#junkDealerView").innerHTML.includes("珍品偏愛堂") && elements.get("#junkDealerView").innerHTML.includes("珍素材との交換"), "junk dealer view did not open");
+elements.get("#closeJunkDealerButton").listeners.click();
 elements.get("#restInnButton").listeners.click();
 assert(elements.get("#goldText").textContent === 390, "inn did not charge exactly 10G");
 assert(elements.get("#logList").innerHTML.includes("宿の主人"), "inn advice was not added to the log");
+assert((elements.get("#townView").innerHTML.match(/data-tavern-snack=/g) || []).length === 5, "inn does not show exactly five random snacks");
+const goldBeforeSnack = Number(elements.get("#goldText").textContent);
+document.querySelectorAll("[data-tavern-snack]")[0].listeners.click();
+assert(Number(elements.get("#goldText").textContent) < goldBeforeSnack, "eating a tavern snack did not charge gold");
+assert(elements.get("#logList").innerHTML.includes("を食べた。たかし「"), "tavern snack did not produce an in-character comment");
+assert((elements.get("#townView").innerHTML.match(/data-tavern-snack=/g) || []).length === 5, "tavern snacks were not replenished after eating");
 elements.get("#openShopButton").listeners.click();
 assert(elements.get("#shopView").innerHTML.includes("宝箱の品を売る"), "treasure selling section is missing");
 assert(elements.get("#shopView").innerHTML.includes("装備品<select"), "shop equipment label was not changed");
@@ -2313,4 +2397,4 @@ assert(elements.get("#researchView").innerHTML.includes("報酬受領済み"), "
 viewTabs.find((tab) => tab.dataset.view === "guild").listeners.click();
 assert(!elements.get("#guildView").innerHTML.includes('data-guild-donate="omniscient_archive"'), "complete compendium reward can be donated");
 
-"smoke test: ok";
+`smoke test: ok / equipment roles ${JSON.stringify(equipmentRoleCounts)}`;

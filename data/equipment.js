@@ -3,10 +3,10 @@
   const allJobs = window.HD_DATA.jobs.map((job) => job.id);
   const bladeJobs = ["swordsman", "hunter", "archer", "spellblade", "scavenger", "handyman", "ninja"];
   const maulJobs = ["swordsman", "heavy", "researcher", "scavenger", "handyman", "priest"];
-  const toolJobs = ["hunter", "archer", "researcher", "mage", "spellblade", "tourist", "psychic", "scavenger", "handyman", "priest", "ninja", "flower_tamer"];
+  const toolJobs = ["hunter", "archer", "researcher", "mage", "spellblade", "tourist", "psychic", "scavenger", "handyman", "priest", "ninja", "flower_tamer", "capoeirista"];
   const coatJobs = allJobs;
-  const greavesJobs = ["swordsman", "heavy", "spellblade", "scavenger", "handyman", "ninja"];
-  const bootsJobs = ["hunter", "archer", "researcher", "mage", "spellblade", "tourist", "psychic", "handyman", "priest", "ninja", "flower_tamer"];
+  const greavesJobs = ["swordsman", "heavy", "spellblade", "scavenger", "handyman", "ninja", "capoeirista"];
+  const bootsJobs = ["hunter", "archer", "researcher", "mage", "spellblade", "tourist", "psychic", "handyman", "priest", "ninja", "flower_tamer", "capoeirista"];
 
   window.HD_DATA.equipment = [
     {
@@ -843,6 +843,49 @@
     };
   }));
 
+  // 固定アーティファクトは、負耐性装備を組み上げる際の強力な接続部品になる。
+  // 平凡品は複数耐性、使える品は一免疫、チート品は二免疫と全体耐性を提供する。
+  const fixedArtifactSupport = window.HD_DATA.equipment.filter((item) => item.artifact?.chestOnly);
+  fixedArtifactSupport.forEach((item, index) => {
+    const tier = item.artifact.tier;
+    if (!["ordinary", "useful", "cheat"].includes(tier)) return;
+    item.resistances = item.resistances || {};
+    const primary = window.HD_DATA.attributes[(index * 3 + 1) % window.HD_DATA.attributes.length];
+    const secondary = window.HD_DATA.attributes[(index * 7 + 5) % window.HD_DATA.attributes.length];
+    const tertiary = window.HD_DATA.attributes[(index * 11 + 9) % window.HD_DATA.attributes.length];
+    if (tier === "ordinary") {
+      [primary, secondary, tertiary].forEach((attribute) => {
+        if (item.resistances[attribute] !== "immune") item.resistances[attribute] = Math.max(2, Number(item.resistances[attribute] || 0));
+      });
+      item.attributePuzzleSupport = { tier: 1, immunities: [] };
+      item.description = `${item.description} 三属性耐性2以上を繋ぎ、負耐性を相殺しやすくする。`;
+      return;
+    }
+    if (tier === "useful") {
+      item.resistances[primary] = "immune";
+      [secondary, tertiary].forEach((attribute) => {
+        if (item.resistances[attribute] !== "immune") item.resistances[attribute] = Math.max(3, Number(item.resistances[attribute] || 0));
+      });
+      item.attributePuzzleSupport = { tier: 2, immunities: [primary] };
+      item.description = `${item.description} ${window.HD_DATA.attributeLabels[primary]}免疫が他装備の負耐性を完全に塞ぎ、二属性耐性3が残る穴を補う。`;
+      return;
+    }
+    window.HD_DATA.attributes.forEach((attribute) => {
+      if (item.resistances[attribute] !== "immune") item.resistances[attribute] = Math.max(2, Number(item.resistances[attribute] || 0));
+    });
+    item.resistances[primary] = "immune";
+    item.resistances[secondary] = "immune";
+    item.attributePuzzleSupport = { tier: 3, immunities: [primary, secondary] };
+    item.description = `${item.description} 全属性耐性2を下地に、${window.HD_DATA.attributeLabels[primary]}・${window.HD_DATA.attributeLabels[secondary]}免疫で二つの致命的弱点を同時に消す。`;
+  });
+  fixedArtifactSupport.filter((item) => ["useful", "cheat"].includes(item.artifact.tier)).forEach((item, index) => {
+    const coverage = window.HD_DATA.attributes[index % window.HD_DATA.attributes.length];
+    if (item.resistances[coverage] === "immune") return;
+    item.resistances[coverage] = "immune";
+    item.attributePuzzleSupport.immunities.push(coverage);
+    item.description = `${item.description} 属性接続：${window.HD_DATA.attributeLabels[coverage]}免疫。`;
+  });
+
   // 「すけべ」の性格と共鳴する艶装備。通常の装備性能は他の性格でもそのまま使える。
   const risqueEquipmentIds = new Set([
     "artifact_invisible_emperor_cloak", "artifact_moon_thread_coat", "artifact_shadow_step_boots",
@@ -872,6 +915,185 @@
     }
     item.attackAttributes = normalized;
     if (!item.attributeAttack && normalized.length) item.attributeAttack = normalized[0];
+  });
+
+  // 素材装備は同じ数値の色違いにせず、素材系統を小さな実戦上の癖として残す。
+  // 鎚は素材耐性、装飾品は副攻撃属性、防具は重量差を持ち、完全重複を抑える。
+  const themeIndexById = Object.fromEntries(themes.map((theme, index) => [theme.id, index]));
+  const themeById = Object.fromEntries(themes.map((theme) => [theme.id, theme]));
+  window.HD_DATA.equipment.forEach((item) => {
+    const baseId = item.id.replace(/^series_\d+_/, "");
+    const match = /^crafted_(.+)_(blade|maul|tool|coat|greaves|boots|pendant|ring|talisman)$/.exec(baseId);
+    if (!match) return;
+    const [, themeId, form] = match;
+    const theme = themeById[themeId];
+    const themeIndex = themeIndexById[themeId];
+    if (!theme || !Number.isFinite(themeIndex)) return;
+    if (form === "maul") {
+      const current = item.resistances[theme.resistance];
+      if (current !== "immune") item.resistances[theme.resistance] = Math.max(Number(current || 0), 1 + (themeIndex % 3 === 0 ? 1 : 0));
+      if (themeIndex % 5 === 1) item.acceleration = Number(item.acceleration || 0) + 1;
+    } else if (["pendant", "ring", "talisman"].includes(form)) {
+      if (!item.attackAttributes.includes(theme.attribute)) item.attackAttributes.push(theme.attribute);
+      if (!item.attributeAttack) item.attributeAttack = theme.attribute;
+      if (themeIndex % 7 === 2) item.hpRegen = Number(item.hpRegen || 0) + 1;
+    } else if (["coat", "greaves", "boots"].includes(form)) {
+      const weightAccent = themeIndex % 4;
+      if (weightAccent === 0) item.defense = Number(item.defense || 0) + 1;
+      if (weightAccent === 1) item.acceleration = Number(item.acceleration || 0) + 1;
+      if (weightAccent === 2) item.hpRegen = Number(item.hpRegen || 0) + 1;
+    }
+  });
+
+  // 粗製系列は基礎品の複製にせず、重い代わりに一属性へ強い荒削り装備とする。
+  window.HD_DATA.equipment.forEach((item, index) => {
+    if (!item.id.startsWith("series_1_")) return;
+    const roughWard = attackAttributePool[(index * 7 + item.id.length * 3) % attackAttributePool.length];
+    const current = item.resistances[roughWard];
+    if (current !== "immune") item.resistances[roughWard] = Math.max(Number(current || 0), 1);
+    item.acceleration = Number(item.acceleration || 0) - 1;
+    item.description = `${item.description} 粗い補強材で重いが、${window.HD_DATA.attributeLabels[roughWard]}への備えになる。`;
+  });
+
+  // 普及品以上の生成系列には、大きな長所と短所を併せ持つ原型を与える。
+  // 同じ等級でも「何を伸ばし、何を捨てるか」が変わり、装備交換で戦法が変化する。
+  const equipmentArchetypes = [
+    { id: "assault", name: "猛攻型", apply(item, grade) { item.attack += Math.ceil(grade * 0.9); item.defense -= Math.ceil(grade * 0.4); }, text: "攻撃を大きく伸ばす代わりに防御を削る" },
+    { id: "bulwark", name: "城塞型", apply(item, grade) { item.defense += Math.ceil(grade * 0.85); item.acceleration -= Math.ceil(grade * 0.75); }, text: "重防御と引き換えに加速度を失う" },
+    { id: "gale", name: "疾風型", apply(item, grade) { item.acceleration += grade * 2; item.defense -= Math.ceil(grade * 0.55); }, text: "圧倒的な加速度と引き換えに装甲を薄くする" },
+    { id: "renewal", name: "再生型", apply(item, grade) { item.hpRegen += Math.ceil(grade * 0.55); item.attack -= Math.ceil(grade * 0.55); }, text: "継戦再生と引き換えに瞬間火力を落とす" },
+    { id: "prism", name: "多相型", apply(item, grade, seed) {
+      const first = attackAttributePool[(seed + grade * 2) % attackAttributePool.length];
+      const second = attackAttributePool[(seed * 3 + grade * 5) % attackAttributePool.length];
+      [first, second].forEach((attribute) => { if (!item.attackAttributes.includes(attribute)) item.attackAttributes.push(attribute); });
+      item.attack -= Math.ceil(grade * 0.3);
+    }, text: "基礎火力を抑えて複数の攻撃属性を扱う" },
+    { id: "reckless", name: "背水型", apply(item, grade, seed) {
+      item.attack += grade;
+      item.acceleration += grade;
+      const vulnerable = attackAttributePool[(seed * 5 + grade) % attackAttributePool.length];
+      if (item.resistances[vulnerable] !== "immune") item.resistances[vulnerable] = Math.min(Number(item.resistances[vulnerable] || 0), grade >= 6 ? -2 : -1);
+    }, text: "攻撃と加速度を得る代わりに一属性が致命的な弱点になる" },
+  ];
+  window.HD_DATA.equipment.forEach((item, index) => {
+    const gradeMatch = /^series_(\d+)_/.exec(item.id);
+    const grade = gradeMatch ? Number(gradeMatch[1]) : 0;
+    if (grade < 2) return;
+    const seed = [...item.id].reduce((sum, character) => sum + character.codePointAt(0), index);
+    const archetype = equipmentArchetypes[(seed + grade * 3) % equipmentArchetypes.length];
+    item.attack = Number(item.attack || 0);
+    item.defense = Number(item.defense || 0);
+    item.acceleration = Number(item.acceleration || 0);
+    item.hpRegen = Number(item.hpRegen || 0);
+    archetype.apply(item, grade, seed);
+    const weaknessCandidates = attackAttributePool.filter((attribute) => item.resistances[attribute] !== "immune");
+    const weaknessEnabled = ["assault", "gale", "prism", "reckless"].includes(archetype.id) || grade >= 5;
+    if (weaknessEnabled && weaknessCandidates.length) {
+      const weakness = weaknessCandidates[(seed * 11 + grade * 7) % weaknessCandidates.length];
+      item.resistances[weakness] = Math.min(Number(item.resistances[weakness] || 0), grade >= 7 ? -2 : -1);
+      const secondWeaknessEnabled = grade >= 8 && ["prism", "reckless", "assault"].includes(archetype.id);
+      if (secondWeaknessEnabled && weaknessCandidates.length > 1) {
+        const remaining = weaknessCandidates.filter((attribute) => attribute !== weakness);
+        const secondWeakness = remaining[(seed * 5 + grade * 13) % remaining.length];
+        item.resistances[secondWeakness] = Math.min(Number(item.resistances[secondWeakness] || 0), -1);
+      }
+    }
+    const immunityEnabled = grade >= 8 && ["bulwark", "renewal", "prism"].includes(archetype.id);
+    let immunityAttribute = null;
+    if (immunityEnabled) {
+      const immunityCandidates = attackAttributePool.filter((attribute) => item.resistances[attribute] !== "immune" && Number(item.resistances[attribute] || 0) >= 0);
+      if (immunityCandidates.length) {
+        const desiredImmunity = attackAttributePool[(index + grade) % attackAttributePool.length];
+        immunityAttribute = immunityCandidates.includes(desiredImmunity)
+          ? desiredImmunity
+          : immunityCandidates[(index + grade) % immunityCandidates.length];
+        item.resistances[immunityAttribute] = "immune";
+        const sacrificeCandidates = attackAttributePool.filter((attribute) => attribute !== immunityAttribute && item.resistances[attribute] !== "immune");
+        if (sacrificeCandidates.length) {
+          const sacrifice = sacrificeCandidates[(seed * 23 + grade * 11) % sacrificeCandidates.length];
+          item.resistances[sacrifice] = Math.min(Number(item.resistances[sacrifice] || 0), -2);
+        }
+        item.attack -= 2;
+        item.acceleration -= 3;
+      }
+    }
+    item.equipmentArchetype = archetype.id;
+    const weaknesses = Object.entries(item.resistances).filter(([, value]) => value !== "immune" && Number(value) < 0)
+      .map(([attribute, value]) => `${window.HD_DATA.attributeLabels[attribute]}${value}`);
+    item.description = `${item.description} ${archetype.name}：${archetype.text}。${immunityAttribute ? ` ${window.HD_DATA.attributeLabels[immunityAttribute]}免疫で他装備の弱点を完全に塞ぐ。` : ""}${weaknesses.length ? ` 弱点：${weaknesses.join("・")}。` : ""}`;
+  });
+  const generatedImmunityGear = window.HD_DATA.equipment.filter((item) => {
+    const grade = Number(/^series_(\d+)_/.exec(item.id)?.[1] || 0);
+    return grade >= 8 && ["bulwark", "renewal", "prism"].includes(item.equipmentArchetype);
+  });
+  generatedImmunityGear.forEach((item, index) => {
+    const coverageAttribute = attackAttributePool[index % attackAttributePool.length];
+    if (item.resistances[coverageAttribute] === "immune") return;
+    item.resistances[coverageAttribute] = "immune";
+    item.description = `${item.description} 免疫調律：${window.HD_DATA.attributeLabels[coverageAttribute]}免疫。`;
+  });
+
+  // 4部位から組む段階式セット。2部位から実用になり、4部位で戦法が完成する。
+  const equipmentSets = [];
+  window.HD_DATA.attributes.forEach((attribute) => {
+    equipmentSets.push({
+      id: `ward_set_${attribute}`,
+      name: `${window.HD_DATA.attributeLabels[attribute]}界四重陣`,
+      itemIds: ["mantle", "plate", "stride", "seal"].map((form) => `ward_${attribute}_${form}`),
+      bonuses: [
+        { pieces: 2, resistances: { [attribute]: 1 }, text: `${window.HD_DATA.attributeLabels[attribute]}耐性+1` },
+        { pieces: 3, defense: 4, text: "防御+4" },
+        { pieces: 4, resistances: { [attribute]: "immune" }, acceleration: 6, text: `${window.HD_DATA.attributeLabels[attribute]}免疫・加速度+6` },
+      ],
+    });
+  });
+  const lineageSetThemeIds = ["thunder", "lizard", "garm", "slimeborn", "spiritborn", "plantborn", "elfborn", "dragonborn", "demonborn", "angelborn"];
+  lineageSetThemeIds.forEach((themeId) => {
+    const theme = themeById[themeId];
+    equipmentSets.push({
+      id: `lineage_set_${themeId}`,
+      name: `${theme.name}四宝装`,
+      itemIds: ["coat", "greaves", "boots", "pendant"].map((form) => `crafted_${themeId}_${form}`),
+      bonuses: [
+        { pieces: 2, attack: 4, attackAttributes: [theme.attribute], text: `攻撃+4・${window.HD_DATA.attributeLabels[theme.attribute]}攻撃を追加` },
+        { pieces: 3, resistances: { [theme.resistance]: 2 }, hpRegen: 1, text: `${window.HD_DATA.attributeLabels[theme.resistance]}耐性+2・再生+1` },
+        { pieces: 4, attack: 8, acceleration: 10, hpRegen: 2, text: "攻撃+8・加速度+10・再生+2" },
+      ],
+    });
+  });
+  equipmentSets.forEach((set) => set.itemIds.forEach((itemId) => {
+    const item = window.HD_DATA.equipment.find((candidate) => candidate.id === itemId);
+    if (!item) return;
+    item.setId = set.id;
+    item.description = `${item.description} セット「${set.name}」の構成品。`;
+  }));
+  window.HD_DATA.equipmentSets = equipmentSets;
+
+  // 数値の上位互換ではなく、他部位との組み合わせで完成する手作業設計の装備効果。
+  const puzzleEquipment = {
+    iron_sword: [{ type: "resistance", attribute: "slash", threshold: 3, attack: 5, text: "斬耐性3以上なら、刃を捨て身で滑らせ攻撃+5。" }],
+    bone_maul: [{ type: "resistance", attribute: "blunt", threshold: 3, attack: 6, defense: -2, text: "打耐性3以上なら攻撃+6、防御-2。衝撃を防具ごと武器へ返す。" }],
+    fire_lizard_dagger: [{ type: "resistance", attribute: "fire", threshold: 3, attack: 6, text: "火耐性3以上なら刀身が白熱し攻撃+6。" }],
+    hunter_bow: [{ type: "acceleration", threshold: 20, crit: 0.08, text: "加速度20以上なら照準が静止し、会心率+8%。" }],
+    thunder_charm: [{ type: "resistance", attribute: "thunder", threshold: 3, acceleration: 8, text: "雷耐性3以上なら蓄電を脚へ流し、加速度+8。" }],
+    garm_fireguard: [{ type: "resistance", attribute: "fire", threshold: 5, hpRegen: 3, text: "火耐性5なら赤熱を生命へ変換し、再生+3。" }],
+    fur_clothes: [{ type: "resistance", attribute: "poison", threshold: 2, luck: 3, text: "毒耐性2以上なら毒気の匂いを読み、運+3。" }],
+    carapace_armor: [{ type: "resistancePair", attributes: ["slash", "blunt"], thresholds: [2, 2], defense: 4, text: "斬耐性2・打耐性2を揃えると甲殻が噛み合い、防御+4。" }],
+    fire_lizard_cloak: [{ type: "resistance", attribute: "fire", threshold: 3, hpRegen: 2, text: "火耐性3以上なら外套が体温を循環させ、再生+2。" }],
+    truth_lens: [{ type: "research", multiplier: 1.5, text: "透明看破中、戦闘で得る調査証拠が1.5倍。" }],
+    guild_glass_cannon: [{ type: "lowHp", rate: 0.35, attack: 15, text: "HP35%以下では亀裂が砲身となり、攻撃+15。" }],
+    guild_anchor_greaves: [{ type: "resistancePair", attributes: ["steel", "earth"], thresholds: [3, 2], defense: 10, text: "鋼耐性3・土耐性2を同時に満たすと防御+10。" }],
+    guild_void_talisman: [{ type: "vulnerability", count: 1, attack: 10, text: "負の耐性を一つ以上残すと、空白が牙を持ち攻撃+10。" }],
+    guild_rainbow_pendant: [{ type: "resistanceDiversity", count: 10, threshold: 1, acceleration: 10, text: "耐性1以上を十属性揃えると加速度+10。" }],
+    guild_tourist_camera: [{ type: "research", multiplier: 2, text: "調査証拠を2倍記録する。完全解析済みには効果なし。" }],
+    crafted_plantborn_pendant: [{ type: "flower", chance: 0.08, duration: 4, text: "花ペットの洗脳率+8%、使役時間+4ターン。" }],
+    crafted_spiritborn_talisman: [{ type: "rareLoot", multiplier: 1.5, text: "呪耐性3以上なら超レア・ウルトラレア判定が1.5倍。" , attribute: "curse", threshold: 3 }],
+  };
+  Object.entries(puzzleEquipment).forEach(([id, effects]) => {
+    const item = window.HD_DATA.equipment.find((candidate) => candidate.id === id);
+    if (!item) return;
+    item.puzzleEffects = effects;
+    item.description = `${item.description} 連携効果：${effects.map((effect) => effect.text).join(" ")}`;
   });
 
 })();
