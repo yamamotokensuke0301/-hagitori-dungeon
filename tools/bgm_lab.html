@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BGMラボ - 剥ぎ取りダンジョン</title>
+<style>
+  :root { color-scheme: dark; }
+  body {
+    margin: 0; padding: 16px; background: #14161c; color: #e8e4d8;
+    font-family: "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+  }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  p.note { font-size: 12px; color: #9a958a; margin: 0 0 14px; }
+  .controls { display: flex; gap: 14px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; font-size: 12px; color: #b8b2a4; }
+  .track {
+    display: flex; align-items: center; gap: 12px; padding: 10px 12px; margin-bottom: 8px;
+    background: #1e222c; border: 1px solid #3a4152; border-radius: 10px;
+  }
+  .track.playing { border-color: #d8b25a; background: #262b38; }
+  .track button {
+    background: #2d3446; color: #e8e4d8; border: 1px solid #4a5268; border-radius: 8px;
+    width: 56px; padding: 8px 0; font-size: 14px; cursor: pointer; flex-shrink: 0;
+  }
+  .track button:active { background: #3a4358; }
+  .meta { flex: 1; min-width: 0; }
+  .meta .name { font-size: 14px; }
+  .meta .file { font-family: ui-monospace, monospace; font-size: 11px; color: #8fd0ff; }
+  .meta .desc { font-size: 11px; color: #9a958a; margin-top: 2px; }
+  .time { font-family: ui-monospace, monospace; font-size: 11px; color: #b8b2a4; width: 88px; text-align: right; flex-shrink: 0; }
+</style>
+</head>
+<body>
+<h1>BGMラボ(開発用)</h1>
+<p class="note">assets/audio/ の全11曲を試聴する。ゲーム本体からはリンクされない。再生成は python3 tools/generate_bgm.py --only <名前></p>
+<div class="controls">
+  <label>音量 <input id="volume" type="range" min="0" max="100" value="70"></label>
+  <label><input id="loop" type="checkbox" checked> ループ再生(つなぎ目の確認)</label>
+</div>
+<div id="list"></div>
+<script>
+(function () {
+  "use strict";
+  const TRACKS = [
+    ["town", "town-bgm.wav", "街", "弦+ハープ+フルート主旋律。終盤にカデンツとチェレスタ"],
+    ["dungeon", "dungeon-bgm.wav", "浅層ダンジョン", "ダークアンビエント。ドローン+風+遠い鐘"],
+    ["deep", "deep-bgm.wav", "深層", "機械的な低音オスティナート+太鼓+ミュート金管"],
+    ["abyss", "abyss-bgm.wav", "最深層", "フォルマント聖歌隊+サブドローン+弔鐘+太鼓"],
+    ["battle", "battle-bgm.wav", "修練連武闘技場", "弦16分エンジン+金管スタブ+ティンパニ+勇壮な旋律"],
+    ["boss", "boss-bgm.wav", "ボス", "低音金管と聖歌隊の壁+倍速打楽器+弔鐘"],
+    ["tension-1", "tension-1-bgm.wav", "緊張度1(平静崩れ)", "ほぼ純アンビエント。鼓動と散発の鐘"],
+    ["tension-2", "tension-2-bgm.wav", "緊張度2(不穏)", "弦パッドとシェイカーが加わる"],
+    ["tension-3", "tension-3-bgm.wav", "緊張度3(緊迫)", "パルスオスティナートとドラムパターン"],
+    ["tension-4", "tension-4-bgm.wav", "緊張度4(死線)", "聖歌隊暗色層+密集ドラム"],
+    ["tension-5", "tension-5-bgm.wav", "緊張度5(破局)", "全レイヤー+16分ハット+弔鐘"],
+  ];
+  const list = document.getElementById("list");
+  const volume = document.getElementById("volume");
+  const loop = document.getElementById("loop");
+  let current = null;
+
+  function fmt(seconds) {
+    if (!Number.isFinite(seconds)) return "-:--";
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return m + ":" + String(s).padStart(2, "0");
+  }
+
+  TRACKS.forEach(([id, file, name, desc]) => {
+    const row = document.createElement("div");
+    row.className = "track";
+    const button = document.createElement("button");
+    button.textContent = "再生";
+    const meta = document.createElement("div");
+    meta.className = "meta";
+    meta.innerHTML = '<span class="name">' + name + '</span> <span class="file">' + id + "</span><div class=\"desc\">" + desc + "</div>";
+    const time = document.createElement("div");
+    time.className = "time";
+    time.textContent = "-:-- / -:--";
+    const audio = new Audio("../assets/audio/" + file);
+    audio.preload = "none";
+    audio.loop = loop.checked;
+    audio.volume = Number(volume.value) / 100;
+
+    audio.addEventListener("timeupdate", () => { time.textContent = fmt(audio.currentTime) + " / " + fmt(audio.duration); });
+    audio.addEventListener("ended", () => { button.textContent = "再生"; row.classList.remove("playing"); });
+
+    button.addEventListener("click", () => {
+      if (current && current.audio !== audio) {
+        current.audio.pause();
+        current.audio.currentTime = 0;
+        current.button.textContent = "再生";
+        current.row.classList.remove("playing");
+      }
+      if (audio.paused) {
+        audio.loop = loop.checked;
+        audio.volume = Number(volume.value) / 100;
+        audio.play();
+        button.textContent = "停止";
+        row.classList.add("playing");
+        current = { audio, button, row };
+      } else {
+        audio.pause();
+        audio.currentTime = 0;
+        button.textContent = "再生";
+        row.classList.remove("playing");
+        current = null;
+      }
+    });
+
+    volume.addEventListener("input", () => { audio.volume = Number(volume.value) / 100; });
+    loop.addEventListener("change", () => { audio.loop = loop.checked; });
+
+    row.appendChild(button);
+    row.appendChild(meta);
+    row.appendChild(time);
+    list.appendChild(row);
+  });
+})();
+</script>
+</body>
+</html>

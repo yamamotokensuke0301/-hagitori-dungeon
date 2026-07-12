@@ -105,7 +105,7 @@ rewardProfile: {
 
 ユニーク個体の公開表示名 `name` はIDに結び付く固定データとする。`baseName` はネタ名などの例外表示を適用する前の個体名、`epithet` は台詞・人物像生成に使う内部モチーフであり、画面上の名前へ機械的に連結しない。調査、討伐、賞金、心、固有台詞はすべてモンスターIDを主キーとし、改名で進捗を分断しない。進行中のダンジョン・闘技場セーブに複製された `name`、`baseName`、`epithet`、危険技名・予告文はロード時に現行のマスターデータへ同期する。過去の戦闘ログと死亡履歴は出来事の記録として書き換えない。
 
-一部のダンジョンユニークは `summon: { every: 6, count: 1, maxAlive: 2, maxTotal: 4, pool: "floor_attribute" }` を持つ。召喚個体には召喚主ID、経験値0.25倍、剥ぎ取り1回固定を保存し、同時数・累計数・階層の生成上限を全て守る。
+一部のダンジョンユニークは `summon: { every: 6, count: 1, maxAlive: 2, maxTotal: 4, pool: "floor_attribute" }` を持つ。敵インスタンスの `summonProgress` を通常の行動周期と独立して進め、特殊行動や危険技との周期衝突で召喚を飛ばさない。召喚個体には召喚主ID、経験値0.25倍、剥ぎ取り1回固定を保存し、同時数・累計数・階層の生成上限を全て守る。
 
 金品盗賊8種は `rareSpawn: true`、`specialAttack: "gold_steal"`、`goldTheft: { rate, maxRate, escapeDistance }` を持つ。通常の `monsterPool` から除外し、階層の `rareMonsterPool` から最大1体だけ抽選する。加速度は36〜59。敵の行動回数には通常・ユニーク・金品盗賊・闘技場を問わず上限を設けず、`1 + floor(max(0, 加速度) / 12)` で決める。盗難率は浅層の20%から最深層の80%まで上がり、全種とも現在の所持金の80%を絶対上限とする。敵インスタンスの `hasStolenGold` で一個体一回に制限し、盗まれた金は討伐しても返還しない。
 
@@ -254,7 +254,7 @@ dangerous: {
 
 ## セーブデータ
 
-localStorageキーは `hagitori-dungeon-save-v1`。
+本体のlocalStorageキーは `hagitori-dungeon-save-v1`。競合検知用の小さなリビジョン値は `hagitori-dungeon-save-revision-v1` に分離する。
 
 ```js
 {
@@ -278,15 +278,16 @@ localStorageキーは `hagitori-dungeon-save-v1`。
     randomArtifacts: {
       random_artifact_0001: { id: "random_artifact_0001", artifact: { random: true, quality: 3, depth: 74 } }
     },
-    bountyCorpses: []
+    bountyCorpses: [],
+    attritionRecoveryDebt: 0,
+    donatedPermanentEquipmentIds: []
   },
   meta: {
     researchSchemaVersion: 2,
     economySchemaVersion: 2,
     progressionSchemaVersion: 2,
+    saveRevision: 12,
     compendiumEquipmentUnlocked: false,
-    donatedPermanentEquipmentIds: [],
-    recoveryMedicineSale: false,
     research: {
       cave_rat: { level: 3, seen: true }
     },
@@ -305,3 +306,7 @@ localStorageキーは `hagitori-dungeon-save-v1`。
 ```
 
 死亡時は `meta.deaths`、`meta.deathLog`、死亡確認用の `pendingDeathReview` に加えて、`meta.research` を引き継ぐ。完全調査済みのモンスターは `meta.monsterHeartClaims[id] = true`、`meta.monsterHearts[id] = 1` に再構成し、生前に消費した心も各1個へ復活させる。装備と `equipmentEnhancements`、商店流通、称号、賞金情報などは新規開始状態へ戻す。死亡直前ログはリロード後もプレイヤーが閉じるまで復元する。
+
+`adventurer.donatedPermanentEquipmentIds` は永続報酬をGP納品した当代だけの再支給抑止。世代交代時に空へ戻り、次代には解禁済み報酬を再支給する。`attritionRecoveryDebt` は存在侵食で失ったうち受動再生できないHP量で、能動回復時に減少する。`meta.saveRevision` は保存成功ごとに増え、独立キーの同値だけを保存前に読み、別タブからの古い状態による上書きを拒否する。
+
+ロード時はプレーンオブジェクト、有限数、既知ID、マップ形状と必須座標・配列を検証する。進行中ダンジョンだけが不正なら `dungeon = null` として街へ戻し、それ以外のセーブは維持する。所持素材・アイテム・商店売却数は既知IDの非負整数辞書へ正規化する。

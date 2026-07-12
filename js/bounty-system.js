@@ -21,6 +21,11 @@
   }
 
   function nativeFloor(monster, maxFloor = 100) {
+    if (monster?.arenaOnly && Number.isFinite(Number(monster.arenaRank))) {
+      const rank = Math.max(1, Math.floor(Number(monster.arenaRank)));
+      const rosterSize = Math.max(rank, Number(window.HD_DATA?.monsters?.filter((candidate) => candidate.arenaOnly).length || rank));
+      return 1 + Math.floor((rank - 1) * Math.max(0, maxFloor - 1) / Math.max(1, rosterSize - 1));
+    }
     return Math.min(...(monster.floors?.length ? monster.floors : [maxFloor]));
   }
 

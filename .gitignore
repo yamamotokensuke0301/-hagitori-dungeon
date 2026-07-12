@@ -2,6 +2,9 @@
 __pycache__/
 *.py[cod]
 
+# Local AI assistant permissions and launch settings
+/.claude/
+
 # Local build output
 /_site/
 /dist/

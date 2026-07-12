@@ -1,6 +1,6 @@
 # Hagitori Dungeon
 
-Current version: **Prototype 3.5.0**
+Current version: **Prototype 3.6.0**
 
 『剥ぎ取りダンジョン』は、地下100階対応を前提にしたスマートフォン向けターン制ローグライクRPGのブラウザプロトタイプです。
 
@@ -165,8 +165,9 @@ assets/
 - データ形式は `docs/DATA_SCHEMA.md`
 - 実行対象とモジュール責務は `docs/CODE_STRUCTURE.md`
 - 未実装、簡略化、将来拡張は `docs/TODO.md`
-- BGMの生成元は `tools/generate_bgm.py`
-- 緊張度BGMだけを再生成する場合は `python3 tools/generate_bgm.py --tension-only`
+- BGMの生成元は `tools/generate_bgm.py`（ウェーブテーブル・FM・Karplus-Strong・Freeverb系残響の依存ゼロ合成エンジン）
+- 緊張度BGMだけを再生成する場合は `python3 tools/generate_bgm.py --tension-only`、1曲だけなら `--only town` など
+- 効果音の試聴は開発サーバー起動後に `tools/sfx_lab.html`、BGMの試聴は `tools/bgm_lab.html` を開く（どちらもゲーム本体からはリンクされない）
 - macOSでは `osascript -l JavaScript tools/smoke_test.js` で構文、ロスター件数、全30,160台詞の衝突、88効果音、剥ぎ取り回数、職業技、生成密度・特別室・罠安全域、魔法書、固定／ランダムアーティファクト、賞金・商店・闘技場報酬、死亡継承境界、旧セーブ移行を確認できる
 
 ## ライセンス

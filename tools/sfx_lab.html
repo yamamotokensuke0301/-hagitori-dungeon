@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>効果音ラボ - 剥ぎ取りダンジョン</title>
+<style>
+  :root { color-scheme: dark; }
+  body {
+    margin: 0; padding: 16px; background: #14161c; color: #e8e4d8;
+    font-family: "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+  }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  p.note { font-size: 12px; color: #9a958a; margin: 0 0 12px; }
+  .controls { display: flex; gap: 12px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }
+  .controls input[type="search"] {
+    background: #1e222c; color: #e8e4d8; border: 1px solid #3a4152; border-radius: 6px;
+    padding: 6px 10px; font-size: 14px; width: 220px;
+  }
+  .controls label { font-size: 12px; color: #b8b2a4; display: flex; align-items: center; gap: 6px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+  button.sfx {
+    background: #232837; color: #e8e4d8; border: 1px solid #3a4152; border-radius: 8px;
+    padding: 10px 8px; font-size: 13px; cursor: pointer; text-align: left; line-height: 1.3;
+  }
+  button.sfx:hover { background: #2d3446; border-color: #5a6478; }
+  button.sfx:active { background: #3a4358; }
+  button.sfx .en { display: block; font-family: ui-monospace, monospace; font-size: 12px; color: #8fd0ff; }
+  button.sfx .ja { display: block; font-size: 11px; color: #9a958a; margin-top: 2px; }
+  button.sfx.recent { border-color: #d8b25a; }
+</style>
+</head>
+<body>
+<h1>効果音ラボ(開発用)</h1>
+<p class="note">js/audio-effects.js の全効果音を試聴する。ゲーム本体からはリンクされない。気になった音の名前をそのまま伝えれば個別調整できる。</p>
+<div class="controls">
+  <input id="search" type="search" placeholder="絞り込み (例: ui, trap, death)">
+  <label>音量 <input id="volume" type="range" min="0" max="100" value="70"></label>
+  <label><input id="repeat" type="checkbox"> 0.8秒間隔で連打(戦闘の連続再生を確認)</label>
+</div>
+<div class="grid" id="grid"></div>
+<script src="../js/audio-effects.js"></script>
+<script>
+(function () {
+  "use strict";
+  const LABELS = {
+    startup: "起動", step: "足音", bump: "壁ぶつかり", select: "選択", descend: "階段降下",
+    return: "帰還", encounter: "遭遇", boss: "ボス出現", slash: "斬撃", blunt: "打撃",
+    skill: "職業技", fire: "火", water: "水", thunder: "雷", poison: "毒", ice: "凍",
+    curse: "呪", acid: "酸", dark: "闇", light: "光", earth: "土", wind: "風",
+    steel: "鋼", illusion: "幻", observe: "調査", guard: "防御", warning: "警告",
+    hit: "被弾", fireHit: "火被弾", loot: "戦利品", chest: "宝箱", coinSell: "売却",
+    purchase: "購入", researchUp: "調査度上昇", critical: "会心", trapDamage: "罠ダメージ",
+    trapDrain: "罠吸収", trapSlow: "罠鈍化", teleportShort: "短距離転移", teleportLong: "長距離転移",
+    timeStop: "時間停止", eat: "摂食", feast: "大摂食", bountyCarry: "遺体運搬",
+    anomaly: "異変", chaos: "大混乱", invisibleReveal: "透明発見", heal: "回復",
+    corpse: "遺体", harvest: "剥ぎ取り", craft: "作成", equip: "装備", rest: "宿屋",
+    victory: "勝利", levelUp: "レベルアップ", levelStatUp: "能力上昇", death: "死亡",
+    deathCrySharp: "断末魔(鋭)", deathCryFading: "断末魔(消)", deathCryLow: "断末魔(低)",
+    flee: "逃走", uiTab: "UIタブ", uiConfirm: "UI決定", uiCancel: "UI取消", uiOpen: "UI開く",
+    uiClose: "UI閉じる", uiPage: "UIページ", uiFilter: "UI絞込", uiToggle: "UI切替",
+    uiError: "UIエラー", menuOpen: "メニュー開", menuClose: "メニュー閉", drink: "飲酒",
+    intoxicate: "酩酊", heartEquip: "心装備", heartRestore: "心復活", trapDiscover: "罠発見",
+    trapDisarm: "罠解除", summon: "召喚", invulnerable: "無敵", regenerate: "再生",
+    knockback: "吹き飛ばし", selfDestruct: "自爆", debuff: "能力低下", devour: "捕食",
+    jobChange: "転職", tutorial: "指南", shopRefresh: "品揃え更新",
+  };
+
+  let context = null;
+  let sfx = null;
+  let master = null;
+  let repeatTimer = null;
+
+  function ensureAudio() {
+    if (sfx) return sfx;
+    context = new (window.AudioContext || window.webkitAudioContext)();
+    master = context.createGain();
+    master.gain.value = Number(document.getElementById("volume").value) / 100;
+    master.connect(context.destination);
+    sfx = window.HD_SFX.create(context, master);
+    return sfx;
+  }
+
+  function play(type) {
+    const engine = ensureAudio();
+    if (context.state === "suspended") context.resume();
+    engine.play(type);
+  }
+
+  const grid = document.getElementById("grid");
+  const types = window.HD_SFX.create(null, null).types;
+  types.forEach((type) => {
+    const button = document.createElement("button");
+    button.className = "sfx";
+    button.dataset.type = type;
+    button.innerHTML = '<span class="en">' + type + '</span><span class="ja">' + (LABELS[type] || "") + "</span>";
+    button.addEventListener("click", () => {
+      document.querySelectorAll("button.sfx.recent").forEach((b) => b.classList.remove("recent"));
+      button.classList.add("recent");
+      if (repeatTimer) { clearInterval(repeatTimer); repeatTimer = null; }
+      play(type);
+      if (document.getElementById("repeat").checked) {
+        repeatTimer = setInterval(() => play(type), 800);
+        setTimeout(() => { if (repeatTimer) { clearInterval(repeatTimer); repeatTimer = null; } }, 5000);
+      }
+    });
+    grid.appendChild(button);
+  });
+
+  document.getElementById("search").addEventListener("input", (event) => {
+    const query = event.target.value.trim().toLowerCase();
+    document.querySelectorAll("button.sfx").forEach((button) => {
+      const type = button.dataset.type.toLowerCase();
+      const ja = (LABELS[button.dataset.type] || "").toLowerCase();
+      button.style.display = !query || type.includes(query) || ja.includes(query) ? "" : "none";
+    });
+  });
+
+  document.getElementById("volume").addEventListener("input", (event) => {
+    if (master) master.gain.value = Number(event.target.value) / 100;
+  });
+})();
+</script>
+</body>
+</html>

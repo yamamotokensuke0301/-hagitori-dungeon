@@ -2,8 +2,9 @@
   "use strict";
 
   const SAVE_KEY = "hagitori-dungeon-save-v1";
+  const SAVE_REVISION_KEY = "hagitori-dungeon-save-revision-v1";
   const AUDIO_KEY = "hagitori-audio-enabled-v4";
-  const APP_VERSION = "Prototype 3.5.0";
+  const APP_VERSION = "Prototype 3.6.0";
   const DEVELOPER_MODE_ENABLED = /^(localhost|127\.0\.0\.1|\[?::1\]?)$/.test(String(window.location?.hostname || ""))
     && /(?:^|[?&])debug=1(?:&|$)/.test(String(window.location?.search || ""));
   const MAP_SIZE_RANGE = Object.freeze([36, 60]);
@@ -305,6 +306,9 @@
     deathReviewLog: document.querySelector("#deathReviewLog"),
     continueAfterDeath: document.querySelector("#continueAfterDeathButton"),
     liveLogAnnouncer: document.querySelector("#liveLogAnnouncer"),
+    saveWarning: document.querySelector("#saveWarning"),
+    saveWarningText: document.querySelector("#saveWarningText"),
+    saveWarningReload: document.querySelector("#saveWarningReloadButton"),
     magicMoveControls: document.querySelector("#magicMoveControls"),
     jobSkill: document.querySelector("#jobSkillButton"),
     teleport: document.querySelector("#teleportButton"),
@@ -315,6 +319,8 @@
 
   const loaded = loadGame();
   let state = loaded.state;
+  let lastKnownSaveRevision = Math.max(0, Math.floor(finiteNumber(state.meta.saveRevision, 0)));
+  let saveConflictDetected = false;
   refreshShopInventoryForDepth();
   let currentView = state.adventurer.inDungeon ? "dungeon" : state.arena ? "arena" : "town";
   let cells = [];
@@ -341,6 +347,8 @@
   let shopCompatibleOnly = false;
   let depthPickerReturnFocus = null;
   let logHistoryReturnFocus = null;
+  const modalStack = [];
+  const modalReturnFocus = new Map();
 
   // State creation, persistence, and save migration.
   function defaultSave() {
@@ -353,6 +361,7 @@
         researchSchemaVersion: RESEARCH_SCHEMA_VERSION,
         economySchemaVersion: ECONOMY_SCHEMA_VERSION,
         progressionSchemaVersion: PROGRESSION_SCHEMA_VERSION,
+        saveRevision: 0,
         deaths: 0,
         deathLog: [],
         retirementLog: [],
@@ -365,7 +374,6 @@
         pendingDeathReview: null,
         titles: [],
         compendiumEquipmentUnlocked: false,
-        donatedPermanentEquipmentIds: [],
         beginnerCourseStatus: "unoffered",
         startGuidanceShown: true,
         awaitingCreation: true,
@@ -423,6 +431,8 @@
       snackBuff: null,
       materials: {},
       items: {},
+      attritionRecoveryDebt: 0,
+      donatedPermanentEquipmentIds: [],
       learnedSpells: [],
       activeSpellId: null,
       guard: false,
@@ -445,7 +455,7 @@
     const accessory1 = agilePersonalities.has(personality.id) ? "thunder_charm"
       : personality.id === "glutton" ? "crafted_beast_ring"
         : "garm_fireguard";
-    const weapon = weaponByJob[job.id] ?? "rusty_knife";
+    const weapon = Object.prototype.hasOwnProperty.call(weaponByJob, job.id) ? weaponByJob[job.id] : "rusty_knife";
     const feet = job.id === "capoeirista" ? "starter_capoeira_wraps" : null;
     const equippedIds = [weapon, upper, feet, accessory1].filter(Boolean);
     return {
@@ -454,16 +464,67 @@
     };
   }
 
+  function showPersistenceWarning(message, reloadRecommended = false) {
+    if (els.liveLogAnnouncer) els.liveLogAnnouncer.textContent = message;
+    if (!els.saveWarning || !els.saveWarningText) return;
+    els.saveWarningText.textContent = message;
+    els.saveWarning.classList.remove("hidden");
+    els.saveWarning.setAttribute("aria-hidden", "false");
+    els.saveWarningReload?.classList.toggle("hidden", !reloadRecommended);
+  }
+
+  function hidePersistenceWarning() {
+    if (!els.saveWarning) return;
+    els.saveWarning.classList.add("hidden");
+    els.saveWarning.setAttribute("aria-hidden", "true");
+  }
+
+  function markSaveConflict(message) {
+    saveConflictDetected = true;
+    showPersistenceWarning(message, true);
+  }
+
+  function readStorage(key) {
+    try {
+      return localStorage.getItem(key);
+    } catch (error) {
+      console.warn?.("保存領域を読み込めませんでした。", error);
+      return null;
+    }
+  }
+
+  function writeStorage(key, value) {
+    try {
+      localStorage.setItem(key, value);
+      return true;
+    } catch (error) {
+      console.warn?.("保存領域へ書き込めませんでした。", error);
+      showPersistenceWarning("セーブに失敗しました。ブラウザの保存領域を確認してください。");
+      return false;
+    }
+  }
+
+  function removeStorage(key) {
+    try {
+      localStorage.removeItem(key);
+      return true;
+    } catch (error) {
+      console.warn?.("保存領域を初期化できませんでした。", error);
+      showPersistenceWarning("セーブの初期化に失敗しました。");
+      return false;
+    }
+  }
+
 
   function loadGame() {
     try {
-      const saved = JSON.parse(localStorage.getItem(SAVE_KEY));
+      const saved = JSON.parse(readStorage(SAVE_KEY));
       if (saved && saved.adventurer && saved.meta) {
         const state = migrateSave(saved);
         return { state, initialSetupPending: Boolean(state.meta.awaitingCreation) };
       }
     } catch (error) {
-      console.warn(error);
+      console.warn?.(error);
     }
     return { state: defaultSave(), initialSetupPending: true };
   }
@@ -480,17 +541,74 @@
 
   function isValidDungeonMap(map) {
     if (!Array.isArray(map) || map.length < MAP_SIZE_RANGE[0] || map.length > MAP_SIZE_RANGE[1]) return false;
-    return map.every((row) => Array.isArray(row) && row.length === map.length);
+    return map.every((row) => Array.isArray(row) && row.length === map.length
+      && row.every((tile) => tile === "floor" || tile === "wall"));
+  }
+
+  function isPlainRecord(value) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+    const prototype = Object.getPrototypeOf(value);
+    return prototype === Object.prototype || prototype === null;
+  }
+
+  function finiteNumber(value, fallback = 0) {
+    const number = Number(value);
+    return Number.isFinite(number) ? number : fallback;
+  }
+
+  function normalizeCountRecord(value, allowedIds = null) {
+    if (!isPlainRecord(value)) return {};
+    return Object.fromEntries(Object.entries(value).flatMap(([id, rawCount]) => {
+      const count = Math.max(0, Math.floor(finiteNumber(rawCount, 0)));
+      if (!count || (allowedIds && !allowedIds.has(id))) return [];
+      return [[id, count]];
+    }));
+  }
+
+  function isValidGridPosition(position, map, allowWall = false) {
+    if (!isPlainRecord(position)) return false;
+    const x = Number(position.x);
+    const y = Number(position.y);
+    return Number.isInteger(x) && Number.isInteger(y)
+      && y >= 0 && y < map.length && x >= 0 && x < map.length
+      && (map[y]?.[x] === "floor" || (allowWall && map[y]?.[x] === "wall"));
+  }
+
+  function isValidDungeonState(dungeon, options = {}) {
+    if (!isPlainRecord(dungeon) || !isValidDungeonMap(dungeon.map)
+      || !isValidGridPosition(dungeon.player, dungeon.map, options.allowPlayerWall === true)) return false;
+    if (![dungeon.enemies, dungeon.chests].every(Array.isArray)) return false;
+    const stairs = Array.isArray(dungeon.stairs) ? dungeon.stairs : isPlainRecord(dungeon.stairs) ? [dungeon.stairs] : null;
+    if (!stairs) return false;
+    return dungeon.enemies.every((entry) => isPlainRecord(entry)
+      && typeof entry.id === "string" && Boolean(monsters[entry.id])
+      && Number.isFinite(Number(entry.hp)) && Number.isFinite(Number(entry.maxHp)) && Number(entry.maxHp) > 0
+      && typeof entry.alive === "boolean"
+      && isValidGridPosition(entry, dungeon.map, true))
+      && [...dungeon.chests, ...stairs].every((entry) => isPlainRecord(entry) && isValidGridPosition(entry, dungeon.map, true));
+  }
+
+  function isValidArenaState(arena) {
+    if (!isPlainRecord(arena) || !isPlainRecord(arena.enemy) || !isPlainRecord(arena.player)) return false;
+    const size = Math.max(3, Math.floor(finiteNumber(arena.size, 9)));
+    const validPosition = (entry) => Number.isInteger(Number(entry?.x)) && Number.isInteger(Number(entry?.y))
+      && Number(entry.x) >= 0 && Number(entry.y) >= 0 && Number(entry.x) < size && Number(entry.y) < size;
+    return typeof arena.enemy.id === "string" && Boolean(monsters[arena.enemy.id])
+      && Number.isFinite(Number(arena.enemy.hp)) && Number.isFinite(Number(arena.enemy.maxHp)) && Number(arena.enemy.maxHp) > 0
+      && typeof arena.enemy.alive === "boolean"
+      && validPosition(arena.player) && validPosition(arena.enemy)
+      && Array.isArray(arena.obstacles) && arena.obstacles.every(validPosition);
   }
 
   function migrateSave(saved) {
-    saved.adventurer = saved.adventurer || {};
-    saved.meta = saved.meta || {};
+    saved = isPlainRecord(saved) ? saved : {};
+    saved.adventurer = isPlainRecord(saved.adventurer) ? saved.adventurer : {};
+    saved.meta = isPlainRecord(saved.meta) ? saved.meta : {};
     const legacyEconomy = Number(saved.meta.economySchemaVersion || 1) < ECONOMY_SCHEMA_VERSION;
     const legacyProgression = Number(saved.meta.progressionSchemaVersion || 1) < PROGRESSION_SCHEMA_VERSION;
-    saved.meta.research = saved.meta.research || {};
-    saved.meta.monsterHearts = saved.meta.monsterHearts && typeof saved.meta.monsterHearts === "object" ? saved.meta.monsterHearts : {};
-    saved.meta.monsterHeartClaims = saved.meta.monsterHeartClaims && typeof saved.meta.monsterHeartClaims === "object" ? saved.meta.monsterHeartClaims : {};
+    saved.meta.research = isPlainRecord(saved.meta.research) ? saved.meta.research : {};
+    saved.meta.monsterHearts = isPlainRecord(saved.meta.monsterHearts) ? saved.meta.monsterHearts : {};
+    saved.meta.monsterHeartClaims = isPlainRecord(saved.meta.monsterHeartClaims) ? saved.meta.monsterHeartClaims : {};
     const legacyResearch = Number(saved.meta.researchSchemaVersion || 1) < RESEARCH_SCHEMA_VERSION;
     Object.entries(saved.meta.research).forEach(([monsterId, value]) => {
       const record = value && typeof value === "object"
@@ -507,25 +625,26 @@
       };
     });
     saved.meta.researchSchemaVersion = RESEARCH_SCHEMA_VERSION;
+    saved.meta.saveRevision = Math.max(0, Math.floor(finiteNumber(saved.meta.saveRevision, 0)));
     const currentMonsterIds = new Set(DATA.monsters.map((monster) => monster.id));
     [saved.meta.research, saved.meta.monsterHearts, saved.meta.monsterHeartClaims].forEach((records) => {
       Object.keys(records).forEach((monsterId) => {
         if (!currentMonsterIds.has(monsterId)) delete records[monsterId];
       });
     });
-    saved.meta.deaths = Number(saved.meta.deaths || 0);
+    saved.meta.deaths = Math.max(0, Math.floor(finiteNumber(saved.meta.deaths, 0)));
     saved.meta.deathLog = Array.isArray(saved.meta.deathLog) ? saved.meta.deathLog : [];
     saved.meta.retirementLog = Array.isArray(saved.meta.retirementLog)
       ? saved.meta.retirementLog.filter((record) => record && typeof record === "object").slice(0, 24)
       : [];
     saved.meta.discoveredRecipes = Array.isArray(saved.meta.discoveredRecipes) ? saved.meta.discoveredRecipes : [];
-    saved.meta.bounties = saved.meta.bounties || {};
+    saved.meta.bounties = isPlainRecord(saved.meta.bounties) ? saved.meta.bounties : {};
     saved.meta.guildClaims = Array.isArray(saved.meta.guildClaims) ? saved.meta.guildClaims : [];
-    saved.meta.uniqueKills = saved.meta.uniqueKills || {};
+    saved.meta.uniqueKills = isPlainRecord(saved.meta.uniqueKills) ? saved.meta.uniqueKills : {};
     if (typeof saved.adventurer.gameCleared !== "boolean") {
       saved.adventurer.gameCleared = Boolean(saved.meta.uniqueKills.dungeon_lord_nox);
     }
-    saved.meta.randomArtifactSerial = Math.max(0, Math.floor(Number(saved.meta.randomArtifactSerial || 0)));
+    saved.meta.randomArtifactSerial = Math.max(0, Math.floor(finiteNumber(saved.meta.randomArtifactSerial, 0)));
     saved.meta.clearedBossFloors = Array.isArray(saved.meta.clearedBossFloors)
       ? [...new Set(saved.meta.clearedBossFloors.map(Number).filter((floor) => floor >= 10 && floor <= MAX_FLOOR && floor % 10 === 0))].sort((a, b) => a - b)
       : [];
@@ -547,16 +666,20 @@
       || saved.meta.titles.includes("万象の記録者")
       || saved.adventurer?.ownedEquipment?.includes("omniscient_archive"),
     );
-    saved.meta.donatedPermanentEquipmentIds = Array.isArray(saved.meta.donatedPermanentEquipmentIds)
-      ? [...new Set(saved.meta.donatedPermanentEquipmentIds.filter((id) => ["game_master_emblem", "omniscient_archive"].includes(id)))]
+    const legacyDonatedPermanentEquipmentIds = Array.isArray(saved.meta.donatedPermanentEquipmentIds)
+      ? saved.meta.donatedPermanentEquipmentIds
       : [];
+    saved.adventurer.donatedPermanentEquipmentIds = Array.isArray(saved.adventurer.donatedPermanentEquipmentIds)
+      ? [...new Set(saved.adventurer.donatedPermanentEquipmentIds.filter((id) => ["game_master_emblem", "omniscient_archive"].includes(id)))]
+      : [...new Set(legacyDonatedPermanentEquipmentIds.filter((id) => ["game_master_emblem", "omniscient_archive"].includes(id)))];
+    delete saved.meta.donatedPermanentEquipmentIds;
     Object.entries(saved.meta.bounties).forEach(([id, record]) => {
       saved.meta.bounties[id] = record === true
         ? { intel: true, claimed: 1 }
         : { ...record, intel: Boolean(record?.intel), claimed: Math.max(0, Math.floor(Number(record?.claimed || 0))) };
     });
-    saved.meta.shop = saved.meta.shop || { soldMaterials: {}, inventory: [] };
-    saved.meta.shop.soldMaterials = saved.meta.shop.soldMaterials || {};
+    saved.meta.shop = isPlainRecord(saved.meta.shop) ? saved.meta.shop : { soldMaterials: {}, inventory: [] };
+    saved.meta.shop.soldMaterials = normalizeCountRecord(saved.meta.shop.soldMaterials, new Set(DATA.materials.map((material) => material.id)));
     saved.meta.shop.inventory = Array.isArray(saved.meta.shop.inventory)
       ? [...new Set(saved.meta.shop.inventory.filter((id) => equipment[id] && !equipment[id].artifact))]
       : [];
@@ -579,18 +702,32 @@
           race: races[saved.adventurer.raceId],
           personality: personalities[saved.adventurer.personalityId],
         });
-    saved.adventurer.materials = saved.adventurer.materials || {};
-    saved.adventurer.gold = Math.max(0, Number(saved.adventurer.gold || 0));
-    saved.adventurer.guildPoints = Math.max(0, Number(saved.adventurer.guildPoints || 0));
-    saved.adventurer.junkTokens = Math.max(0, Math.floor(Number(saved.adventurer.junkTokens || 0)));
-    saved.adventurer.arenaBestRound = clamp(Number(saved.adventurer.arenaBestRound || 0), 0, ARENA_BATTLE_COUNT);
+    const fallbackMaxHp = CHARACTER.buildBaseStats(
+      races[saved.adventurer.raceId],
+      jobs[saved.adventurer.jobId],
+      personalities[saved.adventurer.personalityId],
+    ).maxHp;
+    saved.adventurer.maxHp = Math.max(1, finiteNumber(saved.adventurer.maxHp, fallbackMaxHp));
+    saved.adventurer.hp = clamp(finiteNumber(saved.adventurer.hp, saved.adventurer.maxHp), 0, saved.adventurer.maxHp);
+    saved.adventurer.attritionRecoveryDebt = clamp(
+      finiteNumber(saved.adventurer.attritionRecoveryDebt, 0),
+      0,
+      saved.adventurer.maxHp,
+    );
+    saved.adventurer.materials = normalizeCountRecord(saved.adventurer.materials, new Set(DATA.materials.map((material) => material.id)));
+    saved.adventurer.gold = Math.max(0, finiteNumber(saved.adventurer.gold, 0));
+    saved.adventurer.guildPoints = Math.max(0, finiteNumber(saved.adventurer.guildPoints, 0));
+    saved.adventurer.junkTokens = Math.max(0, Math.floor(finiteNumber(saved.adventurer.junkTokens, 0)));
+    saved.adventurer.arenaBestRound = clamp(finiteNumber(saved.adventurer.arenaBestRound, 0), 0, ARENA_BATTLE_COUNT);
     saved.adventurer.bountyCorpses = Array.isArray(saved.adventurer.bountyCorpses) ? saved.adventurer.bountyCorpses : [];
-    saved.adventurer.scavengerNutrition = Math.max(0, Number(saved.adventurer.scavengerNutrition || 0));
-    saved.adventurer.temporaryDebuffs = saved.adventurer.temporaryDebuffs || {};
-    saved.adventurer.slowTurns = Math.max(0, Number(saved.adventurer.slowTurns || 0));
-    saved.adventurer.immobilizedTurns = Math.max(0, Math.floor(Number(saved.adventurer.immobilizedTurns || 0)));
-    saved.adventurer.intoxicationDrinks = Math.max(0, Math.floor(Number(saved.adventurer.intoxicationDrinks || 0)));
-    saved.adventurer.intoxicationTurns = Math.max(0, Math.floor(Number(saved.adventurer.intoxicationTurns || 0)));
+    saved.adventurer.scavengerNutrition = Math.max(0, finiteNumber(saved.adventurer.scavengerNutrition, 0));
+    saved.adventurer.temporaryDebuffs = isPlainRecord(saved.adventurer.temporaryDebuffs)
+      ? Object.fromEntries(STAT_KEYS.map((key) => [key, finiteNumber(saved.adventurer.temporaryDebuffs[key], 0)]))
+      : {};
+    saved.adventurer.slowTurns = Math.max(0, finiteNumber(saved.adventurer.slowTurns, 0));
+    saved.adventurer.immobilizedTurns = Math.max(0, Math.floor(finiteNumber(saved.adventurer.immobilizedTurns, 0)));
+    saved.adventurer.intoxicationDrinks = Math.max(0, Math.floor(finiteNumber(saved.adventurer.intoxicationDrinks, 0)));
+    saved.adventurer.intoxicationTurns = Math.max(0, Math.floor(finiteNumber(saved.adventurer.intoxicationTurns, 0)));
     if (saved.adventurer.snackBuff && typeof saved.adventurer.snackBuff === "object") {
       const validSnackStats = new Set(["strength", "speed", "dexterity", "durability", "luck"]);
       if (!validSnackStats.has(saved.adventurer.snackBuff.stat)) saved.adventurer.snackBuff = null;
@@ -601,9 +738,10 @@
         snackName: String(saved.adventurer.snackBuff.snackName || "つまみ").slice(0, 40),
       };
     } else saved.adventurer.snackBuff = null;
-    saved.adventurer.items = saved.adventurer.items && typeof saved.adventurer.items === "object" ? saved.adventurer.items : {};
+    const validItemIds = new Set([RECOVERY_MEDICINE.id, ...DATA.treasureItems.map((item) => item.id)]);
+    saved.adventurer.items = normalizeCountRecord(saved.adventurer.items, validItemIds);
     const jobIds = DATA.jobs.map((job) => job.id);
-    const randomArtifactEntries = Object.entries(saved.adventurer.randomArtifacts || {})
+    const randomArtifactEntries = Object.entries(isPlainRecord(saved.adventurer.randomArtifacts) ? saved.adventurer.randomArtifacts : {})
       .filter(([id, item]) => id === item?.id && ARTIFACTS?.isValid(item, DATA.attributes, jobIds));
     saved.adventurer.randomArtifacts = Object.fromEntries(randomArtifactEntries);
     randomArtifactEntries.forEach(([, item]) => { equipment[item.id] = item; });
@@ -618,14 +756,18 @@
     saved.adventurer.activeSpellId = saved.adventurer.learnedSpells.includes(saved.adventurer.activeSpellId)
       ? saved.adventurer.activeSpellId
       : saved.adventurer.learnedSpells[0] || null;
-    saved.arena = saved.arena || null;
+    saved.arena = isPlainRecord(saved.arena) ? saved.arena : null;
     if (saved.arena) {
       const round = Math.floor(Number(saved.arena.round || 0));
       const expectedEnemy = ARENA_ROSTER[round - 1];
       if (!expectedEnemy || saved.arena.enemy?.id !== expectedEnemy.id) saved.arena = null;
       else {
-        saved.arena.actionProgress = Math.max(0, Math.floor(Number(saved.arena.actionProgress || 0)));
-        saved.arena.healCooldown = Math.max(0, Math.floor(Number(saved.arena.healCooldown || 0)));
+        ensureArenaField(saved.arena);
+        if (!isValidArenaState(saved.arena)) saved.arena = null;
+      }
+      if (saved.arena) {
+        saved.arena.actionProgress = Math.max(0, Math.floor(finiteNumber(saved.arena.actionProgress, 0)));
+        saved.arena.healCooldown = Math.max(0, Math.floor(finiteNumber(saved.arena.healCooldown, 0)));
         saved.arena.awaitingNext = Boolean(saved.arena.awaitingNext);
       }
     }
@@ -639,6 +781,15 @@
         enemy.name = canonicalMonster.name;
         enemy.baseName = canonicalMonster.baseName || canonicalMonster.name;
         enemy.epithet = canonicalMonster.epithet || null;
+        if (canonicalMonster.summon) enemy.summon = JSON.parse(JSON.stringify(canonicalMonster.summon));
+        else delete enemy.summon;
+        if (canonicalMonster.elixirAttrition) enemy.elixirAttrition = { ...canonicalMonster.elixirAttrition };
+        else delete enemy.elixirAttrition;
+        enemy.automaticSpecialAttack = canonicalMonster.automaticSpecialAttack;
+        if (canonicalMonster.automaticSpecialAttack === false) {
+          if (canonicalMonster.specialAttack) enemy.specialAttack = canonicalMonster.specialAttack;
+          else delete enemy.specialAttack;
+        }
         if (enemy.dangerous && canonicalMonster.dangerous) {
           enemy.dangerous.name = canonicalMonster.dangerous.name;
           enemy.dangerous.telegraph = canonicalMonster.dangerous.telegraph;
@@ -648,6 +799,13 @@
       delete enemy.hasSpoken;
       delete enemy.lastSpeechStage;
       enemy.asleep = Boolean(enemy.asleep && enemy.alive !== false);
+      enemy.turns = Math.max(0, Math.floor(finiteNumber(enemy.turns, 0)));
+      if (enemy.summon) {
+        const summonEvery = Math.max(2, Math.floor(finiteNumber(enemy.summon.every, 6)));
+        enemy.summonProgress = Number.isFinite(Number(enemy.summonProgress))
+          ? Math.min(summonEvery, Math.max(0, Math.floor(Number(enemy.summonProgress))))
+          : enemy.turns % summonEvery;
+      }
       enemy.specialRoomGraceTurns = Math.max(0, Math.floor(Number(enemy.specialRoomGraceTurns || 0)));
       sanitizeGuardianSpecialAttack(enemy);
       enemy.canPhaseWalls = monsterCanPhaseWalls(enemy);
@@ -661,14 +819,14 @@
       enemy.harvestsTotal = Math.max(enemy.harvestsRemaining, Math.floor(Number(enemy.harvestsTotal || enemy.harvestsRemaining)));
       enemy.harvested = enemy.harvestsRemaining <= 0;
     });
-    saved.adventurer.craftedDetails = saved.adventurer.craftedDetails || {};
-    saved.adventurer.level = clamp(Number(saved.adventurer.level || 1), 1, MAX_LEVEL);
-    saved.adventurer.debugBonuses = saved.adventurer.debugBonuses || {};
+    saved.adventurer.craftedDetails = isPlainRecord(saved.adventurer.craftedDetails) ? saved.adventurer.craftedDetails : {};
+    saved.adventurer.level = clamp(finiteNumber(saved.adventurer.level, 1), 1, MAX_LEVEL);
+    saved.adventurer.debugBonuses = isPlainRecord(saved.adventurer.debugBonuses) ? saved.adventurer.debugBonuses : {};
     [...STAT_KEYS, "acceleration"].forEach((key) => {
       saved.adventurer.debugBonuses[key] = clamp(Math.floor(Number(saved.adventurer.debugBonuses[key] || 0)), -999, 999);
     });
-    saved.adventurer.experience = Math.max(0, Number(saved.adventurer.experience || 0));
-    const existingJobProgress = saved.adventurer.jobProgress && typeof saved.adventurer.jobProgress === "object"
+    saved.adventurer.experience = Math.max(0, finiteNumber(saved.adventurer.experience, 0));
+    const existingJobProgress = isPlainRecord(saved.adventurer.jobProgress)
       ? saved.adventurer.jobProgress
       : null;
     saved.adventurer.jobProgress = {};
@@ -705,7 +863,9 @@
     }
     saved.meta.economySchemaVersion = ECONOMY_SCHEMA_VERSION;
     saved.adventurer.inDungeon = Boolean(saved.adventurer.inDungeon && saved.dungeon);
-    if (saved.dungeon && !isValidDungeonMap(saved.dungeon.map)) {
+    if (saved.dungeon && !isValidDungeonState(saved.dungeon, {
+      allowPlayerWall: saved.adventurer.raceId === "ghost",
+    })) {
       saved.dungeon = null;
       saved.adventurer.inDungeon = false;
       saved.adventurer.floor = 1;
@@ -788,27 +948,32 @@
       saved.meta.guildClaims.push(...saved.adventurer.bountyCorpses);
       saved.adventurer.bountyCorpses = [];
     }
-    const remapEquipmentId = (id) => id && id.replace(/_plate$/, "_greaves").replace(/_robe$/, "_boots");
+    const remapEquipmentId = (id) => typeof id === "string" ? id.replace(/_plate$/, "_greaves").replace(/_robe$/, "_boots") : null;
     if (Array.isArray(saved.adventurer.ownedEquipment)) {
-      saved.adventurer.ownedEquipment = [...new Set(saved.adventurer.ownedEquipment.map(remapEquipmentId))];
+      saved.adventurer.ownedEquipment = [...new Set(saved.adventurer.ownedEquipment.map(remapEquipmentId).filter((id) => equipment[id]))];
     }
-    const oldEquipment = saved.adventurer.equipment || {};
+    const fallbackEquipment = starterBuildLoadout(
+      races[saved.adventurer.raceId],
+      jobs[saved.adventurer.jobId],
+      personalities[saved.adventurer.personalityId],
+    ).equipment;
+    const oldEquipment = isPlainRecord(saved.adventurer.equipment) ? saved.adventurer.equipment : {};
     if (!("upper" in oldEquipment)) {
-      const migrated = { weapon: oldEquipment.weapon || "rusty_knife", upper: null, lower: null, feet: null, accessory1: null, accessory2: null };
+      const migrated = { weapon: oldEquipment.weapon || fallbackEquipment.weapon, upper: null, lower: null, feet: fallbackEquipment.feet, accessory1: null, accessory2: null };
       [oldEquipment.armor, oldEquipment.charm].map(remapEquipmentId).filter(Boolean).forEach((id) => {
         const item = equipment[id];
         if (!item) return;
         if (item.slot === "accessory") migrated.accessory1 = id;
         else migrated[item.slot] = id;
       });
-      if (!migrated.upper) migrated.upper = "cloth";
+      if (!migrated.upper) migrated.upper = fallbackEquipment.upper;
       saved.adventurer.equipment = migrated;
     }
     Object.keys(saved.adventurer.equipment).forEach((slot) => {
       saved.adventurer.equipment[slot] = remapEquipmentId(saved.adventurer.equipment[slot]);
     });
     ["weapon", "upper", "lower", "feet", "accessory1", "accessory2"].forEach((slot) => {
-      if (!(slot in saved.adventurer.equipment)) saved.adventurer.equipment[slot] = slot === "weapon" ? "rusty_knife" : slot === "upper" ? "cloth" : null;
+      if (!(slot in saved.adventurer.equipment)) saved.adventurer.equipment[slot] = fallbackEquipment[slot] || null;
     });
     Object.entries(saved.adventurer.equipment).forEach(([slot, id]) => {
       const item = equipment[id];
@@ -819,7 +984,7 @@
     if (!Array.isArray(saved.adventurer.ownedEquipment)) {
       saved.adventurer.ownedEquipment = Object.values(saved.adventurer.equipment || {}).filter(Boolean);
     }
-    saved.adventurer.equipmentEnhancements = saved.adventurer.equipmentEnhancements && typeof saved.adventurer.equipmentEnhancements === "object"
+    saved.adventurer.equipmentEnhancements = isPlainRecord(saved.adventurer.equipmentEnhancements)
       ? saved.adventurer.equipmentEnhancements
       : {};
     saved.adventurer.discoveredArtifacts = Array.isArray(saved.adventurer.discoveredArtifacts)
@@ -845,8 +1010,46 @@
   }
 
   function saveGame() {
+    if (saveConflictDetected) return false;
+    const storedRevisionText = readStorage(SAVE_REVISION_KEY);
+    let storedRevision = storedRevisionText !== null && Number.isFinite(Number(storedRevisionText))
+      ? Math.max(0, Math.floor(Number(storedRevisionText)))
+      : null;
+    if (storedRevision === null) {
+      const storedSave = readStorage(SAVE_KEY);
+      try {
+        storedRevision = storedSave
+          ? Math.max(0, Math.floor(finiteNumber(JSON.parse(storedSave)?.meta?.saveRevision, 0)))
+          : 0;
+      } catch (error) {
+        // A malformed disk copy is handled by loadGame on the next reload. Keep
+        // the current in-memory run playable and attempt a normal save.
+        storedRevision = 0;
+      }
+    }
+    if (storedRevision > lastKnownSaveRevision) {
+      markSaveConflict("別のタブで新しい進行が保存されたため、このタブからの上書きを停止しました。最新データを再読み込みしてください。");
+      return false;
+    }
     saveActiveJobProgress();
-    localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+    const previousRevision = Math.max(0, Math.floor(finiteNumber(state.meta.saveRevision, lastKnownSaveRevision)));
+    const nextRevision = Math.max(previousRevision, lastKnownSaveRevision) + 1;
+    state.meta.saveRevision = nextRevision;
+    let serialized;
+    try {
+      serialized = JSON.stringify(state);
+    } catch (error) {
+      state.meta.saveRevision = previousRevision;
+      showPersistenceWarning("セーブデータを作成できませんでした。ゲームを再読み込みしてください。", true);
+      return false;
+    }
+    if (!writeStorage(SAVE_KEY, serialized)) {
+      state.meta.saveRevision = previousRevision;
+      return false;
+    }
+    lastKnownSaveRevision = nextRevision;
+    if (writeStorage(SAVE_REVISION_KEY, String(nextRevision))) hidePersistenceWarning();
+    return true;
   }
 
   function log(text) {
@@ -1027,22 +1230,87 @@
     updateAudioScene();
   }
 
+  function activeModalPanel() {
+    for (let index = modalStack.length - 1; index >= 0; index -= 1) {
+      const panel = modalStack[index];
+      if (panel && !panel.classList.contains("hidden")) return panel;
+    }
+    return null;
+  }
+
+  function syncOverlayAccessibility() {
+    const titleOpen = !els.titleScreen.classList.contains("hidden");
+    els.titleScreen.setAttribute("aria-hidden", titleOpen ? "false" : "true");
+    if (titleOpen) {
+      els.app.setAttribute("aria-hidden", "true");
+      els.app.setAttribute("inert", "");
+      return;
+    }
+    els.app.setAttribute("aria-hidden", "false");
+    els.app.removeAttribute("inert");
+    const activePanel = activeModalPanel();
+    Array.from(els.app.children || []).forEach((child) => {
+      if (child === activePanel) {
+        child.removeAttribute("inert");
+        delete child.dataset.modalBackgroundInert;
+      } else if (activePanel) {
+        child.setAttribute("inert", "");
+        child.dataset.modalBackgroundInert = "true";
+      } else if (child.dataset?.modalBackgroundInert === "true") {
+        child.removeAttribute("inert");
+        delete child.dataset.modalBackgroundInert;
+      }
+    });
+  }
+
+  function showDialog(panel, initialFocus = null, returnFocus = document.activeElement) {
+    if (!panel) return;
+    const wasHidden = panel.classList.contains("hidden");
+    if (wasHidden) {
+      modalReturnFocus.set(panel, returnFocus);
+      modalStack.push(panel);
+    }
+    panel.classList.remove("hidden");
+    panel.setAttribute("aria-hidden", "false");
+    syncOverlayAccessibility();
+    if (wasHidden) (initialFocus || panel)?.focus?.();
+  }
+
+  function hideDialog(panel, restoreFocus = true) {
+    if (!panel) return;
+    const wasOpen = !panel.classList.contains("hidden");
+    panel.classList.add("hidden");
+    panel.setAttribute("aria-hidden", "true");
+    for (let index = modalStack.length - 1; index >= 0; index -= 1) {
+      if (modalStack[index] === panel) modalStack.splice(index, 1);
+    }
+    const returnFocus = modalReturnFocus.get(panel);
+    modalReturnFocus.delete(panel);
+    syncOverlayAccessibility();
+    if (restoreFocus && wasOpen) returnFocus?.focus?.();
+  }
+
   function showTitleScreen() {
     closeSetupPicker();
     closeMonsterInfo();
     closeDepthPicker();
     closeLogHistory(false);
-    els.deathReviewPanel?.classList.add("hidden");
-    els.setupPanel.classList.add("hidden");
-    els.confirmPanel.classList.add("hidden");
+    hideDialog(els.deathReviewPanel, false);
+    hideDialog(els.setupPanel, false);
+    hideDialog(els.confirmPanel, false);
     els.version.textContent = APP_VERSION;
     els.titleStart.textContent = initialSetupPending ? "新しい冒険者を作る" : "つづきから";
     els.titleScreen.classList.remove("hidden");
+    els.titleScreen.setAttribute("aria-hidden", "false");
+    syncOverlayAccessibility();
+    els.titleStart.focus();
   }
 
   function startFromTitle() {
     startAudioFromGesture();
     els.titleScreen.classList.add("hidden");
+    els.titleScreen.setAttribute("aria-hidden", "true");
+    syncOverlayAccessibility();
     if (initialSetupPending) {
       if (!pendingSetup) {
         pendingSetup = {
@@ -1293,7 +1561,7 @@
 
   // Town and facility views.
   function renderTown() {
-    const retirementHistory = (state.meta.retirementLog || []).slice(0, 6).map((record) => `<li><strong>${escapeHtml(record.name)}</strong> Lv${record.level} ${escapeHtml(jobs[record.jobId]?.name || record.jobId)} — ${escapeHtml(record.title || "迷宮踏破者")}</li>`).join("");
+    const retirementHistory = (state.meta.retirementLog || []).slice(0, 6).map((record) => `<li><strong>${escapeHtml(record.name)}</strong> ${escapeHtml(races[record.raceId]?.name || record.raceId || "種族不明")} / Lv${record.level} ${escapeHtml(jobs[record.jobId]?.name || record.jobId)} / 最深B${Math.max(1, Number(record.deepestFloor || 1))}F — ${escapeHtml(record.title || "迷宮踏破者")}</li>`).join("");
     els.townView.innerHTML = `
       <div class="town-grid">
         <article class="town-card">
@@ -1322,8 +1590,12 @@
     });
     document.querySelector("#resetSaveButton").addEventListener("click", () => {
       askConfirm("セーブ初期化", "調査記録と死亡記録を含む全データを削除します。", () => {
-        localStorage.removeItem(SAVE_KEY);
+        removeStorage(SAVE_KEY);
+        removeStorage(SAVE_REVISION_KEY);
         state = defaultSave();
+        lastKnownSaveRevision = 0;
+        saveConflictDetected = false;
+        hidePersistenceWarning();
         initialSetupPending = true;
         pendingSetup = { raceId: state.adventurer.raceId || "human", jobId: state.adventurer.jobId || "swordsman", personalityId: "gentle", name: "たかし", preserveMeta: false };
         log("セーブデータを初期化した。");
@@ -1395,8 +1667,7 @@
       <section class="developer-section"><h3>アイテム付与</h3><label class="developer-select">装備<select id="debugEquipment">${equipmentOptions}</select></label><button type="button" data-debug-action="give-equipment">1個付与</button><label class="developer-select">宝箱アイテム<select id="debugTreasure">${itemOptions}</select></label><button type="button" data-debug-action="give-treasure">1個付与</button></section>
       <section class="developer-section"><h3>解禁・検証</h3><div class="inline-actions"><button type="button" data-debug-action="unlock-depths">全階層を解禁</button><button type="button" data-debug-action="complete-research">調査記録を全開示</button></div></section>`;
     body.querySelectorAll("[data-debug-action]").forEach((button) => button.addEventListener("click", () => runDeveloperAction(button.dataset.debugAction)));
-    panel.classList.remove("hidden");
-    body.querySelector("input, select, button")?.focus();
+    showDialog(panel, body.querySelector("input, select, button"), document.querySelector("#openDeveloperPanelButton"));
   }
 
   function debugInputNumber(id, min, max) {
@@ -1416,10 +1687,11 @@
       adv.temporaryDebuffs = {};
       adv.slowTurns = 0;
       adv.hp = getPlayerStats().maxHp;
+      adv.attritionRecoveryDebt = 0;
     } else if (action === "start-floor") {
       const floor = debugInputNumber("debugFloor", 1, MAX_FLOOR);
       adv.deepestFloor = Math.max(adv.deepestFloor || 1, floor);
-      document.querySelector("#developerPanel").classList.add("hidden");
+      hideDialog(document.querySelector("#developerPanel"), false);
       startDungeonAt(floor, true);
       return;
     } else if (action === "apply-bonuses") {
@@ -2134,8 +2406,8 @@
     state.adventurer.ownedEquipment = state.adventurer.ownedEquipment.filter((id) => id !== itemId);
     delete state.adventurer.craftedDetails[itemId];
     state.adventurer.guildPoints += actualPoints;
-    if ((item.masterOnly || item.completionOnly) && !state.meta.donatedPermanentEquipmentIds.includes(item.id)) {
-      state.meta.donatedPermanentEquipmentIds.push(item.id);
+    if ((item.masterOnly || item.completionOnly) && !state.adventurer.donatedPermanentEquipmentIds.includes(item.id)) {
+      state.adventurer.donatedPermanentEquipmentIds.push(item.id);
     }
     log(`${equipmentDisplayName(item)}をギルドへ引き渡し、${actualPoints}GPを得た。`);
     if (item.artifact?.random) {
@@ -2180,6 +2452,17 @@
       document.querySelector("#arenaStartButton").addEventListener("click", startArenaRun);
       return;
     }
+    const activeArenaControl = document.activeElement;
+    const activeArenaControlId = String(activeArenaControl?.id || "");
+    const arenaFocusSelector = activeArenaControl?.dataset?.arenaMove
+      ? `[data-arena-move="${activeArenaControl.dataset.arenaMove}"]`
+      : Object.prototype.hasOwnProperty.call(activeArenaControl?.dataset || {}, "arenaGuard")
+        ? "[data-arena-guard]"
+        : Object.prototype.hasOwnProperty.call(activeArenaControl?.dataset || {}, "arenaEnemy")
+          ? "[data-arena-enemy]"
+          : ["arenaSkillButton", "arenaSpellButton", "arenaNextButton", "arenaRetireButton"].includes(activeArenaControlId)
+            ? `#${activeArenaControlId}`
+            : null;
     ensureArenaField(arena);
     const enemy = arena.enemy;
     const rec = getResearch(enemy.id);
@@ -2199,7 +2482,7 @@
     const arenaSpell = activeLearnedSpell();
     const arenaSpellUsable = Boolean(arenaSpell?.jobs?.includes(state.adventurer.jobId));
     const arenaSpellCooldown = arenaSpell ? spellCooldownRemaining(arenaSpell.id) : 0;
-    const cellsHtml = Array.from({ length: arena.size * arena.size }, (_, index) => {
+    const arenaCellContents = Array.from({ length: arena.size * arena.size }, (_, index) => {
       const x = index % arena.size;
       const y = Math.floor(index / arena.size);
       const obstacle = arena.obstacles.some((item) => item.x === x && item.y === y);
@@ -2213,7 +2496,11 @@
         return `<button type="button" class="arena-cell arena-foe monster-tier-${enemy.colorTier || "white"} unique-${enemy.uniqueStyle || "warrior"}" style="${markerStyle}" data-arena-enemy aria-label="${enemy.name}を狙う">${monsterMarker(enemy)}</button>`;
       }
       return `<span class="arena-cell arena-floor"></span>`;
-    }).join("");
+    });
+    const cellsHtml = Array.from({ length: arena.size }, (_, row) => (
+      `<span class="arena-grid-row" role="row">${arenaCellContents.slice(row * arena.size, (row + 1) * arena.size)
+        .map((content) => `<span class="arena-gridcell" role="gridcell">${content}</span>`).join("")}</span>`
+    )).join("");
     const arenaStats = [
       rec.level >= 1 ? `${attrHtml(enemy.attackAttribute)}属性 / 加速度${enemy.acceleration || 0}` : null,
       rec.level >= 2 ? `攻撃${enemy.attack} / 防御${enemy.defense}` : null,
@@ -2267,6 +2554,7 @@
     document.querySelector("[data-arena-guard]")?.addEventListener("click", arenaGuard);
     document.querySelector("#arenaNextButton")?.addEventListener("click", nextArenaRound);
     document.querySelector("#arenaRetireButton")?.addEventListener("click", retireArena);
+    if (arenaFocusSelector) document.querySelector(arenaFocusSelector)?.focus?.();
   }
 
   function startArenaRun() {
@@ -2437,18 +2725,11 @@
 
   function arenaEnemyAct(arena, enemy) {
     const distance = arenaDistance(arena.player, enemy);
-    if (Number(enemy.spellStunnedTurns || 0) > 0) {
-      enemy.spellStunnedTurns -= 1;
-      log(`${enemy.name}は雷術の痺れで行動できない。`);
-      return;
-    }
+    const action = beginEnemyAction(enemy, { canUseCombatTechniques: distance <= 1 });
+    if (action.consumed) return action.result;
     if (distance <= 1) {
-      return enemyTurn(enemy);
-    }
-    if (Number(enemy.spellCursedTurns || 0) > 0) enemy.spellCursedTurns -= 1;
-    if (Number(enemy.spellArmorBreakTurns || 0) > 0) {
-      enemy.spellArmorBreakTurns -= 1;
-      if (enemy.spellArmorBreakTurns <= 0) enemy.spellArmorBreak = 0;
+      performEnemyBasicAttack(enemy);
+      return;
     }
     if (Number(enemy.spellBoundTurns || 0) > 0) {
       enemy.spellBoundTurns -= 1;
@@ -2644,16 +2925,15 @@
     if (!state.log.length) return;
     logHistoryReturnFocus = document.activeElement || els.openLogHistory;
     renderLogHistory();
-    els.logHistoryPanel.classList.remove("hidden");
+    showDialog(els.logHistoryPanel, els.logHistoryList, logHistoryReturnFocus);
     els.logHistoryList.scrollTop = 0;
-    els.logHistoryList.focus();
     playSfx("menuOpen");
   }
 
   function closeLogHistory(restoreFocus = true) {
     if (!els.logHistoryPanel) return;
     const wasOpen = !els.logHistoryPanel.classList.contains("hidden");
-    els.logHistoryPanel.classList.add("hidden");
+    hideDialog(els.logHistoryPanel, false);
     if (wasOpen) playSfx("menuClose");
     const returnFocus = logHistoryReturnFocus;
     logHistoryReturnFocus = null;
@@ -2663,7 +2943,7 @@
   function renderSetupPanel() {
     if (!els.setupPanel) return;
     if (!pendingSetup) {
-      els.setupPanel.classList.add("hidden");
+      hideDialog(els.setupPanel, false);
       return;
     }
     const race = races[pendingSetup.raceId] || races.human;
@@ -2677,14 +2957,14 @@
     els.setupSummary.innerHTML = `
       <p>${personality.name}な${race.name}${escapeHtml(pendingSetup.name || "たかし")} / ${job.name}</p>
       <p>力${formatStatValue(preview.strength)} 素早さ${formatStatValue(preview.speed)} 器用さ${formatStatValue(preview.dexterity)} 耐久力${formatStatValue(preview.durability)} 運${formatStatValue(preview.luck)}</p>
-      <p>加速度 ${formatStatValue(race.acceleration || 0)} / 世界1ターンの行動回数 ${1 + Math.floor((race.acceleration || 0) / 10)}</p>
+      <p>加速度 ${formatStatValue(race.acceleration || 0)} / 世界1ターンの行動回数 ${1 + Math.floor(Math.max(0, Number(race.acceleration || 0)) / 10)}</p>
       <p>種族耐性 ${formatResistances(race.resistances) || "なし"}</p>
       <p>成長難度 必要経験値×${Number(race.experienceMultiplier || 1).toFixed(2)}（強い種族ほどレベルアップが遅い）</p>
       <p>HP ${preview.maxHp} / 攻撃試行 ${job.combat.attackTrials} 回 / 命中 ${Math.round(job.combat.accuracy * 100)}%</p>
       <p>${race.description}</p>
       <p>性格成長: ${personality.description}</p>
     `;
-    els.setupPanel.classList.remove("hidden");
+    showDialog(els.setupPanel, els.adventurerNameInput);
     els.setupOk.textContent = initialSetupPending ? "この設定で開始" : "この設定に変更";
   }
 
@@ -2705,7 +2985,7 @@
         <strong>${item.name}</strong><small>${detail}</small>
       </button>`;
     }).join("");
-    els.setupPickerPanel.classList.remove("hidden");
+    showDialog(els.setupPickerPanel, els.setupPickerList.querySelector?.("button") || els.setupPickerClose);
     playSfx("uiOpen");
     document.querySelectorAll("[data-picker-id]").forEach((button) => {
       button.addEventListener("click", () => {
@@ -2718,7 +2998,7 @@
 
   function closeSetupPicker() {
     const wasOpen = !els.setupPickerPanel.classList.contains("hidden");
-    els.setupPickerPanel.classList.add("hidden");
+    hideDialog(els.setupPickerPanel);
     if (wasOpen) playSfx("uiClose");
   }
 
@@ -2735,7 +3015,7 @@
   }
 
   function closeSetup() {
-    if (els.setupPanel) els.setupPanel.classList.add("hidden");
+    if (els.setupPanel) hideDialog(els.setupPanel);
     if (initialSetupPending) {
       showTitleScreen();
       return;
@@ -2903,6 +3183,7 @@
           if (capoeiraActive(state.dungeon)) cell.classList.add("capoeira-inverted");
           if (state.dungeon.map[y]?.[x] === "wall") cell.classList.add("tile-phasing-wall");
           cell.textContent = "@";
+          cell.setAttribute("aria-label", `冒険者の現在地（B${state.adventurer.floor}F・座標${x},${y}）`);
         } else if (enemy) {
           const rec = getResearch(enemy.id);
           cell.classList.add(enemy.flowerPet ? "tile-flower-pet" : enemy.unique ? "tile-unique" : "tile-enemy");
@@ -2944,6 +3225,7 @@
         } else if (chestByPos.has(key)) {
           cell.classList.add("tile-chest");
           cell.textContent = "箱";
+          cell.setAttribute("aria-label", "未開封の宝箱");
         } else {
           cell.classList.add("tile-floor");
           if (excavatedByPos.has(key)) cell.classList.add("tile-excavated");
@@ -3003,6 +3285,7 @@
     const before = state.adventurer.hp;
     addItem(RECOVERY_MEDICINE.id, -1);
     state.adventurer.hp = Math.min(maxHp, state.adventurer.hp + Math.max(1, Math.ceil(maxHp * RECOVERY_MEDICINE.healRatio)));
+    state.adventurer.attritionRecoveryDebt = 0;
     log(`${RECOVERY_MEDICINE.name}を飲み、HPを${state.adventurer.hp - before}回復した。空瓶は妙にこちらを見ている。`);
     playSfx("heal");
     advanceWorldIfDue();
@@ -3089,12 +3372,18 @@
   function buildMapCells() {
     els.map.innerHTML = "";
     cells = [];
-    for (let i = 0; i < VIEW_SIZE * VIEW_SIZE; i += 1) {
-      const cell = document.createElement("div");
-      cell.className = "cell tile-wall";
-      cell.setAttribute("role", "gridcell");
-      els.map.appendChild(cell);
-      cells.push(cell);
+    for (let rowIndex = 0; rowIndex < VIEW_SIZE; rowIndex += 1) {
+      const row = document.createElement("div");
+      row.className = "map-grid-row";
+      row.setAttribute("role", "row");
+      for (let columnIndex = 0; columnIndex < VIEW_SIZE; columnIndex += 1) {
+        const cell = document.createElement("div");
+        cell.className = "cell tile-wall";
+        cell.setAttribute("role", "gridcell");
+        row.appendChild(cell);
+        cells.push(cell);
+      }
+      els.map.appendChild(row);
     }
   }
 
@@ -3130,6 +3419,7 @@
     state.adventurer.gold -= INN_COST;
     const maxHp = getPlayerStats().maxHp;
     state.adventurer.hp = maxHp;
+    state.adventurer.attritionRecoveryDebt = 0;
     state.adventurer.temporaryDebuffs = {};
     state.adventurer.slowTurns = 0;
     state.adventurer.intoxicationDrinks = 0;
@@ -3267,19 +3557,18 @@
       const floorData = floorByNumber[floor];
       return `<button type="button" data-start-floor="${floor}"><strong>B${floor}F</strong><small>${floor === 1 ? "入口から探索" : `${floorData?.name || "守護者階"}へ直接出発`}</small></button>`;
     }).join("");
-    els.depthPickerPanel.classList.remove("hidden");
     const destinationButtons = document.querySelectorAll("[data-start-floor]");
+    showDialog(els.depthPickerPanel, destinationButtons[0], depthPickerReturnFocus);
     destinationButtons.forEach((button) => button.addEventListener("click", () => {
       const floor = Number(button.dataset.startFloor);
       closeDepthPicker();
       startDungeonAt(floor);
     }));
-    destinationButtons[0]?.focus();
   }
 
   function closeDepthPicker() {
     const wasOpen = Boolean(els.depthPickerPanel && !els.depthPickerPanel.classList.contains("hidden"));
-    els.depthPickerPanel?.classList.add("hidden");
+    hideDialog(els.depthPickerPanel, false);
     const returnFocus = depthPickerReturnFocus;
     depthPickerReturnFocus = null;
     if (wasOpen) returnFocus?.focus?.();
@@ -3287,21 +3576,34 @@
 
   function trapModalFocus(event) {
     if (event.key !== "Tab") return false;
-    const dialog = [els.deathReviewPanel, els.depthPickerPanel, els.logHistoryPanel, document.querySelector("#developerPanel")]
-      .find((panel) => panel && !panel.classList.contains("hidden"));
+    const dialog = activeModalPanel();
     if (!dialog) return false;
-    const focusable = Array.from(dialog.querySelectorAll(
+    const focusable = Array.from(dialog.querySelectorAll?.(
       'button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])',
-    ));
+    ) || []);
     if (!focusable.length) return false;
     const first = focusable[0];
     const last = focusable[focusable.length - 1];
     const active = document.activeElement;
-    const focusEscapesBackward = event.shiftKey && (!dialog.contains(active) || active === first);
-    const focusEscapesForward = !event.shiftKey && (!dialog.contains(active) || active === last);
+    const containsActive = typeof dialog.contains === "function" ? dialog.contains(active) : focusable.includes(active);
+    const focusEscapesBackward = event.shiftKey && (!containsActive || active === first);
+    const focusEscapesForward = !event.shiftKey && (!containsActive || active === last);
     if (!focusEscapesBackward && !focusEscapesForward) return false;
     event.preventDefault();
     (focusEscapesBackward ? last : first).focus();
+    return true;
+  }
+
+  function closeTopModalFromEscape() {
+    const dialog = activeModalPanel();
+    if (!dialog || dialog === els.deathReviewPanel) return false;
+    if (dialog === els.setupPickerPanel) closeSetupPicker();
+    else if (dialog === els.confirmPanel) cancelConfirm();
+    else if (dialog === els.setupPanel) closeSetup();
+    else if (dialog === els.monsterInfoPanel) closeMonsterInfo();
+    else if (dialog === els.depthPickerPanel) closeDepthPicker();
+    else if (dialog === els.logHistoryPanel) closeLogHistory();
+    else hideDialog(dialog);
     return true;
   }
 
@@ -3436,10 +3738,12 @@
     guardian.floorGuardian = true;
     sanitizeGuardianSpecialAttack(guardian);
     guardian.asleep = false;
-    guardian.maxHp = Math.round(guardian.maxHp * (1.3 + floorNumber / 300));
+    if (guardian.id !== "dungeon_lord_nox") {
+      guardian.maxHp = Math.round(guardian.maxHp * (1.3 + floorNumber / 300));
+      guardian.attack = Math.round(guardian.attack * (1.08 + floorNumber / 500));
+      guardian.acceleration = Number(guardian.acceleration || 0) + 5;
+    }
     guardian.hp = guardian.maxHp;
-    guardian.attack = Math.round(guardian.attack * (1.08 + floorNumber / 500));
-    guardian.acceleration = Number(guardian.acceleration || 0) + 5;
     dungeon.guardianId = guardian.id;
     dungeon.guardianDefeated = false;
     dungeon.stairs = [];
@@ -3486,6 +3790,7 @@
 
   function applyFloorAnomaly(dungeon, floor) {
     if (dungeon.madnessRoom || dungeon.treasureVault || dungeon.thrillRoom) return;
+    if (floor.floor === MAX_FLOOR) return;
     if (floor.floor < 11 || Math.random() >= Math.min(0.095, 0.05 + floor.floor * 0.00045)) return;
     const steadyAnomalies = [
       { id: "brittle", name: "脆化の月", description: "魔物の攻撃力が少し増す一方、防御力が大きく低下する。" },
@@ -3564,11 +3869,12 @@
       unique: Boolean(forceUnique || data.unique),
       summonToken: data.summon ? `${data.id}@${pos.x},${pos.y}` : null,
       summonsUsed: 0,
+      summonProgress: 0,
       asleep: Math.random() < (data.unique || forceUnique ? UNIQUE_SLEEP_CHANCE : MONSTER_SLEEP_CHANCE),
     };
     enemy.canPhaseWalls = monsterCanPhaseWalls(data);
     const nativeFloor = monsterNativeFloor(data);
-    if (nativeFloor >= 35 && !enemy.specialAttack) {
+    if (nativeFloor >= 35 && !enemy.specialAttack && data.automaticSpecialAttack !== false) {
       const specials = ["ranged", "drain", "knockback", "self_destruct", "debuff", "devour"];
       const hash = [...data.id].reduce((sum, char) => sum + char.charCodeAt(0), 0);
       enemy.specialAttack = data.unique && nativeFloor >= 60 && hash % 3 === 0 ? "time_stop" : specials[hash % specials.length];
@@ -3625,6 +3931,7 @@
     const amount = Math.max(6, Math.round(stats.maxHp * 0.28 + stats.luck * 1.8));
     const healed = Math.min(amount, stats.maxHp - state.adventurer.hp);
     state.adventurer.hp += healed;
+    state.adventurer.attritionRecoveryDebt = Math.max(0, Number(state.adventurer.attritionRecoveryDebt || 0) - healed);
     host.healCooldown = Number(jobs.priest.skill.cooldown || 8);
     log(`プリーストの癒光がHPを${healed}回復した。`);
     playSfx("heal");
@@ -4145,7 +4452,12 @@
     state.adventurer.floor += 1;
     state.adventurer.deepestFloor = Math.max(state.adventurer.deepestFloor || 1, state.adventurer.floor);
     refreshShopInventoryForDepth();
+    const hpBeforeDescent = state.adventurer.hp;
     state.adventurer.hp = Math.min(getPlayerStats().maxHp, state.adventurer.hp + 4);
+    state.adventurer.attritionRecoveryDebt = Math.max(
+      0,
+      Number(state.adventurer.attritionRecoveryDebt || 0) - Math.max(0, state.adventurer.hp - hpBeforeDescent),
+    );
     state.dungeon = generateFloor(state.adventurer.floor);
     log(`B${state.adventurer.floor}Fへ降りた。${state.dungeon.layout ? `構造は「${state.dungeon.layout.name}」。${state.dungeon.layout.description}` : ""}`);
     if (state.dungeon.anomaly) {
@@ -4447,11 +4759,17 @@
     playSfx("observe");
   }
 
+  function advanceSummonProgress(enemy) {
+    const summon = enemy?.summon;
+    if (!summon) return false;
+    const every = Math.max(2, Math.floor(Number(summon.every || 6)));
+    enemy.summonProgress = Math.max(0, Math.floor(Number(enemy.summonProgress || 0))) + 1;
+    return enemy.summonProgress >= every;
+  }
+
   function trySummonMinions(enemy) {
     const summon = enemy?.summon;
     if (!summon || !state.dungeon || state.arena) return false;
-    const every = Math.max(2, Math.floor(Number(summon.every || 6)));
-    if (enemy.turns % every !== 0) return false;
     enemy.summonToken = enemy.summonToken || `${enemy.id}@${enemy.x},${enemy.y}`;
     const aliveSummons = state.dungeon.enemies.filter((candidate) => candidate.alive && candidate.summonedBy === enemy.summonToken).length;
     const aliveCount = state.dungeon.enemies.filter((candidate) => candidate.alive).length;
@@ -4513,19 +4831,24 @@
     return true;
   }
 
-  function enemyTurn(enemy) {
-    if (enemy.hp <= 0) return;
-    ensureUniqueEncounterSpeech(enemy);
-    enemy.turns += 1;
+  function beginEnemyAction(enemy, options = {}) {
+    if (enemy.hp <= 0) return { consumed: true };
+    const canUseCombatTechniques = options.canUseCombatTechniques !== false;
+    if (canUseCombatTechniques) ensureUniqueEncounterSpeech(enemy);
+    enemy.turns = Math.max(0, Math.floor(Number(enemy.turns || 0))) + 1;
     if (enemy.elixirAttrition && enemy.turns % enemy.elixirAttrition.every === 0) {
       const maxHp = getPlayerStats().maxHp;
       const damage = Math.max(1, Math.ceil(maxHp * enemy.elixirAttrition.ratio));
       state.adventurer.hp -= damage;
+      state.adventurer.attritionRecoveryDebt = Math.min(
+        maxHp,
+        Math.max(0, Number(state.adventurer.attritionRecoveryDebt || 0)) + damage,
+      );
       log(`${enemy.name}の存在圧が生命を直接摩耗させ、最大HPの${Math.round(enemy.elixirAttrition.ratio * 100)}%にあたる${damage}ダメージ！ 防具は職務を放棄した。`);
       playSfx("curse");
       if (state.adventurer.hp <= 0) {
         die(`${enemy.name}の存在侵食`);
-        return;
+        return { consumed: true };
       }
     }
     if (Number(enemy.spellCursedTurns || 0) > 0) enemy.spellCursedTurns -= 1;
@@ -4537,26 +4860,31 @@
       enemy.spellStunnedTurns -= 1;
       log(`${enemy.name}は雷術の痺れで行動できない。`);
       playSfx("debuff");
-      return;
+      return { consumed: true };
+    }
+    const summonDue = advanceSummonProgress(enemy);
+    if (canUseCombatTechniques && enemy.telegraphed) {
+      enemy.telegraphed = false;
+      uniqueSpeak(enemy, "dangerousRelease", { chance: 0.82 });
+      const dangerousAttribute = enemy.telegraphedAttribute || chooseEnemyAttackAttribute(enemy, enemy.dangerous.attribute);
+      enemy.telegraphedAttribute = null;
+      enemyAttack(enemy, enemy.dangerous.name, dangerousAttribute, enemy.dangerous.power, { trials: enemy.dragonBreath?.trials || 1, hitBonus: 0.08, critChance: 0.1 });
+      return { consumed: true };
+    }
+    if (summonDue) {
+      enemy.summonProgress = 0;
+      if (trySummonMinions(enemy)) return { consumed: true };
     }
     if (enemy.divineInvulnerability && enemy.turns % enemy.divineInvulnerability.every === 0
       && Number(enemy.divineInvulnerabilityCharges || 0) <= 0) {
       enemy.divineInvulnerabilityCharges = enemy.divineInvulnerability.charges;
       log(`${enemy.name}が「${enemy.divineInvulnerability.name}」を展開。次の${enemy.divineInvulnerabilityCharges}回、あらゆる攻撃を無効化する！`);
       playSfx("invulnerable");
-      return;
+      return { consumed: true };
     }
+    if (!canUseCombatTechniques) return { consumed: false };
     const specialInterval = enemy.specialAttack === "gold_steal" ? 3 : 4;
-    if (enemy.specialAttack && enemy.turns % specialInterval === 0 && useEnemySpecial(enemy)) return;
-    if (enemy.telegraphed) {
-      enemy.telegraphed = false;
-      uniqueSpeak(enemy, "dangerousRelease", { chance: 0.82 });
-      const dangerousAttribute = enemy.telegraphedAttribute || chooseEnemyAttackAttribute(enemy, enemy.dangerous.attribute);
-      enemy.telegraphedAttribute = null;
-      enemyAttack(enemy, enemy.dangerous.name, dangerousAttribute, enemy.dangerous.power, { trials: enemy.dragonBreath?.trials || 1, hitBonus: 0.08, critChance: 0.1 });
-      return;
-    }
-    if (trySummonMinions(enemy)) return;
+    if (enemy.specialAttack && enemy.turns % specialInterval === 0 && useEnemySpecial(enemy)) return { consumed: true };
     if (enemy.dangerous && enemy.turns % enemy.dangerous.every === 0) {
       enemy.telegraphed = true;
       enemy.telegraphedAttribute = chooseEnemyAttackAttribute(enemy, enemy.dangerous.attribute);
@@ -4566,11 +4894,21 @@
       if (dialogue) dialogue.stages.dangerous = true;
       uniqueSpeak(enemy, "dangerous", { force: firstTechnique, chance: 0.58 });
       playSfx("warning");
-      return "telegraphed";
+      return { consumed: true, result: "telegraphed" };
     }
+    return { consumed: false };
+  }
+
+  function performEnemyBasicAttack(enemy) {
     if (enemy.turns % 3 === 1) uniqueSpeak(enemy, "battle", { chance: 0.62 });
     uniqueSpeak(enemy, "attack", { chance: 0.56 });
     enemyAttack(enemy, "攻撃", chooseEnemyAttackAttribute(enemy, enemy.attackAttribute), enemy.attack);
+  }
+
+  function enemyTurn(enemy) {
+    const action = beginEnemyAction(enemy);
+    if (action.consumed) return action.result;
+    performEnemyBasicAttack(enemy);
   }
 
   function enemyAttackAttributePool(enemy) {
@@ -4581,7 +4919,7 @@
     const seed = [...String(enemy.id || enemy.name)].reduce((sum, character) => sum + character.charCodeAt(0), 0);
     const pool = [enemy.attackAttribute, enemy.dangerous?.attribute].filter(Boolean);
     for (let index = 0; pool.length < desiredSize && index < DATA.attributes.length * 2; index += 1) {
-      const candidate = DATA.attributes[(seed + index * 5 + nativeFloor) % DATA.attributes.length];
+      const candidate = DATA.attributes[(seed + index * 7 + nativeFloor) % DATA.attributes.length];
       if (!pool.includes(candidate)) pool.push(candidate);
     }
     return pool;
@@ -4610,7 +4948,7 @@
       enemy.lastAttackReadWeakness = true;
     } else {
       const previousIndex = Math.max(-1, pool.indexOf(enemy.lastChosenAttackAttribute));
-      selected = pool[(previousIndex + 1 + Math.max(0, Number(enemy.turns || 0) % Math.max(1, pool.length - 1))) % pool.length];
+      selected = pool[(previousIndex + 1) % pool.length];
       enemy.lastAttackReadWeakness = false;
     }
     enemy.lastChosenAttackAttribute = selected;
@@ -4859,12 +5197,12 @@
   }
 
   function grantMasterEquipment() {
-    if (!state.meta.masterEquipmentUnlocked || state.meta.donatedPermanentEquipmentIds.includes("game_master_emblem") || state.adventurer.ownedEquipment.includes("game_master_emblem")) return;
+    if (!state.meta.masterEquipmentUnlocked || state.adventurer.donatedPermanentEquipmentIds.includes("game_master_emblem") || state.adventurer.ownedEquipment.includes("game_master_emblem")) return;
     state.adventurer.ownedEquipment.push("game_master_emblem");
   }
 
   function grantCompendiumEquipment() {
-    if (!state.meta.compendiumEquipmentUnlocked || state.meta.donatedPermanentEquipmentIds.includes("omniscient_archive") || state.adventurer.ownedEquipment.includes("omniscient_archive")) return;
+    if (!state.meta.compendiumEquipmentUnlocked || state.adventurer.donatedPermanentEquipmentIds.includes("omniscient_archive") || state.adventurer.ownedEquipment.includes("omniscient_archive")) return;
     state.adventurer.ownedEquipment.push("omniscient_archive");
   }
 
@@ -5008,7 +5346,9 @@
     saveActiveJobProgress();
     if (!levelsGained) return;
     const newStats = { ...getPlayerStats() };
+    const hpBeforeLevelUp = adv.hp;
     adv.hp = Math.min(newStats.maxHp, adv.hp + (newStats.maxHp - oldStats.maxHp) + Math.max(2, Math.floor(newStats.maxHp * 0.15)));
+    adv.attritionRecoveryDebt = Math.max(0, Number(adv.attritionRecoveryDebt || 0) - Math.max(0, adv.hp - hpBeforeLevelUp));
     log(levelsGained > 1 ? `${levelsGained}レベル上昇し、Lv${adv.level}になった！` : `レベルアップ！ Lv${adv.level}になった！`);
     const growthEntries = levelGrowthEntries(oldStats, newStats);
     const growth = formatLevelGrowth(oldStats, newStats);
@@ -5115,7 +5455,7 @@
     const harvestsSpent = state.adventurer.jobId === "hunter" ? corpseHarvestsRemaining(corpse) : 1;
     const anomalyMultiplier = ["gold", "pandemonium"].includes(state.dungeon?.anomaly?.id) ? 2 : 1;
     const rarity = materials[materialId]?.rarity;
-    const quantity = rarity ? 1 : quantityPerHarvest * harvestsSpent * anomalyMultiplier;
+    const quantity = rarity ? harvestsSpent * anomalyMultiplier : quantityPerHarvest * harvestsSpent * anomalyMultiplier;
     corpse.harvestsRemaining = Math.max(0, corpseHarvestsRemaining(corpse) - harvestsSpent);
     corpse.harvested = corpse.harvestsRemaining <= 0;
     markResearch(corpse.id, corpse.harvested ? MAX_RESEARCH_LEVEL : 4);
@@ -5190,7 +5530,12 @@
     state.adventurer.scavengerNutrition = Number(state.adventurer.scavengerNutrition || 0) + Math.max(1, Number(amount || 1));
     const growth = scavengerGrowth(state.adventurer.scavengerNutrition);
     const afterMaxHp = getPlayerStats().maxHp;
+    const hpBeforeGrowth = state.adventurer.hp;
     state.adventurer.hp = Math.min(afterMaxHp, state.adventurer.hp + Math.max(1, afterMaxHp - beforeMaxHp));
+    state.adventurer.attritionRecoveryDebt = Math.max(
+      0,
+      Number(state.adventurer.attritionRecoveryDebt || 0) - Math.max(0, state.adventurer.hp - hpBeforeGrowth),
+    );
     log(`${reason}。摂食値${state.adventurer.scavengerNutrition}（力+${growth.strength}・耐久+${growth.durability}・運+${growth.luck}・最大HP+${growth.maxHp}・加速+${growth.acceleration}）。`);
     playSfx(amount >= 3 ? "feast" : "eat");
   }
@@ -5263,8 +5608,11 @@
 
   function die(reason) {
     const floor = state.adventurer.floor;
+    const deathPlace = state.arena
+      ? `闘技場 第${Math.max(1, Number(state.arena.round || 1))}戦`
+      : state.adventurer.inDungeon && state.dungeon ? `B${floor}F` : "街";
     state.meta.deaths += 1;
-    state.meta.deathLog.unshift(`B${floor}F: ${reason}で死亡`);
+    state.meta.deathLog.unshift(`${deathPlace}: ${reason}で死亡`);
     state.meta.deathLog = state.meta.deathLog.slice(0, 12);
     const adventurerName = state.adventurer.name || "たかし";
     const deathCry = chooseDeathCry(state.adventurer, reason);
@@ -5339,16 +5687,16 @@
     audio.musicBlocked = true;
     stopMusic();
     els.titleScreen.classList.add("hidden");
+    els.titleScreen.setAttribute("aria-hidden", "true");
     els.deathReviewReason.textContent = `死因：${reason}。死亡直前の記録は、読み終えるまで閉じません。`;
     els.deathReviewLog.innerHTML = lines.map((line) => `<p>${escapeHtml(line)}</p>`).join("");
-    els.deathReviewPanel.classList.remove("hidden");
-    els.deathReviewLog?.focus();
+    showDialog(els.deathReviewPanel, els.deathReviewLog, null);
   }
 
   function continueAfterDeath() {
     state.meta.pendingDeathReview = null;
     saveGame();
-    els.deathReviewPanel?.classList.add("hidden");
+    hideDialog(els.deathReviewPanel, false);
     audio.musicBlocked = false;
     showTitleScreen();
     updateAudioScene(true);
@@ -5532,6 +5880,7 @@
     stats.acceleration -= stats.materialBurden;
     adv.maxHp = stats.maxHp;
     adv.hp = Math.min(adv.hp, stats.maxHp);
+    adv.attritionRecoveryDebt = clamp(Number(adv.attritionRecoveryDebt || 0), 0, stats.maxHp);
     return stats;
   }
 
@@ -5780,11 +6129,18 @@
       .filter((monster) => monster.id !== monsterId && state.meta.research[monster.id]?.seen && getResearch(monster.id).level < MAX_RESEARCH_LEVEL)
       .sort((left, right) => getResearch(left.id).evidence - getResearch(right.id).evidence)
       .slice(0, 2);
+    let completedPeer = false;
     peers.forEach((monster) => {
       const record = getResearch(monster.id);
+      const previousLevel = record.level;
       record.evidence = Math.min(RESEARCH_EVIDENCE_THRESHOLDS[MAX_RESEARCH_LEVEL], record.evidence + shared);
       record.level = RESEARCH_EVIDENCE_THRESHOLDS.reduce((result, threshold, index) => record.evidence >= threshold ? index : result, 0);
+      if (previousLevel < MAX_RESEARCH_LEVEL && record.level >= MAX_RESEARCH_LEVEL) {
+        grantMonsterHeart(monster.id, true);
+        completedPeer = true;
+      }
     });
+    if (completedPeer) reconcileResearchCompletion(true);
   }
 
   function getMaterialCount(id) {
@@ -5911,7 +6267,6 @@
       known.push(`<div class="monster-info-row"><span>弱点</span><strong>${enemy.weaknesses.map(attr).join("・") || "なし"}</strong></div>`);
       known.push(`<div class="monster-info-row"><span>耐性</span><strong>${formatResistances(enemy.resistances) || "なし"}</strong></div>`);
       if (enemy.rapidRegeneration) known.push(`<div class="monster-info-row"><span>急速再生</span><strong>世界ターンごとにHP${Math.ceil(enemy.maxHp * enemy.rapidRegeneration.rate)}回復 / 火で2ターン停止・毒で3ターン半減・会心で1ターン停止</strong></div>`);
-      if (enemy.rapidRegeneration) known.push(`<div class="monster-info-row"><span>急速再生</span><strong>世界ターンごとにHP${enemy.rapidRegeneration.amount}回復</strong></div>`);
       const attackPool = enemyAttackAttributePool(enemy);
       known.push(`<div class="monster-info-row"><span>攻撃候補</span><strong>${attackPool.map(attrHtml).join("・")}</strong></div>`);
       if (enemyTacticalIntelligence(enemy) > 0) known.push(`<div class="monster-info-row"><span>戦術知性</span><strong>耐性の薄い属性を狙う確率 約${Math.round(enemyTacticalIntelligence(enemy) * 100)}%</strong></div>`);
@@ -5949,7 +6304,7 @@
       ${ranged.range ? `<button type="button" id="monsterRangedAttack" ${ranged.available ? "" : "disabled"}>${ranged.available ? `遠隔攻撃（射程${ranged.range}）` : `遠隔攻撃不可：${ranged.reason}`}</button>` : ""}
       ${spellAttack.spell ? `<button type="button" id="monsterSpellAttack" ${spellAttack.available ? "" : "disabled"}>${spellAttack.available ? `${spellAttack.spell.name}を放つ（射程${spellAttack.range}）` : `${spellAttack.spell.name}：${spellAttack.reason}`}</button>` : ""}
     `;
-    els.monsterInfoPanel.classList.remove("hidden");
+    showDialog(els.monsterInfoPanel, els.monsterInfoClose || document.querySelector("#monsterInfoClose"));
     document.querySelector("#monsterJobSkillAttack")?.addEventListener("click", () => useJobSkillAt(enemy));
     document.querySelector("#monsterRangedAttack")?.addEventListener("click", () => rangedAttackEnemy(enemy));
     document.querySelector("#monsterSpellAttack")?.addEventListener("click", () => castActiveSpellAt(enemy));
@@ -5957,7 +6312,7 @@
   }
 
   function closeMonsterInfo() {
-    els.monsterInfoPanel.classList.add("hidden");
+    hideDialog(els.monsterInfoPanel);
   }
 
   function hpColorClass(rate) {
@@ -6261,8 +6616,13 @@
         const dx = Math.abs(enemy.x - state.dungeon.player.x);
         const dy = Math.abs(enemy.y - state.dungeon.player.y);
         const dist = Math.max(dx, dy);
+        const actionState = beginEnemyAction(enemy, { canUseCombatTechniques: dist <= 1 });
+        if (actionState.consumed) {
+          if (actionState.result === "telegraphed") break;
+          continue;
+        }
         if (dist <= 1) {
-          if (enemyTurn(enemy) === "telegraphed") break;
+          performEnemyBasicAttack(enemy);
           continue;
         }
         if (Number(enemy.spellBoundTurns || 0) > 0) {
@@ -6344,9 +6704,10 @@
       if (state.adventurer.hp <= 0) die("アーティファクトの呪い");
       return;
     }
-    if (state.adventurer.hp >= stats.maxHp) return;
+    const recoveryCeiling = Math.max(0, stats.maxHp - Math.max(0, Number(state.adventurer.attritionRecoveryDebt || 0)));
+    if (state.adventurer.hp >= recoveryCeiling) return;
     const before = state.adventurer.hp;
-    state.adventurer.hp = Math.min(stats.maxHp, state.adventurer.hp + stats.hpRegen);
+    state.adventurer.hp = Math.min(recoveryCeiling, state.adventurer.hp + stats.hpRegen);
     const healed = state.adventurer.hp - before;
     if (healed > 0) log(`再生装備がHPを${healed}回復した。`);
   }
@@ -6431,7 +6792,7 @@
     els.confirmText.textContent = text;
     els.confirmOk.textContent = labels.ok || "実行";
     els.confirmCancel.textContent = labels.cancel || "戻る";
-    els.confirmPanel.classList.remove("hidden");
+    showDialog(els.confirmPanel, els.confirmCancel);
   }
 
   function closeConfirm() {
@@ -6439,7 +6800,7 @@
     pendingConfirmCancel = null;
     els.confirmOk.textContent = "実行";
     els.confirmCancel.textContent = "戻る";
-    els.confirmPanel.classList.add("hidden");
+    hideDialog(els.confirmPanel);
   }
 
   function cancelConfirm() {
@@ -6465,7 +6826,7 @@
       musicFadeTimer: null,
       musicBlocked: false,
       tensionLevel: 1,
-      enabled: localStorage.getItem(AUDIO_KEY) !== "0",
+      enabled: readStorage(AUDIO_KEY) !== "0",
       started: false,
       scene: "silent",
     };
@@ -6476,7 +6837,7 @@
     if (state.adventurer.inDungeon || currentView === "arena") return;
     if (!audio.enabled) {
       audio.enabled = true;
-      localStorage.setItem(AUDIO_KEY, "1");
+      writeStorage(AUDIO_KEY, "1");
       ensureAudio();
       playStartupSound();
       updateAudioScene(true);
@@ -6488,7 +6849,7 @@
       playSfx("select");
     } else {
       audio.enabled = false;
-      localStorage.setItem(AUDIO_KEY, "0");
+      writeStorage(AUDIO_KEY, "0");
       stopMusic();
     }
     updateAudioButton();
@@ -6715,6 +7076,7 @@
   });
   els.returnTown.addEventListener("click", returnTown);
   els.audioButton.addEventListener("click", toggleAudio);
+  els.saveWarningReload?.addEventListener("click", () => window.location?.reload?.());
   els.confirmOk.addEventListener("click", () => {
     playSfx("uiConfirm");
     const action = pendingConfirm;
@@ -6738,7 +7100,7 @@
   els.openLogHistory?.addEventListener("click", openLogHistory);
   els.closeLogHistory?.addEventListener("click", () => closeLogHistory());
   els.continueAfterDeath?.addEventListener("click", continueAfterDeath);
-  document.querySelector("#closeDeveloperPanelButton")?.addEventListener("click", () => document.querySelector("#developerPanel")?.classList.add("hidden"));
+  document.querySelector("#closeDeveloperPanelButton")?.addEventListener("click", () => hideDialog(document.querySelector("#developerPanel")));
   document.addEventListener("pointerdown", (event) => {
     if (event.target && event.target.closest && event.target.closest("#audioButton")) return;
     startAudioFromGesture();
@@ -6750,17 +7112,22 @@
     const button = event.target?.closest?.("[data-shop-page], [data-research-page]");
     if (button && !button.disabled) playSfx("uiPage");
   });
+  window.addEventListener?.("storage", (event) => {
+    if (![SAVE_KEY, SAVE_REVISION_KEY].includes(event.key) || !event.newValue) return;
+    try {
+      const revision = event.key === SAVE_REVISION_KEY
+        ? Math.max(0, Math.floor(finiteNumber(event.newValue, 0)))
+        : Math.max(0, Math.floor(finiteNumber(JSON.parse(event.newValue)?.meta?.saveRevision, 0)));
+      if (revision <= lastKnownSaveRevision) return;
+      markSaveConflict("別のタブで進行が更新されました。このタブからの保存を停止しています。最新データを再読み込みしてください。");
+    } catch (error) {
+      // Ignore unrelated or malformed storage events.
+    }
+  });
   document.addEventListener("keydown", (event) => {
     const developerPanel = document.querySelector("#developerPanel");
-    if (event.key === "Escape" && developerPanel && !developerPanel.classList.contains("hidden")) {
+    if (event.key === "Escape" && closeTopModalFromEscape()) {
       event.preventDefault();
-      developerPanel.classList.add("hidden");
-      document.querySelector("#openDeveloperPanelButton")?.focus();
-      return;
-    }
-    if (event.key === "Escape" && !els.logHistoryPanel.classList.contains("hidden")) {
-      event.preventDefault();
-      closeLogHistory();
       return;
     }
     if (trapModalFocus(event)) return;
@@ -6770,17 +7137,7 @@
     const arenaMovement = currentView === "arena" && state.arena && !state.arena.awaitingNext;
     const dungeonMovement = currentView === "dungeon" && state.adventurer.inDungeon && state.dungeon;
     if (!delta || (!arenaMovement && !dungeonMovement)) return;
-    const overlayOpen = Boolean(
-      pendingConfirm
-      || !els.monsterInfoPanel.classList.contains("hidden")
-      || !els.confirmPanel.classList.contains("hidden")
-      || !els.setupPanel.classList.contains("hidden")
-      || !els.setupPickerPanel.classList.contains("hidden")
-      || !els.depthPickerPanel.classList.contains("hidden")
-      || !els.deathReviewPanel.classList.contains("hidden")
-      || !els.logHistoryPanel.classList.contains("hidden")
-      || (developerPanel && !developerPanel.classList.contains("hidden"))
-    );
+    const overlayOpen = Boolean(pendingConfirm || activeModalPanel() || (developerPanel && !developerPanel.classList.contains("hidden")));
     if (overlayOpen) return;
     event.preventDefault();
     if (arenaMovement) arenaMove(delta[0], delta[1]);

@@ -148,7 +148,7 @@
 
   window.HD_DATA.monsters.push(
     {
-      id: "white_fang_marta", name: "白牙のマルタ", glyph: "白", floors: [1], unique: true,
+      id: "white_fang_marta", name: "白牙のマルタ", glyph: "白", floors: [1], unique: true, forcedSpeciesId: "vermin",
       hp: 30, attack: 6, defense: 1, attackAttribute: "slash", weaknesses: ["blunt"], resistances: { slash: 2 },
       dangerous: { every: 3, telegraph: "白牙のマルタが低く身を沈めた。", name: "白牙連裂", attribute: "slash", power: 15 },
       loot: [{ condition: "default", material: "clean_pelt" }, { condition: { lastAttribute: "blunt" }, material: "fine_pelt" }],
@@ -176,7 +176,7 @@
       research: { 1: "水没した鎧に執念が宿った騎士。", 2: "雷属性が弱点。水と斬に強い。", 3: "雷で鎧を抜くと帯電した部材を得られる。" },
     },
     {
-      id: "thunder_emperor_barg", name: "雷帝バーグ", glyph: "帝", floors: [3], unique: true,
+      id: "thunder_emperor_barg", name: "雷帝バーグ", glyph: "帝", floors: [3], unique: true, forcedSpeciesId: "vermin",
       hp: 58, attack: 9, defense: 3, attackAttribute: "thunder", weaknesses: ["earth"], resistances: { thunder: 4 },
       dangerous: { every: 2, telegraph: "雷帝バーグの全身へ稲妻が収束した。", name: "雷帝落とし", attribute: "thunder", power: 25 },
       loot: [{ condition: "default", material: "thunder_horn" }, { condition: { lastSkill: "precise" }, material: "unbroken_horn" }],
@@ -958,7 +958,10 @@
   singularDungeonUniques.forEach((monster, index) => {
     const specialAttack = singularSpecials[index % singularSpecials.length];
     const addedWeakness = deepAttributes[(index * 7 + 3) % deepAttributes.length];
-    const resistanceAttribute = deepAttributes[(index * 11 + 5) % deepAttributes.length];
+    const resistanceCandidates = deepAttributes.filter((attribute) => (
+      attribute !== addedWeakness && !monster.weaknesses.includes(attribute)
+    ));
+    const resistanceAttribute = resistanceCandidates[(index * 11 + 5) % resistanceCandidates.length];
     const trait = {
       id: `singular_trait_${String(index + 1).padStart(2, "0")}`,
       name: singularTraitNames[index],
@@ -1097,7 +1100,10 @@
     demon: ["demon_horn", "demon_seal", "demon_super", "demon_ultra"],
     angel: ["angel_feather", "angel_halo", "angel_super", "angel_ultra"],
   };
-  const bespokeLootMonsterIds = new Set(["cave_rat", "poison_bat", "thunder_hare", "fire_lizard", "red_garm"]);
+  const bespokeLootMonsterIds = new Set([
+    "cave_rat", "carapace_rat", "poison_bat", "thunder_hare", "fire_lizard", "red_garm",
+    "white_fang_marta", "thunder_emperor_barg",
+  ]);
 
   function classifyMonster(monster, index) {
     const text = `${monster.id} ${monster.name} ${monster.glyph || ""}`;
@@ -1134,10 +1140,11 @@
         { condition: { lastSkill: "precise" }, material: speciesMaterials[1] },
       ];
     }
-    monster.hp = Math.max(1, Math.round(monster.hp * color.multiplier));
-    monster.attack = Math.max(1, Math.round(monster.attack * color.multiplier));
-    monster.defense = Math.max(0, Math.round(monster.defense * color.multiplier));
-    if (monster.dangerous) monster.dangerous.power = Math.max(1, Math.round(monster.dangerous.power * color.multiplier));
+    const colorMultiplier = monster.id === "dungeon_lord_nox" ? 1 : color.multiplier;
+    monster.hp = Math.max(1, Math.round(monster.hp * colorMultiplier));
+    monster.attack = Math.max(1, Math.round(monster.attack * colorMultiplier));
+    monster.defense = Math.max(0, Math.round(monster.defense * colorMultiplier));
+    if (monster.dangerous) monster.dangerous.power = Math.max(1, Math.round(monster.dangerous.power * colorMultiplier));
     if (species.id === "dragon") {
       const breathTitles = ["白煙の竜息", "蒼圧ブレス", "翠嵐竜息", "黄金雷界ブレス", "紅蓮滅界ブレス", "紫冥終葬ブレス", "虹天創滅ブレス"];
       const breathPower = Math.max(20, Math.round(monster.attack * (1.8 + colorIndex * 0.22) + nativeFloor * (0.7 + colorIndex * 0.08)));
@@ -1637,6 +1644,8 @@
   const dungeonLord = window.HD_DATA.monsters.find((monster) => monster.id === "dungeon_lord_nox");
   if (dungeonLord) {
     dungeonLord.summon = { every: 3, count: 1, maxAlive: 2, maxTotal: 8, pool: "undefeated_deep_unique", minFloor: 60 };
+    dungeonLord.elixirAttrition = { every: 2, ratio: 0.05, recommended: 4 };
+    dungeonLord.automaticSpecialAttack = false;
     dungeonLord.research[2] = `${dungeonLord.research[2] || ""} 未討伐の深層ユニークを迷宮の記憶から再召喚する。先に倒した個体は召喚できない。`.trim();
   }
 
@@ -1652,7 +1661,23 @@
   });
 
   const materialNames = Object.fromEntries(window.HD_DATA.materials.map((material) => [material.id, material.name]));
+  // 色・種族・個体特性・深層補正を全て適用した後に、最終データの矛盾を取り除く。
   window.HD_DATA.monsters.forEach((monster) => {
+    const weaknesses = new Set(monster.weaknesses || []);
+    weaknesses.forEach((attribute) => {
+      const resistance = monster.resistances?.[attribute];
+      if (resistance === "immune" || Number(resistance) > 0) delete monster.resistances[attribute];
+    });
+    if (monster.demonicWard?.attributes) {
+      monster.demonicWard.attributes = monster.demonicWard.attributes.filter((attribute) => !weaknesses.has(attribute));
+      if (!monster.demonicWard.attributes.length) delete monster.demonicWard;
+    }
+    if (monster.rapidRegeneration) {
+      monster.rapidRegeneration.amount = Math.max(
+        1,
+        Math.ceil(monster.hp * Number(monster.rapidRegeneration.rate || 0)),
+      );
+    }
     const legacy = monster.research || {};
     const lootNames = [...new Set((monster.loot || []).map((rule) => materialNames[rule.material] || rule.material))];
     monster.research = {

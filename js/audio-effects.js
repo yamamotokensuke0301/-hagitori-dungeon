@@ -510,17 +510,27 @@
       const osc = context.createOscillator();
       const gain = context.createGain();
       const filter = context.createBiquadFilter();
-      const peak = Math.max(0.0002, gainValue * activeLevel);
+      const rough = type === "sawtooth" || type === "square";
+      const peak = Math.max(0.0002, gainValue * activeLevel * (rough ? 0.74 : 1));
       const attack = clamp(opts.attack === undefined ? Math.min(0.007, duration * 0.12) : opts.attack, 0.001, duration * 0.4);
       const sustainRatio = opts.sustain === undefined ? (type === "sine" ? 0.62 : 0.46) : opts.sustain;
       const settle = Math.min(start + duration * 0.42, start + attack + 0.075);
-      const rough = type === "sawtooth" || type === "square";
       const cutoff = clamp(opts.cutoff || freq * (rough ? 10 : 16), rough ? 760 : 1400, 7600);
       const defaultPan = freq < 160 ? nextPan(0.045) : nextPan(0.12);
 
       osc.type = type;
       osc.frequency.setValueAtTime(Math.max(1, freq), start);
       if (osc.detune) osc.detune.setValueAtTime((Math.random() - 0.5) * 3.2, start);
+      if (rough) {
+        // A softly detuned twin removes the raw single-oscillator buzz.
+        const twin = context.createOscillator();
+        twin.type = type;
+        twin.frequency.setValueAtTime(Math.max(1, freq), start);
+        if (twin.detune) twin.detune.setValueAtTime(6.5 + Math.random() * 2.5, start);
+        twin.connect(filter);
+        twin.start(start);
+        twin.stop(start + duration + 0.025);
+      }
       filter.type = "lowpass";
       filter.Q.value = rough ? 0.82 : 0.48;
       filter.frequency.setValueAtTime(cutoff, start);
@@ -660,20 +670,65 @@
       });
     }
 
+    function playFM(frequency, start, duration, gainValue, out, options) {
+      // Two-operator FM: the modulation index decays so the strike is bright
+      // and the tail settles into a near-pure tone, like a struck body.
+      if (!context) return;
+      const opts = options || {};
+      const carrier = context.createOscillator();
+      const modulator = context.createOscillator();
+      const modGain = context.createGain();
+      const gain = context.createGain();
+      const peak = Math.max(0.0002, gainValue * activeLevel);
+      const ratio = opts.ratio || 2.756;
+      const index = opts.index === undefined ? 2.2 : opts.index;
+      const indexDecay = Math.max(0.01, opts.indexDecay === undefined ? duration * 0.45 : opts.indexDecay);
+      const attack = clamp(opts.attack === undefined ? 0.0012 : opts.attack, 0.0008, duration * 0.3);
+      const modFreq = Math.max(1, frequency * ratio);
+      carrier.type = "sine";
+      modulator.type = "sine";
+      carrier.frequency.setValueAtTime(Math.max(1, frequency), start);
+      modulator.frequency.setValueAtTime(modFreq, start);
+      modGain.gain.setValueAtTime(index * modFreq, start);
+      modGain.gain.exponentialRampToValueAtTime(Math.max(0.6, index * modFreq * 0.02), start + indexDecay);
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(peak, start + attack);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+      modulator.connect(modGain);
+      modGain.connect(carrier.frequency);
+      carrier.connect(gain);
+      connectVoice(gain, out, start, duration, {
+        pan: opts.pan === undefined ? nextPan(0.14) : opts.pan,
+        panEnd: opts.panEnd,
+        reverb: opts.reverb === undefined ? 0.2 : opts.reverb,
+      });
+      carrier.start(start);
+      modulator.start(start);
+      carrier.stop(start + duration + 0.025);
+      modulator.stop(start + duration + 0.025);
+    }
+
     function playMetal(frequency, start, duration, gainValue, out, pan) {
-      const ratios = [1, 1.414, 2.03, 2.91];
-      const levels = [1, 0.52, 0.28, 0.16];
-      const lengths = [1, 0.82, 0.64, 0.48];
+      // A clangorous FM strike plus true inharmonic bell partials; coins,
+      // bells, blades and UI chimes all share this voice.
+      playFM(frequency, start, duration, gainValue * 0.62, out, {
+        ratio: 3.01, index: 2.6, indexDecay: duration * 0.3, pan: pan || 0, reverb: 0.22,
+      });
+      const ratios = [1, 2.756, 5.404, 8.933];
+      const levels = [1, 0.5, 0.24, 0.11];
+      const lengths = [1, 0.74, 0.52, 0.36];
       ratios.forEach((ratio, index) => {
-        playTone(frequency * ratio, start + index * 0.0015, duration * lengths[index], gainValue * levels[index], "sine", out, {
+        const partial = frequency * ratio;
+        if (partial > 9200) return;
+        playTone(partial, start + index * 0.0012, duration * lengths[index], gainValue * levels[index] * 0.55, "sine", out, {
           attack: 0.0012,
           sustain: 0.3,
           pan: clamp((pan || 0) + (index % 2 ? 0.09 : -0.07), -0.8, 0.8),
           reverb: 0.22,
         });
       });
-      playNoiseBand(start, Math.min(0.055, duration * 0.32), gainValue * 0.34, out, Math.min(7200, frequency * 4.2), 2.4, pan || 0, {
-        attack: 0.0008, decay: 2.6, reverb: 0.08,
+      playNoiseBand(start, Math.min(0.045, duration * 0.3), gainValue * 0.3, out, Math.min(7600, frequency * 4.6), 2.8, pan || 0, {
+        attack: 0.0008, decay: 2.8, reverb: 0.08,
       });
     }
 

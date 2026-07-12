@@ -1159,4 +1159,14 @@
     item.description = `${item.description} 終盤補正${["", "Ⅰ", "Ⅱ", "Ⅲ"][power]}：深層戦へ向けて基礎性能が強化されている。`;
   });
 
+  // 後段の多相型補正で攻撃属性が追加された装備も、旧形式の先頭属性を同期する。
+  window.HD_DATA.equipment.forEach((item) => {
+    const normalized = [...new Set([
+      ...(Array.isArray(item.attackAttributes) ? item.attackAttributes : []),
+      ...(item.attributeAttack ? [item.attributeAttack] : []),
+    ].filter((attribute) => window.HD_DATA.attributes.includes(attribute)))];
+    item.attackAttributes = normalized;
+    item.attributeAttack = normalized[0] || null;
+  });
+
 })();

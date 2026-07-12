@@ -47,8 +47,10 @@ const innContentSource = read("js/inn-content.js");
 const jobsSource = read("data/jobs.js");
 const dungeonGeneratorSource = read("js/dungeon-generator.js");
 const indexSource = read("index.html");
+const combatSimSource = read("tools/combat_balance_sim.js");
 assert(!/\.enemy-fire\s*\{[^}]*background/.test(styleSource), "monster attribute color still changes the background");
 assert(mainSource.includes("RESEARCH_EVIDENCE_THRESHOLDS = [0, 1, 30, 85, 180, 320]") && mainSource.includes("function spreadSpeciesResearch") && mainSource.includes("firstMilestone ? 2 : 1"), "long-term research progression does not include milestones and species sharing");
+assert(mainSource.includes("if (completedPeer) reconcileResearchCompletion(true)"), "species-shared research can reach maximum without immediate heart/completion reconciliation");
 assert(mainSource.includes("function colorizeResearchAttributes") && mainSource.includes("function embellishedResearchNote") && styleSource.includes(".research-note-label"), "colored theatrical research notes are missing");
 assert(mainSource.includes("弱点属性") && mainSource.includes("耐性属性") && mainSource.includes("monster.weaknesses.map(attrHtml)"), "explicit colored research affinities are missing");
 assert(indexSource.includes('id="deathCryText"') && mainSource.includes("function chooseDeathCry") && mainSource.includes("DEATH_CRY_PERSONALITY"), "player death-cry variation is missing");
@@ -89,10 +91,26 @@ assert(styleSource.includes(".research-monster-graphic"), "research monster grap
 assert(styleSource.includes("#dungeonView") && styleSource.includes("overflow-y: auto"), "narrow dungeon view cannot scroll");
 assert(indexSource.includes('id="jobSkillButton"'), "dungeon job skill control is missing");
 assert(indexSource.includes('id="liveLogAnnouncer"') && indexSource.includes('role="log"'), "accessible incremental log announcer is missing");
+assert(indexSource.includes('aria-rowcount="13" aria-colcount="13"') && mainSource.includes('row.setAttribute("role", "row")')
+  && styleSource.includes(".map-grid-row"),
+"dungeon map does not expose an ARIA row/gridcell structure");
 assert(indexSource.includes('id="openLogHistoryButton"') && indexSource.includes('aria-controls="logHistoryPanel"'), "log-history opener is missing or does not name its dialog");
 assert(indexSource.includes('id="logHistoryPanel"') && indexSource.includes('aria-labelledby="logHistoryTitle"') && indexSource.includes('aria-modal="true"'), "accessible log-history dialog is missing");
+assert(indexSource.includes('id="appShell" class="app-shell town-mode" aria-label="剥ぎ取りダンジョン" aria-hidden="true" inert')
+  && (indexSource.match(/aria-modal="true"/g) || []).length >= 9
+  && mainSource.includes("function syncOverlayAccessibility"),
+"title or modal backgrounds are not made inert and hidden from assistive technology");
+assert(indexSource.includes('id="saveWarning"') && indexSource.includes('id="saveWarningReloadButton"')
+  && styleSource.includes(".save-warning") && mainSource.includes("function markSaveConflict"),
+"save failures or multi-tab conflicts have no visible recovery warning");
+assert(mainSource.includes('SAVE_REVISION_KEY = "hagitori-dungeon-save-revision-v1"')
+  && (mainSource.match(/if \(saved\.dungeon && !isValidDungeonState/g) || []).length === 1,
+"save revision reads were not separated or dungeon validation still runs twice");
 assert(indexSource.includes('id="logHistoryList"') && indexSource.includes('aria-live="off"') && indexSource.includes('tabindex="0"'), "log-history focus target can announce the whole history live");
 assert(styleSource.includes(".log-history-card") && styleSource.includes(".log-history-list") && styleSource.includes("overscroll-behavior: contain"), "log-history dialog cannot scroll safely on short screens");
+assert(/\.setup-card\s*\{[^}]*max-height:\s*calc\(100dvh - 32px\);[^}]*overflow-y:\s*auto;/.test(styleSource)
+  && /\.setup-picker-card\s*\{[^}]*overflow-y:\s*auto;/.test(styleSource),
+"character setup dialogs cannot scroll on short phones");
 assert(mainSource.includes("LOG_HISTORY_LIMIT = 60") && mainSource.includes("function openLogHistory") && mainSource.includes("function closeLogHistory"), "bounded log-history behavior is missing");
 assert(mainSource.includes("const DEVELOPER_MODE_ENABLED") && mainSource.includes("localhost|127\\.0\\.0\\.1") && mainSource.includes("if (!DEVELOPER_MODE_ENABLED) return"), "developer controls are not sealed on public hosts");
 assert(mainSource.includes("DEVELOPER_MODE_ENABLED ? '<button type=\"button\" id=\"openDeveloperPanelButton\""), "developer-panel opener is still unconditional");
@@ -109,8 +127,11 @@ assert(mainSource.includes('state.adventurer.jobId === "ninja"') && mainSource.i
 assert(mainSource.includes("const growthStepDelay = 750") && mainSource.includes("const unchangedStepDelay = 480") && mainSource.includes('entry.difference > 0 ? "will-rise" : "unchanged"'), "level-up stat presentation is not using growth-aware cadence");
 assert(mainSource.includes('class="stat-gain">+${entry.difference}') && styleSource.includes(".level-up-stat.will-rise.revealed .stat-gain"), "level-up stat point gains are not visually exposed");
 assert(mainSource.includes('luck: "運", acceleration: "加速度"') && !mainSource.includes('defense: "防御", attackMin: "最低攻撃"'), "level-up presentation includes stats that cannot grow directly");
-assert(mainSource.includes("els.deathReviewPanel, els.depthPickerPanel, els.logHistoryPanel") && mainSource.includes('event.key === "Escape"'), "log-history focus trapping or Escape close is missing");
+assert(mainSource.includes("function activeModalPanel") && mainSource.includes("function showDialog") && mainSource.includes("function closeTopModalFromEscape") && mainSource.includes('event.key === "Escape"'), "shared modal focus trapping or Escape close is missing");
 assert(mainSource.includes('id="arenaSkillButton"'), "arena job skill control is missing");
+assert(mainSource.includes('class="arena-grid-row" role="row"') && mainSource.includes('class="arena-gridcell" role="gridcell"')
+  && styleSource.includes(".arena-grid-row"),
+"arena board does not expose a valid row/gridcell structure");
 assert(mainSource.includes("enemy.unique ? [3, 5]") && mainSource.includes(": [1, 2]"), "harvest count ranges are missing");
 assert(!mainSource.includes("残り${corpse.harvestsRemaining}回"), "harvest count is exposed to the player");
 assert(mainSource.includes("TRAP_FLOOR_CHANCE = 0.42") && mainSource.includes("Math.random() < TRAP_FLOOR_CHANCE"), "trap floor chance was not doubled to 42%");
@@ -163,10 +184,14 @@ assert(/\.controls\s*\{[^}]*transform:\s*translateY\(-3px\)/.test(styleSource), 
 assert(/\.magic-move-controls\s*\{[^}]*transform:\s*translateY\(-4px\) scale\(0\.9\)[^}]*transform-origin:\s*right center/.test(styleSource), "purple ability box size or four-pixel upward offset is missing");
 assert(styleSource.includes("clamp(105px, 15svh, 132px)") && styleSource.includes("calc((100svh - 328px) / 13)"), "removed dungeon status space was not assigned to the log");
 assert(/\.app-shell\.dungeon-mode \.status-bar\s*\{[^}]*display:\s*none/.test(styleSource), "dungeon still shows the top place/job/race status bar");
-assert(mainSource.includes('localStorage.setItem(AUDIO_KEY, "0")') && mainSource.includes('currentView === "arena"') && styleSource.includes('.app-shell:not(.town-mode) .audio-button') && indexSource.includes("街で音楽を切り替える"), "music switching is not restricted to town screens");
+assert(mainSource.includes('writeStorage(AUDIO_KEY, "0")') && mainSource.includes('currentView === "arena"') && styleSource.includes('.app-shell:not(.town-mode) .audio-button') && indexSource.includes("街で音楽を切り替える"), "music switching is not restricted to town screens");
 assert(styleSource.includes("min(32px, calc((100vw - 42px) / 13)") && styleSource.includes("min(29px, calc((100vw - 42px) / 13)"), "dungeon map tiles do not use the reclaimed phone viewport space");
 assert(mainSource.includes("const overlayOpen") && mainSource.includes("const dungeonMovement"), "global movement keys are not gated to active combat");
 assert(mainSource.includes("function trapModalFocus") && mainSource.includes("focusEscapesForward"), "modal keyboard focus can escape into the background");
+assert(combatSimSource.includes("const RANDOM_SEED") && combatSimSource.includes("pairedProfiles")
+  && combatSimSource.includes("[10, 30, 50]") && combatSimSource.includes("attritionRecoveryDebt")
+  && combatSimSource.includes("telegraphedAttribute"),
+"combat simulator lacks deterministic paired 10/30/50 runs or corrected boss scheduling");
 assert(indexSource.includes("js/artifact-generator.js"), "random artifact generator is not loaded before the game");
 assert(mainSource.includes('item.artifact.random ? "☆" : "★"'), "fixed/random artifact star marks are not differentiated");
 assert(mainSource.includes("discoverSpecialRoomsAt") && mainSource.includes("openTreasureVaultChest") && mainSource.includes("openThrillArtifactChest"), "rare special-room interactions are missing");
@@ -312,10 +337,21 @@ const ninjaJob = window.HD_DATA.jobs.find((job) => job.id === "ninja" && job.nam
 assert(ninjaJob?.acceleration === 14 && ninjaJob.accelerationGrowthEvery === 6 && ninjaJob.stats.speed === 8 && ninjaJob.rangedRange === 5, "ninja strongest-class profile is invalid");
 const handymanJob = window.HD_DATA.jobs.find((job) => job.id === "handyman" && job.name === "便利屋");
 assert(handymanJob?.acceleration === 3 && handymanJob.accelerationGrowthEvery === 12, "handyman acceleration balance is invalid");
-assert(window.HD_DATA.monsters.find((monster) => monster.id === "dungeon_lord_nox")?.hp >= 160000, "final boss HP balance is invalid");
+const finalBoss = window.HD_DATA.monsters.find((monster) => monster.id === "dungeon_lord_nox");
+assert(finalBoss?.hp === 160000 && finalBoss.attack === 108 && finalBoss.defense === 33 && finalBoss.dangerous?.power === 255, "final boss dedicated stats received a generic multiplier");
 assert(window.HD_DATA.monsters.find((monster) => monster.id === "dungeon_lord_nox")?.acceleration === 48, "final boss acceleration balance is invalid");
 assert(window.HD_DATA.monsters.find((monster) => monster.id === "dungeon_lord_nox")?.summon?.every === 3, "final boss summon frequency is invalid");
+assert(window.HD_DATA.monsters.find((monster) => monster.id === "dungeon_lord_nox")?.elixirAttrition?.every === 2
+  && window.HD_DATA.monsters.find((monster) => monster.id === "dungeon_lord_nox")?.elixirAttrition?.ratio === 0.05,
+"final boss unavoidable existence erosion is invalid");
+assert(window.HD_DATA.monsters.find((monster) => monster.id === "dungeon_lord_nox")?.automaticSpecialAttack === false
+  && mainSource.includes('data.automaticSpecialAttack !== false'),
+"final boss still receives an undocumented automatic special attack");
 assert(JSON.stringify(window.HD_DATA.monsters.find((monster) => monster.id === "dungeon_lord_nox")?.weaknesses) === JSON.stringify(["light"]), "final boss unique weakness is not light");
+assert(mainSource.includes("index * 7 + nativeFloor"), "enemy attack attribute pool does not traverse all fifteen attributes");
+assert(mainSource.includes("selected = pool[(previousIndex + 1) % pool.length]"), "enemy attack attribute selection does not round-robin through its full pool");
+assert(mainSource.includes('guardian.id !== "dungeon_lord_nox"'), "final boss still receives the generic floor-guardian stat multiplier");
+assert(mainSource.includes("if (floor.floor === MAX_FLOOR) return"), "a random floor anomaly can still alter the final boss dedicated stats");
 const deepUniquePowerUps = window.HD_DATA.monsters.filter((monster) => monster.unique && !monster.arenaOnly && monster.id !== "dungeon_lord_nox" && Math.min(...(monster.floors || [0])) >= 61);
 assert(deepUniquePowerUps.length > 0 && deepUniquePowerUps.every((monster) => Number(monster.deepUniquePower) >= 1.13), "deep unique strengthening is missing");
 assert(indexSource.includes('id="recoveryMedicineButton"') && mainSource.includes('id: "recovery_medicine"') && mainSource.includes("function exchangeRecoveryMedicine") && mainSource.includes("function useRecoveryMedicine"), "recovery medicine acquisition or dungeon use is missing");
@@ -428,6 +464,28 @@ const uniqueMonsters = window.HD_DATA.monsters.filter((monster) => monster.uniqu
 const generalMonsters = window.HD_DATA.monsters.filter((monster) => !monster.unique);
 const rapidlyRegeneratingUniques = uniqueMonsters.filter((monster) => monster.rapidRegeneration);
 assert(rapidlyRegeneratingUniques.length >= 100 && rapidlyRegeneratingUniques.every((monster) => monster.rapidRegeneration.amount > 0 && monster.rapidRegeneration.rate <= 0.14), "strong unique rapid regeneration is missing or invalid");
+assert(rapidlyRegeneratingUniques.every((monster) => monster.rapidRegeneration.amount === Math.ceil(monster.hp * monster.rapidRegeneration.rate)), "rapid-regeneration display amount is stale after final HP scaling");
+assert(window.HD_DATA.monsters.every((monster) => (monster.weaknesses || []).every((attribute) => {
+  const resistance = monster.resistances?.[attribute];
+  return resistance !== "immune" && Number(resistance || 0) <= 0;
+})), "a monster is simultaneously weak and positively resistant to the same attribute");
+assert(window.HD_DATA.monsters.find((monster) => monster.id === "white_fang_marta")?.speciesId === "vermin"
+  && window.HD_DATA.monsters.find((monster) => monster.id === "thunder_emperor_barg")?.speciesId === "vermin",
+"hand-authored beast uniques still receive contradictory fallback species");
+assert(window.HD_DATA.monsters.find((monster) => monster.id === "white_fang_marta")?.loot.some((rule) => rule.material === "fine_pelt")
+  && window.HD_DATA.monsters.find((monster) => monster.id === "thunder_emperor_barg")?.loot.some((rule) => rule.material === "unbroken_horn"),
+"hand-authored beast unique loot was overwritten by generic species loot");
+assert(window.HD_DATA.equipment.every((item) => item.attributeAttack === (item.attackAttributes?.[0] || null)), "equipment attackAttributes and legacy attributeAttack are out of sync");
+const obtainableMaterialIds = new Set([
+  ...window.HD_DATA.monsters.flatMap((monster) => (monster.loot || []).map((rule) => rule.material)),
+  ...window.HD_DATA.materials.filter((material) => material.junkDealerTier).map((material) => material.id),
+]);
+const unreachableRecipeMaterials = [...new Set(window.HD_DATA.equipment.flatMap((item) => Object.keys(item.recipe || {})))]
+  .filter((materialId) => !obtainableMaterialIds.has(materialId));
+assert(unreachableRecipeMaterials.length === 0, `recipe materials are unreachable: ${unreachableRecipeMaterials.join(",")}`);
+assert(window.HD_DATA.equipment.filter((item) => item.recipe && !item.artifact)
+  .every((item) => Object.keys(item.recipe).some((materialId) => obtainableMaterialIds.has(materialId))),
+"ordinary recipe equipment has no shop-unlock material route");
 const trueDragons = window.HD_DATA.monsters.filter((monster) => monster.speciesId === "dragon");
 assert(trueDragons.length >= 7 && trueDragons.every((monster) => monster.dragonBreath?.power > monster.attack && /ブレス|竜息/.test(monster.dangerous?.name)), "dragon breath progression is missing");
 assert(trueDragons.filter((monster) => monster.colorTier === "rainbow").every((monster) => monster.dragonBreath.trials === 3), "rainbow dragons do not use triple breath attacks");
@@ -500,6 +558,12 @@ assert(summoningUniques.length >= 30 && summoningUniques.length <= 42, "summonin
 assert(summoningUniques.filter((monster) => !monster.singularTrait && monster.id !== "dungeon_lord_nox").every((monster) => monster.summon.every === 6 && monster.summon.maxAlive === 2 && monster.summon.maxTotal === 4), "standard summoning limits are invalid");
 assert(summoningUniques.filter((monster) => monster.singularTrait).every((monster) => monster.summon.every >= 4 && monster.summon.maxAlive >= 1 && monster.summon.maxTotal >= monster.summon.maxAlive), "singular summoning limits are invalid");
 assert(arenaMonsters.map((monster) => monster.arenaRank).sort((a, b) => a - b).every((rank, index) => rank === index + 1), "arena ranks are not continuous");
+assert(window.HD_BOUNTY.nativeFloor(arenaMonsters[0], 100) === 1
+  && window.HD_BOUNTY.nativeFloor(arenaMonsters[arenaMonsters.length - 1], 100) === 100,
+"arena virtual depth still treats every combatant as B100");
+const capoeiraGrowth = window.HD_CHARACTER.levelBonuses(window.HD_DATA, 6, "capoeirista", "gentle");
+const swordsmanGrowth = window.HD_CHARACTER.levelBonuses(window.HD_DATA, 6, "swordsman", "gentle");
+assert(JSON.stringify(capoeiraGrowth) !== JSON.stringify(swordsmanGrowth) && capoeiraGrowth.speed >= 2, "capoeirista still falls back to swordsman growth");
 assert(new Set(arenaMonsters.map((monster) => Math.floor((monster.formerArenaRank - 1) * 10 / 192))).size === 10, "arena curation did not preserve all ten strength bands");
 assert(transferredUniques.every((monster) => monster.migratedFromArenaRank >= 193 && monster.migratedFromArenaRank <= 342), "transferred arena rank is invalid");
 assert(dungeonUniques.every((monster) => monster.floors?.length && monster.floors.every((floor) => floor >= 1 && floor <= 100)), "dungeon unique has no valid floor");
@@ -860,7 +924,7 @@ var document = {
   querySelector(selector) {
     if (!elements.has(selector)) {
       const element = new FakeElement();
-      if (selector === "#developerPanel") element.classList.add("hidden");
+      if (["#developerPanel", "#saveWarning", "#saveWarningReloadButton"].includes(selector)) element.classList.add("hidden");
       elements.set(selector, element);
     }
     return elements.get(selector);
@@ -1273,6 +1337,19 @@ assert(!elements.get("#arenaView").classList.contains("hidden"), "active arena s
 assert(elements.get("#townView").classList.contains("hidden"), "town view remained accessible after active arena reload");
 assert(elements.get("#arenaView").innerHTML.includes("第1戦 / 100"), "reloaded arena round was not rendered");
 
+const legacyArenaFieldSave = clone(arenaReloadSave);
+delete legacyArenaFieldSave.arena.size;
+delete legacyArenaFieldSave.arena.player;
+delete legacyArenaFieldSave.arena.obstacles;
+localStorage.getItem = function (key) {
+  return key === "hagitori-dungeon-save-v1" ? JSON.stringify(legacyArenaFieldSave) : null;
+};
+localStorage.setItem = function () {};
+eval(read("js/main.js"));
+assert(elements.get("#appShell").classList.contains("arena-mode")
+  && elements.get("#arenaView").innerHTML.includes("第1戦 / 100"),
+"repairable legacy arena coordinates were discarded before field migration");
+
 const arenaWorldTurnSave = clone(arenaReloadSave);
 arenaWorldTurnSave.adventurer.jobId = "ninja";
 arenaWorldTurnSave.adventurer.hp = 20;
@@ -1460,6 +1537,231 @@ assert(!/残り\d+回/.test(persistedCorpseSave.log[0]), "remaining harvest coun
 elements.get("#waitButton").listeners.click();
 assert(persistedCorpseSave.dungeon.enemies[0].harvestsRemaining === 0, "final harvest did not exhaust the corpse");
 assert(persistedCorpseSave.adventurer.materials.small_beast_meat === 2, "multi-harvest rewards were not granted per action");
+
+const wallPositionSave = clone(corpseSave);
+wallPositionSave.adventurer.raceId = "ghost";
+wallPositionSave.dungeon.map[10][10] = "wall";
+wallPositionSave.dungeon.map[12][12] = "wall";
+wallPositionSave.dungeon.map[13][13] = "wall";
+wallPositionSave.dungeon.stairs = [{ x: 12, y: 12 }];
+wallPositionSave.dungeon.chests = [{ x: 13, y: 13, opened: false }];
+let persistedWallPositionSave = null;
+localStorage.getItem = function (key) {
+  return key === "hagitori-dungeon-save-v1" ? JSON.stringify(wallPositionSave) : null;
+};
+localStorage.setItem = function (key, value) {
+  if (key === "hagitori-dungeon-save-v1") persistedWallPositionSave = JSON.parse(value);
+};
+eval(read("js/main.js"));
+elements.get("#waitButton").listeners.click();
+assert(persistedWallPositionSave?.dungeon
+  && persistedWallPositionSave.dungeon.player.x === 10
+  && persistedWallPositionSave.dungeon.stairs[0].x === 12
+  && persistedWallPositionSave.dungeon.chests[0].x === 13,
+"valid ghost, stair, or chest wall positions caused the active dungeon to be discarded");
+
+const brokenDungeonSave = clone(corpseSave);
+delete brokenDungeonSave.dungeon.player;
+delete brokenDungeonSave.dungeon.chests;
+localStorage.getItem = function (key) {
+  return key === "hagitori-dungeon-save-v1" ? JSON.stringify(brokenDungeonSave) : null;
+};
+localStorage.setItem = function () {};
+eval(read("js/main.js"));
+assert(elements.get("#appShell").classList.contains("town-mode") && elements.get("#placeText").textContent === "街", "partial dungeon save did not recover safely to town");
+
+const corruptNumericSave = clone(legacySave);
+corruptNumericSave.meta.awaitingCreation = false;
+corruptNumericSave.meta.shop = { soldMaterials: { rat_tail: "2.9", unknown_material: 99 }, inventory: [] };
+corruptNumericSave.adventurer.hp = "not-a-number";
+corruptNumericSave.adventurer.maxHp = "also-bad";
+corruptNumericSave.adventurer.gold = 20;
+corruptNumericSave.adventurer.materials = { rat_tail: "3.8", unknown_material: 99 };
+corruptNumericSave.adventurer.items = { recovery_medicine: "2.9", unknown_item: 99 };
+corruptNumericSave.dungeon = null;
+corruptNumericSave.adventurer.inDungeon = false;
+let persistedCorruptNumericSave = null;
+localStorage.getItem = function (key) {
+  return key === "hagitori-dungeon-save-v1" ? JSON.stringify(corruptNumericSave) : null;
+};
+localStorage.setItem = function (key, value) {
+  if (key === "hagitori-dungeon-save-v1") persistedCorruptNumericSave = JSON.parse(value);
+};
+eval(read("js/main.js"));
+assert(Number.isFinite(Number(elements.get("#hpText").textContent)) && Number(elements.get("#hpText").textContent) > 0, "missing HP migrated to NaN");
+elements.get("#restInnButton").listeners.click();
+assert(persistedCorruptNumericSave.adventurer.materials.rat_tail === 3
+  && !persistedCorruptNumericSave.adventurer.materials.unknown_material
+  && persistedCorruptNumericSave.adventurer.items.recovery_medicine === 2
+  && !persistedCorruptNumericSave.adventurer.items.unknown_item,
+"save count dictionaries were not normalized to finite known integer quantities");
+assert(persistedCorruptNumericSave.meta.shop.soldMaterials.rat_tail === 2
+  && !persistedCorruptNumericSave.meta.shop.soldMaterials.unknown_material,
+"shop material counts were not normalized");
+
+const deniedStorageSave = clone(corruptNumericSave);
+localStorage.getItem = function (key) {
+  return key === "hagitori-dungeon-save-v1" ? JSON.stringify(deniedStorageSave) : null;
+};
+localStorage.setItem = function () { throw new Error("quota denied"); };
+let deniedStorageInterruptedPlay = false;
+let deniedStorageError = "";
+try {
+  eval(read("js/main.js"));
+  elements.get("#restInnButton").listeners.click();
+} catch (error) {
+  deniedStorageInterruptedPlay = true;
+  deniedStorageError = String(error);
+}
+assert(!deniedStorageInterruptedPlay, `localStorage write failure interrupted gameplay: ${deniedStorageError}`);
+
+const revisionKeySave = clone(corruptNumericSave);
+revisionKeySave.meta.saveRevision = 7;
+revisionKeySave.adventurer.gold = 20;
+let revisionKeyDisk = clone(revisionKeySave);
+let revisionKeyValue = "7";
+let fullSaveReads = 0;
+localStorage.getItem = function (key) {
+  if (key === "hagitori-dungeon-save-v1") {
+    fullSaveReads += 1;
+    return JSON.stringify(revisionKeyDisk);
+  }
+  return key === "hagitori-dungeon-save-revision-v1" ? revisionKeyValue : null;
+};
+localStorage.setItem = function (key, value) {
+  if (key === "hagitori-dungeon-save-v1") revisionKeyDisk = JSON.parse(value);
+  if (key === "hagitori-dungeon-save-revision-v1") revisionKeyValue = String(value);
+};
+eval(read("js/main.js"));
+const fullSaveReadsAfterLoad = fullSaveReads;
+elements.get("#restInnButton").listeners.click();
+assert(fullSaveReads === fullSaveReadsAfterLoad && Number(revisionKeyValue) === revisionKeyDisk.meta.saveRevision,
+`routine saves still parse the full stored game: reads=${fullSaveReads}/${fullSaveReadsAfterLoad}, revisions=${revisionKeyValue}/${revisionKeyDisk.meta.saveRevision}`);
+
+const multiTabSave = clone(corruptNumericSave);
+multiTabSave.meta.saveRevision = 5;
+multiTabSave.adventurer.gold = 20;
+let multiTabDisk = clone(multiTabSave);
+let multiTabWrites = 0;
+localStorage.getItem = function (key) {
+  return key === "hagitori-dungeon-save-v1" ? JSON.stringify(multiTabDisk) : null;
+};
+localStorage.setItem = function (key, value) {
+  if (key !== "hagitori-dungeon-save-v1") return;
+  multiTabWrites += 1;
+  multiTabDisk = JSON.parse(value);
+};
+eval(read("js/main.js"));
+const writesBeforeExternalChange = multiTabWrites;
+multiTabDisk.meta.saveRevision = Number(multiTabDisk.meta.saveRevision || 0) + 1;
+elements.get("#restInnButton").listeners.click();
+assert(multiTabWrites === writesBeforeExternalChange
+  && elements.get("#liveLogAnnouncer").textContent.includes("別のタブ"),
+`an older tab overwrote a newer save revision: writes=${multiTabWrites}/${writesBeforeExternalChange}, notice=${elements.get("#liveLogAnnouncer").textContent}`);
+assert(!elements.get("#saveWarning").classList.contains("hidden")
+  && elements.get("#saveWarningText").textContent.includes("別のタブ")
+  && !elements.get("#saveWarningReloadButton").classList.contains("hidden"),
+"multi-tab save refusal was announced only to screen readers and offered no reload action");
+
+const legacyNoxSave = clone(corpseSave);
+legacyNoxSave.adventurer.floor = 100;
+legacyNoxSave.dungeon.enemies = [clone(window.HD_DATA.monsters.find((monster) => monster.id === "dungeon_lord_nox"))];
+Object.assign(legacyNoxSave.dungeon.enemies[0], {
+  x: 20, y: 20, maxHp: legacyNoxSave.dungeon.enemies[0].hp, alive: true,
+  turns: 0, acceleration: 0, asleep: false, summonProgress: 0,
+  summon: { every: 5, count: 1, maxAlive: 2, maxTotal: 8, pool: "undefeated_deep_unique", minFloor: 60 },
+  specialAttack: "time_stop",
+  dialogueState: { recent: [], cooldown: 0, counters: {}, stages: {} },
+});
+delete legacyNoxSave.dungeon.enemies[0].elixirAttrition;
+delete legacyNoxSave.dungeon.enemies[0].automaticSpecialAttack;
+let persistedLegacyNoxSave = null;
+localStorage.getItem = function (key) {
+  return key === "hagitori-dungeon-save-v1" ? JSON.stringify(legacyNoxSave) : null;
+};
+localStorage.setItem = function (key, value) {
+  if (key === "hagitori-dungeon-save-v1") persistedLegacyNoxSave = JSON.parse(value);
+};
+const legacyNoxOriginalRandom = Math.random;
+Math.random = function () { return 0.99; };
+eval(read("js/main.js"));
+elements.get("#waitButton").listeners.click();
+Math.random = legacyNoxOriginalRandom;
+const migratedLegacyNox = persistedLegacyNoxSave.dungeon.enemies.find((enemy) => enemy.id === "dungeon_lord_nox");
+assert(migratedLegacyNox.elixirAttrition?.every === 2
+  && migratedLegacyNox.summon?.every === 3
+  && !migratedLegacyNox.specialAttack,
+"a 3.5 final-boss instance kept time stop or missed current attrition/summon rules");
+assert(!migratedLegacyNox.dialogueState?.stages?.encounter,
+"a distant unique consumed its first-encounter dialogue before the player reached it");
+
+const rangedStunSave = clone(corpseSave);
+const rangedStunEnemy = clone(window.HD_DATA.monsters.find((monster) => monster.id === "cave_rat"));
+Object.assign(rangedStunEnemy, {
+  x: 20, y: 20, maxHp: rangedStunEnemy.hp, alive: true, turns: 0, acceleration: 0,
+  spellStunnedTurns: 1, specialAttack: null, dangerous: null,
+});
+rangedStunSave.dungeon.enemies = [rangedStunEnemy];
+let persistedRangedStunSave = null;
+localStorage.getItem = function (key) {
+  return key === "hagitori-dungeon-save-v1" ? JSON.stringify(rangedStunSave) : null;
+};
+localStorage.setItem = function (key, value) {
+  if (key === "hagitori-dungeon-save-v1") persistedRangedStunSave = JSON.parse(value);
+};
+eval(read("js/main.js"));
+elements.get("#waitButton").listeners.click();
+assert(persistedRangedStunSave.dungeon.enemies[0].turns === 1
+  && persistedRangedStunSave.dungeon.enemies[0].spellStunnedTurns === 0
+  && persistedRangedStunSave.dungeon.enemies[0].x === 20
+  && persistedRangedStunSave.dungeon.enemies[0].y === 20,
+"a stunned enemy at range moved or failed to consume its action opportunity");
+
+const rangedCadenceSave = clone(rangedStunSave);
+Object.assign(rangedCadenceSave.dungeon.enemies[0], {
+  turns: 2, spellStunnedTurns: 0,
+  dangerous: { every: 3, name: "遠距離誤発動試験", attribute: "fire", power: 9999, telegraph: "遠距離誤発動の予兆。" },
+});
+let persistedRangedCadenceSave = null;
+localStorage.getItem = function (key) {
+  return key === "hagitori-dungeon-save-v1" ? JSON.stringify(rangedCadenceSave) : null;
+};
+localStorage.setItem = function (key, value) {
+  if (key === "hagitori-dungeon-save-v1") persistedRangedCadenceSave = JSON.parse(value);
+};
+eval(read("js/main.js"));
+const rangedCadenceHpBefore = Number(elements.get("#hpText").textContent);
+elements.get("#waitButton").listeners.click();
+assert(persistedRangedCadenceSave.dungeon.enemies[0].turns === 3
+  && !persistedRangedCadenceSave.dungeon.enemies[0].telegraphed
+  && persistedRangedCadenceSave.adventurer.hp === rangedCadenceHpBefore,
+"a distant melee enemy fired a dangerous technique globally while its action counter advanced");
+
+const attritionDebtSave = clone(corpseSave);
+const attritionEnemy = clone(window.HD_DATA.monsters.find((monster) => monster.id === "dungeon_lord_nox"));
+Object.assign(attritionEnemy, {
+  x: 20, y: 20, maxHp: attritionEnemy.hp, alive: true, turns: 1, acceleration: 0,
+  specialAttack: null, dangerous: null, summon: null,
+});
+attritionDebtSave.adventurer.hp = 999;
+attritionDebtSave.adventurer.maxHp = 999;
+attritionDebtSave.adventurer.equipment.upper = "artifact_riverstone_mail";
+if (!attritionDebtSave.adventurer.ownedEquipment.includes("artifact_riverstone_mail")) attritionDebtSave.adventurer.ownedEquipment.push("artifact_riverstone_mail");
+attritionDebtSave.dungeon.enemies = [attritionEnemy];
+let persistedAttritionDebtSave = null;
+localStorage.getItem = function (key) {
+  return key === "hagitori-dungeon-save-v1" ? JSON.stringify(attritionDebtSave) : null;
+};
+localStorage.setItem = function (key, value) {
+  if (key === "hagitori-dungeon-save-v1") persistedAttritionDebtSave = JSON.parse(value);
+};
+eval(read("js/main.js"));
+const attritionHpBefore = Number(elements.get("#hpText").textContent);
+elements.get("#waitButton").listeners.click();
+const attritionDamage = Math.ceil(Number(elements.get("#maxHpText").textContent) * 0.05);
+assert(persistedAttritionDebtSave.adventurer.hp === attritionHpBefore - attritionDamage
+  && persistedAttritionDebtSave.adventurer.attritionRecoveryDebt === attritionDamage,
+`passive HP regeneration canceled existence attrition: before=${attritionHpBefore}, damage=${attritionDamage}, after=${persistedAttritionDebtSave.adventurer.hp}, debt=${persistedAttritionDebtSave.adventurer.attritionRecoveryDebt}`);
 
 const timeStopActionSave = clone(corpseSave);
 timeStopActionSave.adventurer.jobId = "psychic";
@@ -1808,6 +2110,54 @@ Math.random = trapOriginalRandom;
 const summonedEnemy = persistedSummonSave.dungeon.enemies.find((enemy) => enemy.summoned);
 assert(summonedEnemy && summonedEnemy.summonedBy, "summoning unique did not create a minion");
 assert(summonedEnemy.rewardProfile.experienceMultiplier === 0.25 && summonedEnemy.rewardProfile.harvestRolls[1] === 1, "summoned minion reward limits are missing");
+
+const summonCollisionSave = clone(summonSave);
+Object.assign(summonCollisionSave.dungeon.enemies[0], {
+  turns: 3, summonProgress: 5, specialAttack: "time_stop", telegraphed: false,
+});
+let persistedSummonCollisionSave = null;
+localStorage.getItem = function (key) {
+  return key === "hagitori-dungeon-save-v1" ? JSON.stringify(summonCollisionSave) : null;
+};
+localStorage.setItem = function (key, value) {
+  if (key === "hagitori-dungeon-save-v1") persistedSummonCollisionSave = JSON.parse(value);
+};
+Math.random = function () { return 0; };
+eval(read("js/main.js"));
+elements.get("#waitButton").listeners.click();
+Math.random = trapOriginalRandom;
+assert(persistedSummonCollisionSave.dungeon.enemies.some((enemy) => enemy.summoned)
+  && persistedSummonCollisionSave.dungeon.enemies[0].summonProgress === 0,
+"summon cadence was skipped when it collided with a periodic special action");
+
+const telegraphSummonCollisionSave = clone(summonSave);
+Object.assign(telegraphSummonCollisionSave.dungeon.enemies[0], {
+  turns: 5,
+  summonProgress: 5,
+  acceleration: 0,
+  telegraphed: true,
+  telegraphedAttribute: "poison",
+  dangerous: { every: 3, name: "予告解放試験", attribute: "poison", power: 1, telegraph: "予告解放試験の構え。" },
+});
+let persistedTelegraphSummonCollisionSave = null;
+localStorage.getItem = function (key) {
+  return key === "hagitori-dungeon-save-v1" ? JSON.stringify(telegraphSummonCollisionSave) : null;
+};
+localStorage.setItem = function (key, value) {
+  if (key === "hagitori-dungeon-save-v1") persistedTelegraphSummonCollisionSave = JSON.parse(value);
+};
+Math.random = function () { return 0.5; };
+eval(read("js/main.js"));
+elements.get("#waitButton").listeners.click();
+Math.random = trapOriginalRandom;
+assert(!persistedTelegraphSummonCollisionSave.dungeon.enemies[0].telegraphed
+  && persistedTelegraphSummonCollisionSave.dungeon.enemies[0].summonProgress === 6
+  && !persistedTelegraphSummonCollisionSave.dungeon.enemies.some((enemy) => enemy.summoned),
+"a due summon ran before releasing an already-telegraphed dangerous attack");
+elements.get("#waitButton").listeners.click();
+assert(persistedTelegraphSummonCollisionSave.dungeon.enemies[0].summonProgress === 0
+  && persistedTelegraphSummonCollisionSave.dungeon.enemies.some((enemy) => enemy.summoned),
+"a summon due on the telegraph-release action was lost instead of running on the next action");
 
 const cappedSummonSave = clone(summonSave);
 cappedSummonSave.dungeon.enemySpawnCap = 1;
@@ -2168,6 +2518,10 @@ replacementSave.meta.clearedBossFloors = [10, 20];
 replacementSave.meta.bounties = { red_garm: { intel: true, claimed: 2 } };
 replacementSave.meta.shop = { soldMaterials: { rat_tail: 4 }, inventory: ["iron_sword"] };
 replacementSave.meta.titles = ["交代後も残る称号"];
+replacementSave.meta.compendiumEquipmentUnlocked = true;
+replacementSave.meta.donatedPermanentEquipmentIds = ["omniscient_archive"];
+replacementSave.adventurer.ownedEquipment = replacementSave.adventurer.ownedEquipment.filter((id) => id !== "omniscient_archive");
+replacementSave.adventurer.jobId = "capoeirista";
 replacementSave.adventurer.inDungeon = false;
 replacementSave.dungeon = null;
 replacementSave.arena = clone(arenaReloadSave.arena);
@@ -2187,6 +2541,12 @@ assert(persistedReplacementSave.arena === null, "confirmSetup carried an arena r
 assert(persistedReplacementSave.meta.clearedBossFloors.length === 0 && persistedReplacementSave.meta.bounties.red_garm.claimed === 0, "new adventurer retained per-life depth or bounty claims");
 assert(Object.keys(persistedReplacementSave.meta.uniqueKills).length === 0 && !persistedReplacementSave.adventurer.gameCleared, "new adventurer inherited final-boss clearance or unique kills");
 assert(persistedReplacementSave.meta.bounties.red_garm.intel && persistedReplacementSave.meta.shop.soldMaterials.rat_tail === 4 && persistedReplacementSave.meta.titles.includes("交代後も残る称号"), "new adventurer lost inherited knowledge or town progress");
+assert(persistedReplacementSave.adventurer.equipment.weapon === null
+  && persistedReplacementSave.adventurer.equipment.feet === "starter_capoeira_wraps",
+"capoeirista did not begin weaponless with its starter wraps");
+assert(persistedReplacementSave.adventurer.ownedEquipment.includes("omniscient_archive")
+  && persistedReplacementSave.adventurer.donatedPermanentEquipmentIds.length === 0,
+"a permanent reward donated by the previous adventurer remained suppressed for the next generation");
 
 const deathLoopSave = clone(corpseSave);
 deathLoopSave.adventurer.hp = 1;
@@ -2498,7 +2858,7 @@ elements.get("#jobSkillButton").listeners.click();
 elements.get("#map").listeners.click({ target: { closest() { return { dataset: { enemyX: "13", enemyY: "10" } }; } } });
 Math.random = originalRandom;
 assert(persistedJobSkillSave.adventurer.lastAttack.skill === "precise", "dungeon job skill did not enter combat");
-assert(persistedJobSkillSave.dungeon.enemies[0].lootMaterialId === "vermin_fang", "species rare loot lost priority to attack attribute loot");
+assert(persistedJobSkillSave.dungeon.enemies[0].lootMaterialId === "fine_pelt", "carapace-rat hand-authored precise loot was overwritten");
 assert(persistedJobSkillSave.dungeon.turnsElapsed === 1, "a killing job skill did not consume an action");
 
 const spellCastSave = clone(rangedSave);
@@ -2659,7 +3019,7 @@ elements.get("dynamic:donate:omniscient_archive").listeners.click();
 elements.get("#confirmOk").listeners.click();
 assert(!persistedCompleteSave.adventurer.ownedEquipment.includes("omniscient_archive")
   && persistedCompleteSave.adventurer.guildPoints > compendiumDonationPointsBefore
-  && persistedCompleteSave.meta.donatedPermanentEquipmentIds.includes("omniscient_archive"),
+  && persistedCompleteSave.adventurer.donatedPermanentEquipmentIds.includes("omniscient_archive"),
 "permanent reward donation did not grant GP, remove the item, and suppress reissue");
 viewTabs.find((tab) => tab.dataset.view === "research").listeners.click();
 viewTabs.find((tab) => tab.dataset.view === "guild").listeners.click();
