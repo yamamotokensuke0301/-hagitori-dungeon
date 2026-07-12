@@ -1118,6 +1118,12 @@ assert(!townArrowPrevented, "town arrow key was captured and prevented normal sc
 
 const researchHtml = elements.get("#researchView").innerHTML;
 assert(researchHtml.includes("基礎最大HP"), "researched monster base HP is not shown in the compendium");
+const caveRatResearchCard = researchHtml.match(/<details[^>]*data-research-card="cave_rat"[\s\S]*?<\/details>/)?.[0] || "";
+assert(caveRatResearchCard.includes("<span>加速度</span><strong>0</strong>"), "research level one does not disclose acceleration in the compendium");
+assert(researchHtml.includes("剥ぎ取り条件")
+  && researchHtml.includes("精密射撃:蝙蝠の翼膜")
+  && researchHtml.includes("超レア抽選:"),
+"maximum research does not show canonical loot conditions in the compendium");
 assert(researchHtml.includes("調査度 1/5"), "legacy level 1 migration failed");
 assert(researchHtml.includes("調査度 3/5"), "legacy level 2 migration failed");
 assert(researchHtml.includes("調査度 5/5 MAX"), "legacy level 3 migration failed");
@@ -2658,6 +2664,34 @@ Math.random = originalRandom;
 assert(Object.keys(persistedChestSave.adventurer.materials).length === 0, "chest still granted monster material");
 assert(Object.keys(persistedChestSave.adventurer.items).some((id) => id.startsWith("spellbook_")), "forced spellbook chest did not grant a spellbook");
 assert(persistedChestSave.dungeon.chests[0].opened, "chest was not marked opened");
+
+const phaseResearchSave = clone(chestSave);
+phaseResearchSave.meta.researchSchemaVersion = 2;
+phaseResearchSave.meta.research.spirit_1 = { seen: true, level: 1, evidence: 1, milestones: {} };
+phaseResearchSave.dungeon.chests = [];
+const phaseResearchEnemy = clone(window.HD_DATA.monsters.find((monster) => monster.id === "spirit_1"));
+Object.assign(phaseResearchEnemy, {
+  x: 11, y: 10, maxHp: phaseResearchEnemy.hp, hp: phaseResearchEnemy.hp, alive: true,
+  turns: 0, telegraphed: false, canPhaseWalls: true,
+});
+phaseResearchSave.dungeon.enemies = [phaseResearchEnemy];
+localStorage.getItem = function (key) {
+  return key === "hagitori-dungeon-save-v1" ? JSON.stringify(phaseResearchSave) : null;
+};
+localStorage.setItem = function () {};
+eval(read("js/main.js"));
+elements.get("#map").listeners.click({ target: { closest() { return { dataset: { enemyX: "11", enemyY: "10" } }; } } });
+const phaseLevelOneHtml = elements.get("#monsterInfoContent").innerHTML;
+assert(!phaseLevelOneHtml.includes("<span>特性</span><strong>壁抜け</strong>"), "wall phasing leaked in live monster details at research level one");
+
+const phaseResearchLevelTwoSave = clone(phaseResearchSave);
+phaseResearchLevelTwoSave.meta.research.spirit_1 = { seen: true, level: 2, evidence: 30, milestones: {} };
+localStorage.getItem = function (key) {
+  return key === "hagitori-dungeon-save-v1" ? JSON.stringify(phaseResearchLevelTwoSave) : null;
+};
+eval(read("js/main.js"));
+elements.get("#map").listeners.click({ target: { closest() { return { dataset: { enemyX: "11", enemyY: "10" } }; } } });
+assert(elements.get("#monsterInfoContent").innerHTML.includes("<span>特性</span><strong>壁抜け</strong>"), "wall phasing was not disclosed in live monster details at research level two");
 
 const goldenChestSave = clone(chestSave);
 goldenChestSave.dungeon.anomaly = { id: "gold", name: "黄金墓" };

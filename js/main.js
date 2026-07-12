@@ -2038,6 +2038,12 @@
         const heartRecord = rec.level >= MAX_RESEARCH_LEVEL
           ? `<p class="heart-enhancement"><strong>${monster.name}の心</strong>：基礎強化+${monsterHeartPower(monster)} / ${attrHtml(monster.attackAttribute)}属性値+${monsterHeartAttributePower(monster)} / ${Number(state.meta.monsterHearts[monster.id] || 0) > 0 ? `所持${state.meta.monsterHearts[monster.id]}個` : "取得済み・消費済み"}</p>`
           : "";
+        const baseStatRecord = rec.level >= 1
+          ? `<p class="research-stat-line"><span>基礎最大HP</span><strong>${monster.hp}</strong></p><p class="research-stat-line"><span>加速度</span><strong>${Number(monster.acceleration || 0)}</strong></p>`
+          : "";
+        const lootConditionRecord = rec.level >= MAX_RESEARCH_LEVEL
+          ? `<div class="monster-loot-info"><span>剥ぎ取り条件</span>${lootHint(monster).map((line) => `<p>${line}</p>`).join("")}</div>`
+          : "";
         const dots = Array.from({ length: MAX_RESEARCH_LEVEL }, (_, index) => `<i class="research-level-dot ${index < rec.level ? "filled" : ""}"></i>`).join("");
         const open = researchFocusId === monster.id ? " open" : "";
         const graphicClasses = rec.seen
@@ -2045,7 +2051,7 @@
           : "research-monster-graphic unknown";
         return `<details class="research-card" data-research-card="${monster.id}"${open}>
           <summary><span class="${graphicClasses}" aria-hidden="true">${rec.seen ? monsterMarker(monster) : "?"}</span><span class="monster-research-title"><strong>${rec.seen ? monster.name : "未確認の魔物"}</strong><small>${rec.seen ? `${monsterSpeciesDisplay(monster, rec.level)} / ${monster.colorTierName}階級 / ` : ""}${rec.seen && monster.unique ? "ユニーク / " : ""}${rec.seen ? floorText : "出現階不明"}</small></span><span class="research-level-dots" aria-label="${researchStatusText(rec.level)}">${dots}</span><span>${rec.level}/5</span></summary>
-          <div class="research-card-details"><p><strong>${researchStatusText(rec.level)}</strong> ${rewardTag}</p>${heartRecord}${rec.level >= 1 ? `<p class="research-stat-line"><span>基礎最大HP</span><strong>${monster.hp}</strong></p>` : ""}${rec.level >= 3 ? `<p class="research-stat-line"><span>弱点属性</span><strong>${monster.weaknesses?.length ? monster.weaknesses.map(attrHtml).join("・") : "なし"}</strong></p><p class="research-stat-line"><span>耐性属性</span><strong>${Object.keys(monster.resistances || {}).length ? formatResistances(monster.resistances) : "なし"}</strong></p>` : ""}${lines.length ? lines.join("") : "<p>まだ詳細不明。遭遇、戦闘、調査で記録が進む。</p>"}${rec.level >= 4 ? `<p>剥ぎ取り候補：${lootCandidateNames(monster).join("・") || "なし"}</p>` : ""}</div>
+          <div class="research-card-details"><p><strong>${researchStatusText(rec.level)}</strong> ${rewardTag}</p>${heartRecord}${baseStatRecord}${rec.level >= 3 ? `<p class="research-stat-line"><span>弱点属性</span><strong>${monster.weaknesses?.length ? monster.weaknesses.map(attrHtml).join("・") : "なし"}</strong></p><p class="research-stat-line"><span>耐性属性</span><strong>${Object.keys(monster.resistances || {}).length ? formatResistances(monster.resistances) : "なし"}</strong></p>` : ""}${lines.length ? lines.join("") : "<p>まだ詳細不明。遭遇、戦闘、調査で記録が進む。</p>"}${rec.level >= 4 ? `<p>剥ぎ取り候補：${lootCandidateNames(monster).join("・") || "なし"}</p>` : ""}${lootConditionRecord}</div>
         </details>`;
       })
       .join("");
@@ -6255,7 +6261,7 @@
       known.push(`<div class="monster-info-row"><span>攻撃属性</span><strong>${attrHtml(enemy.attackAttribute)}</strong></div>`);
       known.push(`<div class="monster-info-row"><span>加速度</span><strong>${enemy.acceleration || 0}</strong></div>`);
       if (enemy.invisible) known.push(`<div class="monster-info-row"><span>特性</span><strong>透明</strong></div>`);
-      if (enemy.canPhaseWalls) known.push(`<div class="monster-info-row"><span>特性</span><strong>壁抜け</strong></div>`);
+      if (rec.level >= 2 && enemy.canPhaseWalls) known.push(`<div class="monster-info-row"><span>特性</span><strong>壁抜け</strong></div>`);
     }
     if (rec.level >= 2) {
       known.push(`<div class="monster-info-row"><span>攻撃力</span><strong>${enemy.attack}</strong></div>`);
