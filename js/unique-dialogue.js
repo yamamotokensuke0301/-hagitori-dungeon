@@ -271,6 +271,104 @@
 
   const SECOND_PERSON_ALIASES = Object.freeze({ scholar: ["君"], guardian: ["お前"], poet: ["君"] });
 
+  const NAME_THEME_PROFILES = Object.freeze({
+    symbol: ["oracle"],
+    mundane: ["jester", "ghost", "warrior"],
+    food: ["artisan", "jester", "beast"],
+    service: ["scholar", "jester", "artisan", "gambler"],
+    royalty: ["monarch", "zealot", "jester", "oracle"],
+    death: ["ghost", "poet", "oracle"],
+    time: ["oracle", "poet", "gambler"],
+    creature: ["beast", "jester", "guardian"],
+    absurd: ["jester", "poet", "oracle", "gambler"],
+  });
+
+  function nameTheme(name) {
+    if (/^[％＝≠？]+$/u.test(name)) return "symbol";
+    if (/(田中|佐藤|佐々木|石田|山田|鈴木|小林|係長)/u.test(name)) return "mundane";
+    if (/(ミルク|パン|ちくわ|うすしお|プリン|冷奴|豆腐|お通し|生の冥界魚|おかわり|食後|味|湯上がり|ポカポカ|温めますか|要冷蔵|冷蔵庫)/u.test(name)) return "food";
+    if (/([％＝≠？★→←＠※／＋≒…㊙￥_]|No\.|PUSH|LAST ORDER|充電中|\.exe|画像|仕様|再起動|更新|電池|説明書|取扱|会議|混み合|音声案内|配送|既読|折り返し|賞味期限|予約|お会計|株式会社|領収書|レシート|先着|抽選|一名様|三割引|ご自由|持ち帰る|法定速度|無事故|優先席|忘れ物|後半未読|ここだけの話|来週から|お近く|箱なし|定休|目撃情報)/u.test(name)) return "service";
+    if (/(死亡|死神|亡霊|墓|棺|冥界|あの世|遺言|骸|骨|呪い|恐怖|絶望|死霊)/u.test(name)) return "death";
+    if (/(予言|神託|昨日|明日|時間|時計|秒針|未来|永遠|期限|創世記)/u.test(name)) return "time";
+    if (/(魔王|皇帝|王|神|覇王|救世主|破壊神|冥王|終末|滅亡|無敵|不死身|天罰|世界樹|超新星|ブラックホール|邪神|聖剣|VALKYRIE|魔神|ラスボス|デストロイヤー|最終兵器|古代兵器|アポカリプス|勇者|英雄|暴君|竜王)/u.test(name)) return "royalty";
+    if (/(犬|鳥|龍|竜|デスワーム|ケルベロス|ベヒーモス|ミノタウロス|空気精|魔獣|魚|山脈|流星|雷雲|鉄巨人)/u.test(name)) return "creature";
+    return "absurd";
+  }
+
+  function nameDrivenIdentity(monster, seed) {
+    if (monster.id === "dungeon_lord_nox" || !monster.baseName || monster.name === monster.baseName) return null;
+    const name = monster.name;
+    const theme = nameTheme(name);
+    const profileIds = NAME_THEME_PROFILES[theme];
+    const profileId = profileIds[seed % profileIds.length];
+    const details = {
+      symbol: {
+        desire: `${name}という記号だけで世界の答えを記し切る`,
+        keepsake: `${name}だけが刻まれた計算板`,
+        truth: `${name}を本人も一度も正しく読めたことがない`,
+        mark: `${name}は空中へ自分と同じ記号を描く`,
+        technique: `${name}・解答不能`,
+      },
+      mundane: {
+        desire: `${name}という平凡な呼び名を迷宮で最も恐ろしい名にする`,
+        keepsake: `${name}とだけ書かれた古い名札`,
+        truth: `${name}が本名なのか本人にも分からない`,
+        mark: `${name}は曲がった名札を胸へ付け直す`,
+        technique: `${name}式・本気`,
+      },
+      food: {
+        desire: `${name}を最高の状態で完成させる`,
+        keepsake: `${name}のためだけに用意した欠けた皿`,
+        truth: `${name}を本人だけは一度も味わったことがない`,
+        mark: `${name}は戦場の温度と食べ頃を確かめる`,
+        technique: `${name}・食べ頃`,
+      },
+      service: {
+        desire: `${name}に書かれた手続きと注意事項を最後まで実行する`,
+        keepsake: `${name}と印刷された未処理伝票`,
+        truth: `${name}の問い合わせ先は迷宮のどこにも存在しない`,
+        mark: `${name}は存在しない受付番号を読み上げる`,
+        technique: `${name}・最終受付`,
+      },
+      royalty: {
+        desire: `${name}という大仰な肩書きを現実にする`,
+        keepsake: `${name}と刻まれた安物の王冠`,
+        truth: `${name}ほど本人は自分の権威を信じていない`,
+        mark: `${name}は傾いた王冠を正面へ戻す`,
+        technique: `${name}・真価`,
+      },
+      death: {
+        desire: `${name}の名で死と生の境を一つ増やす`,
+        keepsake: `${name}と墓碑へ刻むための欠けた鑿`,
+        truth: `${name}自身の死に場所だけはまだ決まっていない`,
+        mark: `${name}は誰もいない墓前へ一礼する`,
+        technique: `${name}・送葬`,
+      },
+      time: {
+        desire: `${name}が示す時刻まで結末を引き延ばす`,
+        keepsake: `${name}と同じ言葉が刻まれた止まった時計`,
+        truth: `${name}にも次の瞬間だけは読めない`,
+        mark: `${name}は逆向きに進む針を一度だけ確かめる`,
+        technique: `${name}・期限到来`,
+      },
+      creature: {
+        desire: `${name}という奇妙な生き物の名を獲物すべてへ覚えさせる`,
+        keepsake: `${name}の名札を結び付けた古い首輪`,
+        truth: `${name}と呼ばれる前の姿を本人だけが覚えている`,
+        mark: `${name}は自分の名に反応して低く唸る`,
+        technique: `${name}・本能解放`,
+      },
+      absurd: {
+        desire: `${name}という意味不明な名を勝利によって説明する`,
+        keepsake: `${name}と書かれた由来不明の札`,
+        truth: `${name}の意味を尋ねた者は誰も帰っていない`,
+        mark: `${name}は名を笑われる前に先に笑う`,
+        technique: `${name}・説明不能`,
+      },
+    }[theme];
+    return { profileId, ...details };
+  }
+
   function hashText(text) {
     let hash = 0x811c9dc5;
     for (let index = 0; index < text.length; index += 1) {
@@ -306,13 +404,14 @@
 
   uniques.forEach((monster, uniqueIndex) => {
     const seed = hashText(monster.id);
-    const shortName = monster.coreName || monster.baseName || monster.name;
+    const shortName = monster.name;
     const floor = monster.floors?.length ? Math.min(...monster.floors) : 0;
     const station = monster.arenaOnly ? `第${monster.arenaRank}戦` : `B${floor}F`;
     const motif = `${PERSONAL_OBJECTS[uniqueIndex % PERSONAL_OBJECTS.length]}へ${PERSONAL_VOWS[Math.floor(uniqueIndex / PERSONAL_OBJECTS.length) % PERSONAL_VOWS.length]}`;
     const arenaPersona = ARENA_TITLE_PERSONAS[monster.arenaTitle] || ["勝利の意味を探す", "古い対戦票を持つ", "敗北後の自分を想像できない"];
     const coreVoice = ARENA_CORE_VOICES[monster.coreName] || ["warrior", "俺", "お前", "構える前に一度だけ目を閉じる"];
     const dungeonIdentity = DUNGEON_IDENTITIES[monster.id];
+    const nameIdentity = nameDrivenIdentity(monster, seed);
     const authoredIdentity = monster.dialogueProfile ? [
       monster.dialogueProfile,
       monster.dialogueDesire || `${shortName}だけの勝利を探す`,
@@ -320,13 +419,16 @@
       monster.dialogueSecret || `${shortName}自身にも明かせない過去を持つ`,
     ] : null;
     const inheritedArenaIdentity = Boolean(monster.arenaTitle && monster.coreName);
-    const identity = dungeonIdentity || authoredIdentity || [coreVoice[0], arenaPersona[0], arenaPersona[1], arenaPersona[2]];
+    const identity = nameIdentity
+      ? [nameIdentity.profileId, nameIdentity.desire, nameIdentity.keepsake, nameIdentity.truth]
+      : dungeonIdentity || authoredIdentity || [coreVoice[0], arenaPersona[0], arenaPersona[1], arenaPersona[2]];
     const profile = VOICE_PROFILES[identity[0]] || VOICE_PROFILES.warrior;
     const attribute = ATTRIBUTE_VOICES[monster.attackAttribute] || ATTRIBUTE_VOICES.dark;
     const dangerAttribute = ATTRIBUTE_VOICES[monster.dangerous?.attribute] || attribute;
-    const first = inheritedArenaIdentity ? coreVoice[1] : profile.first;
-    const second = inheritedArenaIdentity ? coreVoice[2] : profile.second;
-    const technique = monster.dangerous?.originalName || monster.dangerous?.name || `${DATA.attributeLabels[monster.dangerous?.attribute || monster.attackAttribute]}奥義`;
+    const useInheritedArenaVoice = inheritedArenaIdentity && !nameIdentity;
+    const first = useInheritedArenaVoice ? coreVoice[1] : profile.first;
+    const second = useInheritedArenaVoice ? coreVoice[2] : profile.second;
+    const technique = nameIdentity?.technique || monster.dangerous?.originalName || monster.dangerous?.name || `${DATA.attributeLabels[monster.dangerous?.attribute || monster.attackAttribute]}奥義`;
     const values = {
       first,
       second,
@@ -335,7 +437,7 @@
       desire: identity[1],
       keepsake: identity[2],
       truth: identity[3],
-      mark: monster.arenaOnly ? `${station}で${coreVoice[3]}` : inheritedArenaIdentity ? `${motif}。${coreVoice[3]}` : motif,
+      mark: nameIdentity?.mark || (monster.arenaOnly ? `${station}で${coreVoice[3]}` : inheritedArenaIdentity ? `${motif}。${coreVoice[3]}` : motif),
       force: dangerAttribute[0],
       verb: dangerAttribute[1],
       omen: dangerAttribute[2],
@@ -394,6 +496,13 @@
       speech: Object.freeze(speech),
     });
 
+    if (nameIdentity) {
+      monster.dialogueProfile = nameIdentity.profileId;
+      monster.dialogueDesire = nameIdentity.desire;
+      monster.dialogueKeepsake = nameIdentity.keepsake;
+      monster.dialogueSecret = nameIdentity.truth;
+      monster.dialogueNameMatched = true;
+    }
     monster.uniqueTemperament = `${profile.label}／${identity[1]}`;
     monster.uniqueStyle = PROFILE_STYLES[records[monster.id].voiceId] || "warrior";
     monster.speechCadence = records[monster.id].cadence;

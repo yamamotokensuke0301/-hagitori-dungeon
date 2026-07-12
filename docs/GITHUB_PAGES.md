@@ -63,4 +63,4 @@ https://<OWNER>.github.io/hagitori-dungeon/
 
 ## 容量について
 
-公開対象のWAVは約90MiBあります。GitHub Pagesのサイト上限には収まりますが、回線によっては初回のBGM読み込みが遅くなる可能性があります。必要になった段階でOggまたはMP3へ変換し、`js/main.js` の参照先を変更してください。
+公開用BGMは48kHzステレオ・AAC 192kbpsのM4Aが10本、合計約12MiBです。生成元WAV約98MiBは公開対象から除外しています。`js/main.js`と開発用BGMラボはいずれもM4Aを参照します。

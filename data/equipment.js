@@ -419,7 +419,7 @@
   // 宝箱からしか見つからない固定IDの一点物。星印は表示側で artifact を見て付与する。
   window.HD_DATA.equipment.push(
     {
-      id: "artifact_invisible_emperor_cloak", name: "王様の透明外套", slot: "upper",
+      id: "artifact_invisible_emperor_cloak", name: "王様のインビジブル外套", slot: "upper",
       attack: 0, defense: -2, acceleration: 6, hpRegen: 0, attributeAttack: null, resistances: { illusion: 2 },
       jobs: allJobs, recipe: null, artifact: { tier: "joke", label: "ネタアーティファクト", guildPoints: 5, chestOnly: true },
       curse: { id: "public_shame", name: "裸の王様", severity: 1, penalties: { defense: -3 }, description: "本人にだけ豪華な外套が見える。" },
@@ -433,42 +433,42 @@
       description: "どこへ投げても必ず帰る。敵を経由するとは限らない。",
     },
     {
-      id: "artifact_endless_alarm", name: "鳴り止まない目覚まし", slot: "accessory",
+      id: "artifact_endless_alarm", name: "鳴り止まないモーニングコール", slot: "accessory",
       attack: 0, defense: 0, acceleration: 9, hpRegen: -1, attributeAttack: null, resistances: { illusion: 1 },
       jobs: allJobs, recipe: null, artifact: { tier: "joke", label: "ネタアーティファクト", guildPoints: 7, chestOnly: true },
       curse: { id: "sleepless", name: "不眠", severity: 1, penalties: { hpRegen: -2 }, description: "装備中は一瞬たりとも静かにならない。" },
       description: "針も文字盤もないのに、最悪の時機だけは正確に告げる。",
     },
     {
-      id: "artifact_reversed_hero_boots", name: "左右逆の勇者靴", slot: "feet",
+      id: "artifact_reversed_hero_boots", name: "左右逆のヒーローブーツ", slot: "feet",
       attack: 1, defense: 2, acceleration: -3, hpRegen: 0, attributeAttack: null, resistances: { earth: 1, wind: 1 },
       jobs: allJobs, recipe: null, artifact: { tier: "joke", label: "ネタアーティファクト", guildPoints: 8, chestOnly: true },
       description: "左右を正しく履くと動きにくく、逆に履くと少しだけ勇ましく見える。",
     },
 
     {
-      id: "artifact_holey_bucket_helm", name: "穴だらけの英雄兜", slot: "upper",
+      id: "artifact_holey_bucket_helm", name: "穴だらけのバケツヘルム", slot: "upper",
       attack: 0, defense: 1, acceleration: -2, hpRegen: 0, attributeAttack: null, resistances: { water: -1, acid: -1 },
       jobs: allJobs, recipe: null, artifact: { tier: "trash", label: "ゴミアーティファクト", guildPoints: 9, chestOnly: true },
       curse: { id: "rain_collector", name: "雨集め", severity: 2, penalties: { defense: -2 }, description: "あらゆる液体が穴を通って頭へ集まる。" },
       description: "兜だと言い張る者もいるが、どう見ても底の抜けた古いバケツ。",
     },
     {
-      id: "artifact_world_dulling_sword", name: "世界まで鈍らせる鈍刀", slot: "weapon",
+      id: "artifact_world_dulling_sword", name: "世界までスローにする鈍刀", slot: "weapon",
       attack: 3, defense: 1, acceleration: -5, hpRegen: 0, attributeAttack: "blunt", resistances: { steel: 1 },
       jobs: allJobs, recipe: null, artifact: { tier: "trash", label: "ゴミアーティファクト", guildPoints: 11, chestOnly: true },
       curse: { id: "dull_world", name: "鈍化伝染", severity: 2, penalties: { attack: -3, acceleration: -4 }, description: "刃だけでなく使い手の反応まで鈍らせる。" },
       description: "何も斬れない代わりに、叩かれた側も少し呆れる。",
     },
     {
-      id: "artifact_moth_eaten_mail", name: "千穴の虫喰い鎧", slot: "lower",
+      id: "artifact_moth_eaten_mail", name: "千穴のスイスチーズ鎧", slot: "lower",
       attack: 0, defense: 3, acceleration: -6, hpRegen: 0, attributeAttack: null, resistances: { slash: -1, poison: -1 },
       jobs: allJobs, recipe: null, artifact: { tier: "trash", label: "ゴミアーティファクト", guildPoints: 12, chestOnly: true },
       curse: { id: "phantom_moths", name: "幻虫の巣", severity: 2, penalties: { maxHp: -8 }, description: "見えない虫が内側から着用者を齧る。" },
       description: "穴を数え終わる前に、新しい穴が一つ増える鎧。",
     },
     {
-      id: "artifact_expired_talisman", name: "期限切れの厄除け札", slot: "accessory",
+      id: "artifact_expired_talisman", name: "期限切れのセーフティ札", slot: "accessory",
       attack: 0, defense: 0, acceleration: 0, hpRegen: 0, attributeAttack: null, resistances: { curse: -2, dark: -1 },
       jobs: allJobs, recipe: null, artifact: { tier: "trash", label: "ゴミアーティファクト", guildPoints: 13, chestOnly: true },
       curse: { id: "misfortune_interest", name: "厄の利息", severity: 3, penalties: { defense: -3, maxHp: -6 }, description: "防げなかった厄が利息付きで戻ってくる。" },
@@ -476,26 +476,26 @@
     },
 
     {
-      id: "artifact_old_guard_blade", name: "古衛士の直剣", slot: "weapon",
+      id: "artifact_old_guard_blade", name: "古衛士のスタンダードソード", slot: "weapon",
       attack: 11, defense: 2, acceleration: 0, hpRegen: 0, attributeAttack: "slash", resistances: { steel: 1 },
       jobs: allJobs, recipe: null, artifact: { tier: "ordinary", label: "平凡アーティファクト", guildPoints: 24, chestOnly: true },
       description: "名も残らなかった衛士が、最後まで手放さなかった堅実な剣。",
     },
     {
-      id: "artifact_moon_thread_coat", name: "月糸の旅外套", slot: "upper",
+      id: "artifact_moon_thread_coat", name: "月糸のトラベラー外套", slot: "upper",
       attack: 0, defense: 8, acceleration: 3, hpRegen: 1, attributeAttack: null, resistances: { dark: 2, ice: 1 },
       jobs: allJobs, recipe: null, artifact: { tier: "ordinary", label: "平凡アーティファクト", guildPoints: 27, chestOnly: true },
       curse: { id: "homesick_moon", name: "月郷病", severity: 1, penalties: { acceleration: -2 }, description: "月の見えない場所では足取りが少し重くなる。" },
       description: "月明かりを撚った糸で織られた、丈夫で軽い外套。",
     },
     {
-      id: "artifact_three_color_charm", name: "三色守りの石", slot: "accessory",
+      id: "artifact_three_color_charm", name: "トリコロール守りの石", slot: "accessory",
       attack: 1, defense: 2, acceleration: 1, hpRegen: 0, attributeAttack: null, resistances: { fire: 2, water: 2, thunder: 2 },
       jobs: allJobs, recipe: null, artifact: { tier: "ordinary", label: "平凡アーティファクト", guildPoints: 30, chestOnly: true },
       description: "三つの基本属性を無難に受け止める、実直な護り石。",
     },
     {
-      id: "artifact_patient_greaves", name: "百里歩きの脚甲", slot: "lower",
+      id: "artifact_patient_greaves", name: "百里ウォーカーの脚甲", slot: "lower",
       attack: 0, defense: 9, acceleration: 4, hpRegen: 1, attributeAttack: null, resistances: { earth: 2, blunt: 1 },
       jobs: allJobs, recipe: null, artifact: { tier: "ordinary", label: "平凡アーティファクト", guildPoints: 32, chestOnly: true },
       curse: { id: "never_rest", name: "休息拒絶", severity: 1, penalties: { hpRegen: -1 }, description: "立ち止まると脚甲が小刻みに歩き出す。" },
@@ -503,56 +503,56 @@
     },
 
     {
-      id: "artifact_steam_twinblade", name: "蒸界の双相剣", slot: "weapon",
+      id: "artifact_steam_twinblade", name: "蒸界のデュアルブレード", slot: "weapon",
       attack: 24, defense: 3, acceleration: 8, hpRegen: 0, attributeAttack: "fire", attackAttributes: ["fire", "water"], resistances: { fire: 3, water: 3 },
       jobs: allJobs, recipe: null, artifact: { tier: "useful", label: "使えるアーティファクト", guildPoints: 58, chestOnly: true },
       curse: { id: "boiling_blood", name: "沸血", severity: 2, penalties: { maxHp: -10 }, description: "火と水が交わるたび、使い手の血も熱を帯びる。" },
       description: "火と水の刃を同時に保ち、敵の耐性へ柔軟に食い込む名剣。",
     },
     {
-      id: "artifact_shadow_step_boots", name: "影渡りの長靴", slot: "feet",
+      id: "artifact_shadow_step_boots", name: "シャドウステップの長靴", slot: "feet",
       attack: 2, defense: 7, acceleration: 22, hpRegen: 0, attributeAttack: null, resistances: { dark: 4, illusion: 2, light: -1 },
       jobs: allJobs, recipe: null, artifact: { tier: "useful", label: "使えるアーティファクト", guildPoints: 66, chestOnly: true },
       curse: { id: "light_shyness", name: "光嫌い", severity: 2, penalties: { defense: -4 }, description: "強い光の下で影が使い手を置き去りにする。" },
       description: "足元の影を一歩先へ伸ばし、着用者をそこまで運ぶ長靴。",
     },
     {
-      id: "artifact_survivor_ring", name: "九死環", slot: "accessory",
+      id: "artifact_survivor_ring", name: "ナインライヴズの指輪", slot: "accessory",
       attack: 3, defense: 8, acceleration: 5, hpRegen: 5, attributeAttack: null, resistances: { poison: 3, curse: 3, acid: 3 },
       jobs: allJobs, recipe: null, artifact: { tier: "useful", label: "使えるアーティファクト", guildPoints: 74, chestOnly: true },
       curse: { id: "tenth_death", name: "十度目の死", severity: 2, penalties: { maxHp: -12 }, description: "九度救う代わりに、十度目を待ち続ける。" },
       description: "致命傷へ温かな脈動を送り、生還の可能性を拾い上げる指輪。",
     },
     {
-      id: "artifact_omnivision_mask", name: "万路観測面", slot: "upper",
+      id: "artifact_omnivision_mask", name: "万路のオムニサイト", slot: "upper",
       attack: 4, defense: 12, acceleration: 6, hpRegen: 2, attributeAttack: null, resistances: { illusion: 4, dark: 3, light: 2 }, trueSight: true,
       jobs: allJobs, recipe: null, artifact: { tier: "useful", label: "使えるアーティファクト", guildPoints: 82, chestOnly: true },
       description: "視界に入らない通路まで残響で描き、透明な気配を暴く仮面。",
     },
 
     {
-      id: "artifact_genesis_trinity", name: "創世三極杖", slot: "weapon",
+      id: "artifact_genesis_trinity", name: "ジェネシス三極杖", slot: "weapon",
       attack: 58, defense: 10, acceleration: 18, hpRegen: 6, attributeAttack: "light", attackAttributes: ["light", "dark", "curse"], resistances: { light: 5, dark: 5, curse: 4 }, trueSight: true,
       jobs: allJobs, recipe: null, artifact: { tier: "cheat", label: "チートレベルのアーティファクト", guildPoints: 190, chestOnly: true },
       curse: { id: "creation_tax", name: "創世の代価", severity: 4, penalties: { maxHp: -25, hpRegen: -3 }, description: "三つの極を振るうたび、使い手の存在が少しずつ削れる。" },
       description: "光・闇・呪いの三極を一つの術式へ束ねる、法則外の魔杖。",
     },
     {
-      id: "artifact_time_thief_boots", name: "時盗みの神速靴", slot: "feet",
+      id: "artifact_time_thief_boots", name: "クロノシーフの神速靴", slot: "feet",
       attack: 5, defense: 12, acceleration: 48, hpRegen: 3, attributeAttack: null, resistances: { thunder: 4, wind: 5, illusion: 3 },
       jobs: allJobs, recipe: null, artifact: { tier: "cheat", label: "チートレベルのアーティファクト", guildPoints: 215, chestOnly: true },
       curse: { id: "borrowed_lifetime", name: "寿命前借り", severity: 5, penalties: { maxHp: -35 }, description: "得た時間はすべて未来の自分から盗まれている。" },
       description: "次の瞬間を奪い、誰より早く行動を終えてしまう禁足具。",
     },
     {
-      id: "artifact_undying_world_mail", name: "不滅世界の生体鎧", slot: "upper",
+      id: "artifact_undying_world_mail", name: "イモータル・バイオメイル", slot: "upper",
       attack: 8, defense: 58, acceleration: -12, hpRegen: 14, attributeAttack: null, resistances: { slash: 5, blunt: 5, poison: "immune", acid: 4 },
       jobs: allJobs, recipe: null, artifact: { tier: "cheat", label: "チートレベルのアーティファクト", guildPoints: 245, chestOnly: true },
       curse: { id: "living_prison", name: "生きた牢獄", severity: 4, penalties: { acceleration: -18 }, description: "鎧は着用者を守るほど、決して外へ出したくなくなる。" },
       description: "傷つくそばから世界の肉を継ぎ足し、形を取り戻す生体鎧。",
     },
     {
-      id: "artifact_zero_crown", name: "零界王冠", slot: "accessory",
+      id: "artifact_zero_crown", name: "ゼロ・バウンダリー王冠", slot: "accessory",
       attack: 25, defense: 25, acceleration: 25, hpRegen: 8, attributeAttack: null,
       resistances: Object.fromEntries(window.HD_DATA.attributes.map((id) => [id, id === "curse" ? "immune" : 4])), trueSight: true,
       jobs: allJobs, recipe: null, artifact: { tier: "cheat", label: "チートレベルのアーティファクト", guildPoints: 300, chestOnly: true },
@@ -580,19 +580,19 @@
   const expandedArtifactSpecs = [
     // ネタアーティファクト：利点は小さく、使い方より逸話が先に立つ。
     {
-      id: "artifact_applauding_gauntlet", name: "拍手しかしない篭手", tier: "joke", gp: 5, slot: "accessory",
+      id: "artifact_applauding_gauntlet", name: "オート拍手の篭手", tier: "joke", gp: 5, slot: "accessory",
       attack: 0, defense: 1, acceleration: 2, hpRegen: 0, attributeAttack: null, resistances: { steel: 1 },
       curse: { name: "喝采強要", severity: 1, penalties: { attack: -2 }, description: "戦うべき時にも篭手が勝手に拍手を始める。" },
       description: "誰の武勲かを問わず、危険な場面ほど盛大な拍手を送る篭手。",
     },
     {
-      id: "artifact_backward_compass", name: "帰路だけ指す羅針盤", tier: "joke", gp: 6, slot: "accessory",
+      id: "artifact_backward_compass", name: "リターン専門コンパス", tier: "joke", gp: 6, slot: "accessory",
       attack: 0, defense: 0, acceleration: 3, hpRegen: 0, attributeAttack: null, resistances: { illusion: 1 },
       curse: { name: "未練針", severity: 1, penalties: { acceleration: -2 }, description: "進もうとするたび、針が帰還を強く勧めてくる。" },
       description: "目的地には沈黙し、帰り道だけは得意げに示す羅針盤。",
     },
     {
-      id: "artifact_bottomless_lunchbox", name: "底なし弁当箱", tier: "joke", gp: 6, slot: "accessory",
+      id: "artifact_bottomless_lunchbox", name: "底なしランチボックス", tier: "joke", gp: 6, slot: "accessory",
       attack: 0, defense: 1, acceleration: 0, hpRegen: 2, attributeAttack: null, resistances: { poison: 1 },
       curse: { name: "空腹保存", severity: 1, penalties: { maxHp: -5 }, description: "食べ物ではなく、持ち主の満腹感だけをしまい込む。" },
       description: "蓋を開けるたび湯気は立つが、肝心の中身だけが見つからない。",
@@ -604,50 +604,50 @@
       description: "着用者より半歩早く角を曲がり、勝手に決め姿勢を取るマント。",
     },
     {
-      id: "artifact_squeaky_sabaton", name: "絶叫する鉄靴", tier: "joke", gp: 7, slot: "feet",
+      id: "artifact_squeaky_sabaton", name: "スクリーム・サバトン", tier: "joke", gp: 7, slot: "feet",
       attack: 0, defense: 3, acceleration: -1, hpRegen: 0, attributeAttack: null, resistances: { steel: 1, illusion: 1 },
       curse: { name: "足音絶叫", severity: 1, penalties: { acceleration: -3 }, description: "一歩ごとに迷宮中へ響く甲高い悲鳴を上げる。" },
       description: "蝶番へ油を差すと、今度は別の音程で鳴き始める鉄靴。",
     },
     {
-      id: "artifact_rainmaking_umbrella", name: "屋内雨降らし傘", tier: "joke", gp: 8, slot: "weapon",
+      id: "artifact_rainmaking_umbrella", name: "インドア・レインメーカー", tier: "joke", gp: 8, slot: "weapon",
       attack: 2, defense: 1, acceleration: 1, hpRegen: 0, attributeAttack: "water", attackAttributes: ["water", "wind"], resistances: { water: 1 },
       curse: { name: "局地豪雨", severity: 1, penalties: { defense: -2 }, description: "傘の内側だけへ冷たい雨を降らせ続ける。" },
       description: "晴天にも洞窟にも雨雲を連れてくる、用途の逆転した古傘。",
     },
     {
-      id: "artifact_echoing_purse", name: "小銭を数える財布", tier: "joke", gp: 8, slot: "accessory",
+      id: "artifact_echoing_purse", name: "コインカウンター財布", tier: "joke", gp: 8, slot: "accessory",
       attack: 0, defense: 0, acceleration: 1, hpRegen: 0, attributeAttack: null, resistances: { curse: 1 },
       curse: { name: "残高朗読", severity: 1, penalties: { maxHp: -3 }, description: "所持金が変わるたび、財布が大声で残高を読み上げる。" },
       description: "中身が空でも一枚ずつ数える音だけは律儀に続く財布。",
     },
     {
-      id: "artifact_misplaced_doorplate", name: "迷宮主の表札", tier: "joke", gp: 9, slot: "accessory",
+      id: "artifact_misplaced_doorplate", name: "迷宮主のネームプレート", tier: "joke", gp: 9, slot: "accessory",
       attack: 0, defense: 2, acceleration: 0, hpRegen: 0, attributeAttack: null, resistances: { dark: 1, earth: 1 },
       description: "どの扉へ掛けても『留守』とだけ表示される、迷宮主の古い表札。",
     },
 
     // ゴミアーティファクト：弱い基礎性能を強い欠点がさらに押し下げる。
     {
-      id: "artifact_cracked_mirror_shield", name: "百裂の曇り鏡", tier: "trash", gp: 10, slot: "upper",
+      id: "artifact_cracked_mirror_shield", name: "百裂スモークミラー", tier: "trash", gp: 10, slot: "upper",
       attack: 0, defense: 2, acceleration: -1, hpRegen: 0, attributeAttack: null, resistances: { illusion: 2, light: -2 },
       curse: { name: "破像反射", severity: 2, penalties: { defense: -4 }, description: "映った傷を持ち主の身体へ丁寧に写し取る。" },
       description: "盾としても鏡としても割れすぎている、重い曇り板。",
     },
     {
-      id: "artifact_rusted_anchor_blade", name: "錆海の錨剣", tier: "trash", gp: 11, slot: "weapon",
+      id: "artifact_rusted_anchor_blade", name: "錆海のアンカーブレード", tier: "trash", gp: 11, slot: "weapon",
       attack: 6, defense: 2, acceleration: -10, hpRegen: 0, attributeAttack: "blunt", attackAttributes: ["blunt", "steel"], resistances: { steel: 1 },
       curse: { name: "海底固着", severity: 3, penalties: { attack: -4, acceleration: -5 }, description: "振るうたび見えない海底へ錨を下ろしてしまう。" },
       description: "剣に削り直そうとして諦められた、赤錆だらけの小錨。",
     },
     {
-      id: "artifact_leaking_mana_boots", name: "魔力漏れの長靴", tier: "trash", gp: 12, slot: "feet",
+      id: "artifact_leaking_mana_boots", name: "マナ漏れのロングブーツ", tier: "trash", gp: 12, slot: "feet",
       attack: 0, defense: 2, acceleration: 4, hpRegen: -1, attributeAttack: null, resistances: { curse: -2, illusion: 1 },
       curse: { name: "術漏れ", severity: 2, penalties: { maxHp: -8 }, description: "歩いた跡へ持ち主の生命力まで染み出していく。" },
       description: "底の穴から淡い魔力が漏れ、足跡だけは美しく光る長靴。",
     },
     {
-      id: "artifact_hollow_bone_mail", name: "空洞骨の鎧", tier: "trash", gp: 13, slot: "lower",
+      id: "artifact_hollow_bone_mail", name: "ホロウボーンの鎧", tier: "trash", gp: 13, slot: "lower",
       attack: 0, defense: 5, acceleration: -7, hpRegen: 0, attributeAttack: null, resistances: { slash: -1, blunt: -1 },
       curse: { name: "骨鳴り", severity: 2, penalties: { defense: -5 }, description: "衝撃を受ける前から骨が砕ける音を響かせる。" },
       description: "軽量化のため中身を抜きすぎ、支えまで失った骨鎧。",
@@ -891,6 +891,27 @@
     item.description = `${item.description} 属性接続：${window.HD_DATA.attributeLabels[coverage]}免疫。`;
   });
 
+  // 防御力を完全に捨て、多数の属性免疫だけを残した宝箱限定の艶装備。
+  // 通常の固定アーティファクト補正を通さず、非免疫属性には無防備という弱点を保つ。
+  window.HD_DATA.equipment.push(
+    {
+      id: "artifact_outrageous_bikini_top", name: "やばすぎるビキニ上", slot: "upper",
+      attack: 0, defense: 0, acceleration: 0, hpRegen: 0, attributeAttack: null,
+      resistances: { light: "immune", fire: "immune", water: "immune", poison: "immune", curse: "immune", illusion: "immune" },
+      jobs: allJobs, recipe: null, risque: true, rousesDungeon: true,
+      artifact: { tier: "cheat", label: "チートレベルのアーティファクト", guildPoints: 320, chestOnly: true },
+      description: "守っている面積はほぼない。それでも光・火・水・毒・呪・幻だけはなぜか完全に通さない。特殊効果でダンジョン中のモンスターが全て目を覚ます。",
+    },
+    {
+      id: "artifact_outrageous_bikini_bottom", name: "やばすぎるビキニ下", slot: "lower",
+      attack: 0, defense: 0, acceleration: 0, hpRegen: 0, attributeAttack: null,
+      resistances: { dark: "immune", earth: "immune", wind: "immune", thunder: "immune", ice: "immune", acid: "immune" },
+      jobs: allJobs, recipe: null, risque: true, rousesDungeon: true,
+      artifact: { tier: "cheat", label: "チートレベルのアーティファクト", guildPoints: 320, chestOnly: true },
+      description: "防御力を置き忘れた下半身装備。闇・土・風・雷・凍・酸だけはきっぱり拒絶する。特殊効果でダンジョン中のモンスターが全て目を覚ます。",
+    },
+  );
+
   // 「すけべ」の性格と共鳴する艶装備。通常の装備性能は他の性格でもそのまま使える。
   const risqueEquipmentIds = new Set([
     "artifact_invisible_emperor_cloak", "artifact_moon_thread_coat", "artifact_shadow_step_boots",
@@ -1126,6 +1147,7 @@
   // ネタ・ゴミアーティファクトと初期支給品は、弱さそのものが個性なので対象外とする。
   const lateGameEquipmentPower = (item) => {
     const grade = Number(/^series_(\d+)_/.exec(item.id)?.[1] || 0);
+    if (item.rousesDungeon) return 0;
     if (grade >= 9) return 3;
     if (grade === 8) return 2;
     if (grade === 7) return 1;

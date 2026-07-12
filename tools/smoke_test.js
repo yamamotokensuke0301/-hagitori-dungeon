@@ -48,6 +48,12 @@ const jobsSource = read("data/jobs.js");
 const dungeonGeneratorSource = read("js/dungeon-generator.js");
 const indexSource = read("index.html");
 const combatSimSource = read("tools/combat_balance_sim.js");
+const bgmTrackBlock = mainSource.match(/const BGM_TRACKS = \{([\s\S]*?)\n  \};/)?.[1] || "";
+const publicBgmPaths = [...bgmTrackBlock.matchAll(/"\.\/(assets\/audio\/[^"?]+\.m4a)\?/g)].map((match) => match[1]);
+assert(mainSource.includes('const APP_VERSION = "Prototype 3.7.0"'), "public version was not updated to Prototype 3.7.0");
+assert(publicBgmPaths.length === 10 && !bgmTrackBlock.includes(".wav")
+  && publicBgmPaths.every((path) => $.NSFileManager.defaultManager.fileExistsAtPath(path)),
+"public BGM paths are not ten existing compressed M4A files");
 assert(!/\.enemy-fire\s*\{[^}]*background/.test(styleSource), "monster attribute color still changes the background");
 assert(mainSource.includes("RESEARCH_EVIDENCE_THRESHOLDS = [0, 1, 30, 85, 180, 320]") && mainSource.includes("function spreadSpeciesResearch") && mainSource.includes("firstMilestone ? 2 : 1"), "long-term research progression does not include milestones and species sharing");
 assert(mainSource.includes("if (completedPeer) reconcileResearchCompletion(true)"), "species-shared research can reach maximum without immediate heart/completion reconciliation");
@@ -55,6 +61,8 @@ assert(mainSource.includes("function colorizeResearchAttributes") && mainSource.
 assert(mainSource.includes("弱点属性") && mainSource.includes("耐性属性") && mainSource.includes("monster.weaknesses.map(attrHtml)"), "explicit colored research affinities are missing");
 assert(indexSource.includes('id="deathCryText"') && mainSource.includes("function chooseDeathCry") && mainSource.includes("DEATH_CRY_PERSONALITY"), "player death-cry variation is missing");
 assert(mainSource.includes('log(`${adventurerName}の断末魔') && !mainSource.includes('playSfx("death");\n    playSfx(deathVoice)'), "death cry is not logged or is still masked by the old death jingle");
+const commonDeathCryBlock = mainSource.match(/const DEATH_CRY_COMMON = Object\.freeze\(\[([\s\S]*?)\]\);/)?.[1] || "";
+assert((commonDeathCryBlock.match(/^\s*"/gm) || []).length === 32, "common death-cry catalog must contain 32 lines");
 assert(/\.research-card-details \.attr\s*\{[^}]*font-size:\s*1\.15em;/.test(styleSource), "colored research attributes are not enlarged");
 const arenaFoeRule = styleSource.match(/\.arena-foe\s*\{[^}]*\}/)?.[0] || "";
 assert(arenaFoeRule.includes("color: hsl(var(--arena-marker-hue)"), "arena marker text color is missing");
@@ -269,7 +277,7 @@ assert(lazyBackstory === window.HD_CHARACTER.generateBackstory({
 assert(lazyBackstory.includes("ねむり丸") && lazyBackstory.includes("昼寝と遠回り"), "lazy backstory traits were lost during extraction");
 
 assert(window.HD_DATA.monsters.length === 793, "monster count changed");
-assert(window.HD_DATA.equipment.length === 2722, "equipment count changed");
+assert(window.HD_DATA.equipment.length === 2724, "equipment count changed");
 const starterBuildEquipment = window.HD_DATA.equipment.filter((item) => item.starterOnly);
 assert(starterBuildEquipment.length === 15 && window.HD_DATA.jobs.every((job) => starterBuildEquipment.some((item) => item.jobs.includes(job.id))), "job-specific starter equipment is incomplete");
 assert(starterBuildEquipment.every((item) => item.attackAttributes.length >= 1 && item.description), "starter equipment lacks build identity");
@@ -279,9 +287,17 @@ assert(window.HD_DATA.equipment.some((item) => item.attackAttributes.length >= 2
 const puzzleEquipment = window.HD_DATA.equipment.filter((item) => item.puzzleEffects?.length);
 assert(puzzleEquipment.length === 17 && puzzleEquipment.every((item) => item.description.includes("連携効果")), "hand-authored equipment puzzle set is incomplete");
 const chestArtifacts = window.HD_DATA.equipment.filter((item) => item.artifact?.chestOnly);
-assert(chestArtifacts.length === 63, "fixed artifact catalog must contain 63 items");
-assert(["joke", "trash", "ordinary", "useful"].every((tier) => chestArtifacts.filter((item) => item.artifact.tier === tier).length === 12) && chestArtifacts.filter((item) => item.artifact.tier === "cheat").length === 15, "fixed artifact tiers were not tripled");
+assert(chestArtifacts.length === 65, "fixed artifact catalog must contain 65 items");
+assert(["joke", "trash", "ordinary", "useful"].every((tier) => chestArtifacts.filter((item) => item.artifact.tier === tier).length === 12) && chestArtifacts.filter((item) => item.artifact.tier === "cheat").length === 17, "fixed artifact tier counts are invalid");
 assert(chestArtifacts.some((item) => item.id === "artifact_power_pole" && item.name === "如意棒"), "Power Pole artifact is missing");
+const outrageousBikinis = chestArtifacts.filter((item) => item.id.startsWith("artifact_outrageous_bikini_"));
+assert(outrageousBikinis.length === 2
+  && outrageousBikinis.every((item) => item.risque && item.rousesDungeon && item.defense === 0 && Object.values(item.resistances).filter((value) => value === "immune").length === 6),
+"outrageous bikini artifacts are missing their zero-defense/multi-immunity tradeoff");
+assert(mainSource.includes("function hasDungeonRousingEquipment")
+  && mainSource.includes("asleep: !hasDungeonRousingEquipment()")
+  && mainSource.includes("ダンジョン中のモンスターが一斉に目を覚ました"),
+"outrageous bikini dungeon-wide awakening effect is missing");
 assert(chestArtifacts.filter((item) => item.curse).length >= 45, "artifacts are not often cursed");
 assert(chestArtifacts.every((item) => item.artifact.guildPoints > 0), "an artifact has no guild point value");
 const gradeShopFloors = [1, 1, 15, 25, 35, 45, 55, 70, 85];
@@ -302,6 +318,9 @@ assert(mainSource.includes("function applyRangedJobSkillEffect") && mainSource.i
 assert(mainSource.includes('rangedMode && adv.jobId === "ninja"') && mainSource.includes("attackTrials * 0.5"), "ninja ranged attacks still retain full melee attack count");
 assert(mainSource.includes("VAULT_LEGEND_JUNK_CHANCE = 0.008") && mainSource.includes('item.junkTier !== "legend"') && mainSource.includes(".slice(0, 12)"), "treasure vault still guarantees top-price legend junk");
 assert(mainSource.includes("minimumSpellRank = depth >= 90 ? 4 : depth >= 70 ? 3 : depth >= 40 ? 2 : 1"), "normal chest spellbook ranks do not improve with depth");
+assert(mainSource.includes("OUT_OF_DEPTH_SPELLBOOK_CHANCE = 0.0001")
+  && (mainSource.match(/outOfDepthSpellbooks/g) || []).length >= 6,
+"out-of-depth spellbooks do not have a very rare shallow-floor route");
 assert(mainSource.includes('state.adventurer.jobId === "hunter" ? 0.99') && mainSource.includes('state.adventurer.jobId === "handyman" ? 0.97') && mainSource.includes("failureEffectMultiplier"), "late-game trap disarm expertise is flattened by a shared cap");
 assert(mainSource.includes("floorNumber >= 61 && floorNumber <= 90 && Math.random() < 0.02"), "danger-five traps have no rare pre-final-depth appearance");
 assert(window.HD_DATA.personalities.some((item) => item.id === "ordinary" && item.name === "ふつう"), "ordinary personality is missing");
@@ -369,6 +388,11 @@ assert(elixirSiegeUniques.every((monster) => monster?.elixirAttrition?.recommend
 const finalBossSummon = window.HD_DATA.monsters.find((monster) => monster.id === "dungeon_lord_nox")?.summon;
 assert(finalBossSummon?.pool === "undefeated_deep_unique" && finalBossSummon.every === 3 && finalBossSummon.maxTotal === 8, "final boss unique-memory summon profile is invalid");
 assert(mainSource.includes('summon.pool === "undefeated_deep_unique"') && mainSource.includes("!state.meta.uniqueKills[monster.id]"), "defeated deep uniques are not removed from the final boss summon pool");
+assert(mainSource.includes("function canSpawnDungeonUnique")
+  && (mainSource.match(/canSpawnDungeonUnique\(/g) || []).length >= 8
+  && dungeonGeneratorSource.includes("availableTickets"),
+"defeated or duplicate dungeon uniques are not excluded from every spawn route");
+assert(mainSource.includes("markResearch(enemy.id, MAX_RESEARCH_LEVEL, { force: true })"), "unique defeat does not immediately complete research");
 assert(window.HD_DATA.equipment.find((item) => item.id === "rusty_knife").jobs.includes("ninja") && window.HD_DATA.equipment.find((item) => item.id === "cloth").jobs.includes("ninja"), "ninja cannot use starter equipment");
 const guildWeaponCosts = window.HD_DATA.equipment.filter((item) => item.slot === "weapon" && item.guildCost).map((item) => item.guildCost).sort((a, b) => a - b);
 const lateGameEquipment = window.HD_DATA.equipment.filter((item) => item.lateGamePower);
@@ -448,7 +472,9 @@ assert(renamedGeneratedUniques.every((monster) => !monster.dangerous?.telegraph 
 "a renamed unique still uses an obsolete name in its danger telegraph");
 assert(mainSource.includes("enemy.name = canonicalMonster.name")
   && mainSource.includes("enemy.baseName = canonicalMonster.baseName || canonicalMonster.name")
-  && mainSource.includes("enemy.dangerous.telegraph = canonicalMonster.dangerous.telegraph"),
+  && mainSource.includes("enemy.dangerous.telegraph = canonicalMonster.dangerous.telegraph")
+  && mainSource.includes("enemy.uniqueTemperament = canonicalMonster.uniqueTemperament")
+  && mainSource.includes("enemy.dialogueNameMatched = Boolean(canonicalMonster.dialogueNameMatched)"),
 "saved enemy display names are not synchronized from current monster data");
 assert(window.HD_DATA.monsters.every((monster) => window.HD_DATA.attributes.includes(monster.attackAttribute)), "monster has an invalid attack attribute");
 assert(window.HD_DATA.monsters.every((monster) => !monster.dangerous || window.HD_DATA.attributes.includes(monster.dangerous.attribute)), "monster has an invalid dangerous attribute");
@@ -570,6 +596,24 @@ assert(dungeonUniques.every((monster) => monster.floors?.length && monster.floor
 assert(window.HD_DATA.floors.every((floor) => floor.uniques.every((id) => dungeonUniques.some((monster) => monster.id === id))), "floor contains a non-dungeon unique");
 assert(Math.max(...window.HD_DATA.floors.map((floor) => floor.uniques.length)) < 120, "weighted unique pool grew unexpectedly large");
 assert(window.HD_UNIQUE_DIALOGUE.count === uniqueMonsters.length, "unique dialogue count mismatch");
+const displayRenamedUniques = uniqueMonsters.filter((monster) => (
+  monster.id !== "dungeon_lord_nox" && monster.name !== monster.baseName
+));
+assert(displayRenamedUniques.length === 147 && displayRenamedUniques.every((monster) => (
+  monster.dialogueNameMatched
+  && [monster.dialogueDesire, monster.dialogueKeepsake, monster.dialogueSecret].every((text) => text?.includes(monster.name))
+)), "comedy-name uniques did not receive name-matched identities and research notes");
+assert(uniqueMonsters.every((monster) => window.HD_UNIQUE_DIALOGUE.variants(monster.id, "encounter")
+  .some((line) => line.includes(monster.name))),
+"a unique monster never states its current display name on encounter");
+displayRenamedUniques.forEach((monster) => {
+  const contextLines = window.HD_UNIQUE_DIALOGUE.contexts.map((context) => window.HD_UNIQUE_DIALOGUE.variants(monster.id, context));
+  assert(contextLines.every((lines) => lines.some((line) => line.includes(monster.name))), `${monster.name} has a dialogue context detached from its display name`);
+  const lines = contextLines.flat();
+  const staleNames = [monster.baseName, monster.coreName]
+    .filter((name) => name && !monster.name.includes(name));
+  assert(staleNames.every((name) => lines.every((line) => !line.includes(name))), `${monster.name} still speaks under an obsolete name`);
+});
 const dialogueLines = new Set();
 uniqueMonsters.forEach((monster) => {
   window.HD_UNIQUE_DIALOGUE.contexts.forEach((context) => {
@@ -594,7 +638,7 @@ assert(mainSource.includes("return ECONOMY.shopPurchasePrice(item)"), "shop UI o
 const bountyFormulaTarget = window.HD_DATA.monsters.find((monster) => monster.id === "red_garm");
 const expectedFirstBounty = Math.round(100 + bountyFormulaTarget.hp * 2 + bountyFormulaTarget.attack * 12 + bountyFormulaTarget.defense * 10 + Number(bountyFormulaTarget.acceleration || 0) * 5);
 assert(window.HD_BOUNTY.reward(bountyFormulaTarget) === expectedFirstBounty, "first bounty reward formula is invalid");
-assert(window.HD_BOUNTY.reward(bountyFormulaTarget, 1) === Math.round(expectedFirstBounty * 0.35), "repeat bounty reward is not 35 percent");
+assert(window.HD_BOUNTY.reward(bountyFormulaTarget, 1) === expectedFirstBounty && !("REPEAT_REWARD_RATE" in window.HD_BOUNTY), "obsolete repeat-bounty discount still exists");
 assert(mainSource.includes("FIXED_ARTIFACT_CHEST_CHANCE = 0.01") && mainSource.includes("VAULT_FIXED_ARTIFACT_CHANCE = 0.05"), "fixed artifact chest rates were not raised");
 
 function generatorEnemy(id, pos) {
@@ -1150,7 +1194,7 @@ assert(elements.get("#confirmTitle").textContent === "冒険者ギルド初心�
 elements.get("#confirmCancel").listeners.click();
 assert(elements.get("#guildView").innerHTML.includes("報酬受取"), "guild reward claim section is missing");
 assert(elements.get("#guildView").innerHTML.includes("合計400Gを受け取る"), "pending guild reward is missing");
-assert(elements.get("#guildView").innerHTML.includes("★王様の透明外套"), "artifact guild turn-in is missing");
+assert(elements.get("#guildView").innerHTML.includes("★王様のインビジブル外套"), "artifact guild turn-in is missing");
 elements.get("#claimGuildRewardsButton").listeners.click();
 assert(elements.get("#goldText").textContent === 400, "guild reward claim did not pay gold");
 assert(elements.get("#guildView").innerHTML.includes("受取可能な報酬はない"), "claimed guild reward remained pending");
@@ -1836,7 +1880,7 @@ localStorage.setItem = function (key, value) {
 };
 eval(read("js/main.js"));
 elements.get("#waitButton").listeners.click();
-assert(persistedRepeatBountySave.adventurer.bountyCorpses[0].reward === window.HD_BOUNTY.reward(bountyFormulaTarget, 1), "repeat bounty corpse did not store the 35-percent reward");
+assert(persistedRepeatBountySave.adventurer.bountyCorpses[0].reward === expectedFirstBounty, "legacy claimed-count data still reduced a bounty reward");
 
 const thiefCorpseSave = clone(corpseSave);
 thiefCorpseSave.adventurer.jobId = "hunter";
@@ -1930,8 +1974,9 @@ assert(persistedHandymanBoundarySave.dungeon.map[10][0] === "wall", "handyman ex
 assert(!(persistedHandymanBoundarySave.dungeon.excavatedTiles || []).some((tile) => tile.x === 0 && tile.y === 10), "outer boundary was recorded as excavated");
 
 const madnessDiscoverySave = clone(corpseSave);
-const madnessTestUnique = window.HD_DATA.monsters.find((monster) => monster.unique && !monster.arenaOnly);
-madnessDiscoverySave.dungeon.enemies = [14, 15, 16].map((x) => Object.assign(clone(madnessTestUnique), {
+const madnessTestUniques = window.HD_DATA.monsters.filter((monster) => monster.unique && !monster.arenaOnly).slice(0, 3);
+const madnessTestUnique = madnessTestUniques[0];
+madnessDiscoverySave.dungeon.enemies = [14, 15, 16].map((x, index) => Object.assign(clone(madnessTestUniques[index]), {
   x, y: 10, maxHp: 999, hp: 999, alive: true, specialRoom: "madness", madnessGathering: true,
 }));
 madnessDiscoverySave.dungeon.madnessRoom = { x: 11, y: 8, w: 6, h: 5, discovered: false, enemyCount: 3 };
@@ -2518,6 +2563,30 @@ assert(!migratedUniqueCorpse.dangerous || (migratedUniqueCorpse.dangerous.name =
   && migratedUniqueCorpse.dangerous.telegraph === dungeonUniques[0].dangerous.telegraph),
 "saved unique corpse did not synchronize its renamed danger text");
 
+const defeatedUniqueReloadSave = clone(corpseSave);
+const defeatedUniqueReloadEnemy = clone(bountyFormulaTarget);
+Object.assign(defeatedUniqueReloadEnemy, {
+  x: 16, y: 16, maxHp: defeatedUniqueReloadEnemy.hp, hp: defeatedUniqueReloadEnemy.hp,
+  alive: true, asleep: false, turns: 0, telegraphed: false, unique: true, floorGuardian: true,
+});
+defeatedUniqueReloadSave.meta.uniqueKills = { [defeatedUniqueReloadEnemy.id]: true };
+defeatedUniqueReloadSave.dungeon.enemies = [defeatedUniqueReloadEnemy];
+defeatedUniqueReloadSave.dungeon.stairs = [];
+let persistedDefeatedUniqueReloadSave = null;
+localStorage.getItem = function (key) {
+  return key === "hagitori-dungeon-save-v1" ? JSON.stringify(defeatedUniqueReloadSave) : null;
+};
+localStorage.setItem = function (key, value) {
+  if (key === "hagitori-dungeon-save-v1") persistedDefeatedUniqueReloadSave = JSON.parse(value);
+};
+eval(read("js/main.js"));
+elements.get("#waitButton").listeners.click();
+assert(!persistedDefeatedUniqueReloadSave.dungeon.enemies.some((enemy) => enemy.alive && enemy.id === defeatedUniqueReloadEnemy.id),
+"a defeated dungeon unique survived save migration and reappeared alive");
+assert(persistedDefeatedUniqueReloadSave.dungeon.guardianDefeated
+  && persistedDefeatedUniqueReloadSave.dungeon.stairs.some((stairs) => stairs.x === 16 && stairs.y === 16),
+"removing an already-defeated saved guardian left the floor without an exit");
+
 const replacementSave = clone(legacySave);
 replacementSave.meta.awaitingCreation = false;
 replacementSave.meta.clearedBossFloors = [10, 20];
@@ -2584,9 +2653,12 @@ deathClaimSave.meta.clearedBossFloors = [10, 20];
 deathClaimSave.meta.bounties = { red_garm: { intel: true, claimed: 3 } };
 deathClaimSave.meta.shop = { soldMaterials: { small_beast_meat: 9 }, inventory: ["iron_sword"] };
 deathClaimSave.meta.titles = ["引継ぎ称号"];
-deathClaimSave.meta.research = { red_garm: { seen: true, level: 5, evidence: 320 } };
+deathClaimSave.meta.research = {
+  red_garm: { seen: true, level: 5, evidence: 320 },
+  cave_rat: { seen: true, level: 5, evidence: 320 },
+};
 deathClaimSave.meta.monsterHearts = {};
-deathClaimSave.meta.monsterHeartClaims = { red_garm: true };
+deathClaimSave.meta.monsterHeartClaims = { red_garm: true, cave_rat: true };
 deathClaimSave.adventurer.gold = 321;
 deathClaimSave.adventurer.guildPoints = 12;
 deathClaimSave.adventurer.equipmentEnhancements = { rusty_knife: { level: 3, total: 9, attributes: { fire: 3 } } };
@@ -2608,8 +2680,14 @@ assert(persistedDeathClaimSave.meta.guildClaims.length === 0, "death carried gui
 assert(persistedDeathClaimSave.meta.clearedBossFloors.length === 0, "death retained cleared boss-floor departure points");
 assert(Object.keys(persistedDeathClaimSave.meta.bounties).length === 0, "death retained bounty information");
 assert(Object.keys(persistedDeathClaimSave.meta.shop.soldMaterials).length === 0 && persistedDeathClaimSave.meta.titles.length === 0, "death retained town circulation or titles");
-assert(persistedDeathClaimSave.meta.research.red_garm.level === 5, "death erased inherited monster research");
-assert(persistedDeathClaimSave.meta.monsterHearts.red_garm === 1 && persistedDeathClaimSave.meta.monsterHeartClaims.red_garm, "death did not restore a consumed heart for fully researched monster");
+assert(Number(persistedDeathClaimSave.meta.research.red_garm?.level || 0) === 0
+  && persistedDeathClaimSave.meta.research.cave_rat.level === 5,
+"death did not reset unique research while preserving ordinary-monster research");
+assert(!persistedDeathClaimSave.meta.monsterHearts.red_garm
+  && !persistedDeathClaimSave.meta.monsterHeartClaims.red_garm
+  && persistedDeathClaimSave.meta.monsterHearts.cave_rat === 1
+  && persistedDeathClaimSave.meta.monsterHeartClaims.cave_rat,
+"death restored a unique heart or failed to restore an ordinary-monster heart");
 assert(Object.keys(persistedDeathClaimSave.adventurer.equipmentEnhancements).length === 0, "death retained equipment heart enhancements");
 assert(persistedDeathClaimSave.adventurer.gold === 0 && persistedDeathClaimSave.adventurer.guildPoints === 0, "death retained adventurer currency");
 assert(persistedDeathClaimSave.meta.deaths > 0 && persistedDeathClaimSave.meta.deathLog.length > 0, "death erased its own history record");
@@ -2664,6 +2742,25 @@ Math.random = originalRandom;
 assert(Object.keys(persistedChestSave.adventurer.materials).length === 0, "chest still granted monster material");
 assert(Object.keys(persistedChestSave.adventurer.items).some((id) => id.startsWith("spellbook_")), "forced spellbook chest did not grant a spellbook");
 assert(persistedChestSave.dungeon.chests[0].opened, "chest was not marked opened");
+
+const outOfDepthSpellbookSave = clone(chestSave);
+outOfDepthSpellbookSave.dungeon.chests = [{ x: 11, y: 10, opened: false }];
+let persistedOutOfDepthSpellbookSave = null;
+localStorage.getItem = function (key) {
+  return key === "hagitori-dungeon-save-v1" ? JSON.stringify(outOfDepthSpellbookSave) : null;
+};
+localStorage.setItem = function (key, value) {
+  if (key === "hagitori-dungeon-save-v1") persistedOutOfDepthSpellbookSave = JSON.parse(value);
+};
+const outOfDepthSpellbookRolls = [0.5, 0.00005, 0.5];
+Math.random = function () { return outOfDepthSpellbookRolls.length ? outOfDepthSpellbookRolls.shift() : 0.5; };
+eval(read("js/main.js"));
+document.listeners.keydown({ key: "ArrowRight", preventDefault() {} });
+Math.random = originalRandom;
+const earlySpellbookId = Object.keys(persistedOutOfDepthSpellbookSave.adventurer.items)
+  .find((id) => id.startsWith("spellbook_") && Number(window.HD_DATA.treasureItems.find((item) => item.id === id)?.minFloor || 1) > outOfDepthSpellbookSave.adventurer.floor);
+assert(earlySpellbookId && persistedOutOfDepthSpellbookSave.log.some((line) => line.includes("ごくごく稀")),
+"the very rare roll did not grant and announce an out-of-depth spellbook");
 
 const phaseResearchSave = clone(chestSave);
 phaseResearchSave.meta.researchSchemaVersion = 2;
@@ -2851,6 +2948,25 @@ document.listeners.keydown({ key: "ArrowRight", preventDefault() {} });
 Math.random = originalRandom;
 assert(persistedUniqueChestSave.dungeon.enemies.some((enemy) => enemy.unique && enemy.chestAmbush), "rare unique chest ambush did not spawn");
 
+const defeatedUniqueChestSave = clone(uniqueChestSave);
+const defeatedFloorUniqueIds = window.HD_DATA.floors.find((floor) => floor.floor === defeatedUniqueChestSave.adventurer.floor).uniques;
+defeatedUniqueChestSave.meta.uniqueKills = Object.fromEntries(defeatedFloorUniqueIds.map((id) => [id, true]));
+defeatedUniqueChestSave.dungeon.enemies = [];
+defeatedUniqueChestSave.dungeon.chests = [{ x: 11, y: 10, opened: false }];
+let persistedDefeatedUniqueChestSave = null;
+localStorage.getItem = function (key) {
+  return key === "hagitori-dungeon-save-v1" ? JSON.stringify(defeatedUniqueChestSave) : null;
+};
+localStorage.setItem = function (key, value) {
+  if (key === "hagitori-dungeon-save-v1") persistedDefeatedUniqueChestSave = JSON.parse(value);
+};
+Math.random = function () { return 0.001; };
+eval(read("js/main.js"));
+document.listeners.keydown({ key: "ArrowRight", preventDefault() {} });
+Math.random = originalRandom;
+assert(!persistedDefeatedUniqueChestSave.dungeon.enemies.some((enemy) => defeatedFloorUniqueIds.includes(enemy.id)),
+"a defeated dungeon unique returned through a chest ambush");
+
 const rangedSave = clone(chestSave);
 rangedSave.adventurer.jobId = "archer";
 rangedSave.dungeon.chests = [];
@@ -2871,6 +2987,40 @@ Math.random = originalRandom;
 assert(persistedRangedSave.log.some((line) => line.includes("遠隔攻撃を放った")), "enemy tap did not perform direct ranged attack");
 assert(persistedRangedSave.adventurer.lastAttack.attributes.length >= 2, "multi-attribute equipment was reduced to one combat attribute");
 assert(!persistedRangedSave.dungeon.enemies[0].alive && persistedRangedSave.dungeon.turnsElapsed === 1, "a killing ranged attack did not consume an action");
+
+const uniqueResearchKillSave = clone(rangedSave);
+const uniqueResearchTarget = clone(bountyFormulaTarget);
+Object.assign(uniqueResearchTarget, {
+  x: 13, y: 10, maxHp: uniqueResearchTarget.hp, hp: 1, alive: true, asleep: false,
+  turns: 0, telegraphed: false, unique: true,
+});
+uniqueResearchKillSave.adventurer.level = 100;
+uniqueResearchKillSave.adventurer.experience = 0;
+uniqueResearchKillSave.adventurer.jobProgress = { archer: { level: 100, experience: 0 } };
+uniqueResearchKillSave.meta.researchSchemaVersion = 2;
+uniqueResearchKillSave.meta.research[uniqueResearchTarget.id] = { seen: true, level: 1, evidence: 1, milestones: { 1: true } };
+uniqueResearchKillSave.meta.uniqueKills = {};
+uniqueResearchKillSave.meta.monsterHearts = {};
+uniqueResearchKillSave.meta.monsterHeartClaims = {};
+uniqueResearchKillSave.dungeon.enemies = [uniqueResearchTarget];
+let persistedUniqueResearchKillSave = null;
+localStorage.getItem = function (key) {
+  return key === "hagitori-dungeon-save-v1" ? JSON.stringify(uniqueResearchKillSave) : null;
+};
+localStorage.setItem = function (key, value) {
+  if (key === "hagitori-dungeon-save-v1") persistedUniqueResearchKillSave = JSON.parse(value);
+};
+Math.random = function () { return 0.5; };
+eval(read("js/main.js"));
+elements.get("#map").listeners.click({ target: { closest() { return { dataset: { enemyX: "13", enemyY: "10" } }; } } });
+Math.random = originalRandom;
+assert(persistedUniqueResearchKillSave.meta.uniqueKills[uniqueResearchTarget.id]
+  && persistedUniqueResearchKillSave.meta.research[uniqueResearchTarget.id].level === 5
+  && persistedUniqueResearchKillSave.meta.research[uniqueResearchTarget.id].evidence === 320,
+"defeating a dungeon unique did not record the one-time kill and force research to maximum");
+assert(persistedUniqueResearchKillSave.meta.monsterHearts[uniqueResearchTarget.id] === 1
+  && persistedUniqueResearchKillSave.meta.monsterHeartClaims[uniqueResearchTarget.id],
+"maximum research from a unique defeat did not grant its heart");
 
 const jobSkillSave = clone(chestSave);
 jobSkillSave.adventurer.jobId = "hunter";

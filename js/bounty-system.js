@@ -5,15 +5,12 @@
     return data.monsters.filter((monster) => monster.unique && !monster.arenaOnly && monster.floors?.length);
   }
 
-  const REPEAT_REWARD_RATE = 0.35;
-
   function baseReward(monster) {
     return Math.round(100 + monster.hp * 2 + monster.attack * 12 + monster.defense * 10 + Number(monster.acceleration || 0) * 5);
   }
 
-  function reward(monster, priorClaims = 0) {
-    const base = baseReward(monster);
-    return Number(priorClaims || 0) > 0 ? Math.max(1, Math.round(base * REPEAT_REWARD_RATE)) : base;
+  function reward(monster) {
+    return baseReward(monster);
   }
 
   function intelCost(monster) {
@@ -34,5 +31,5 @@
     return `B${Math.max(1, floor - 2)}〜B${Math.min(maxFloor, floor + 2)}F付近`;
   }
 
-  window.HD_BOUNTY = { REPEAT_REWARD_RATE, targets, baseReward, reward, intelCost, nativeFloor, floorHint };
+  window.HD_BOUNTY = { targets, baseReward, reward, intelCost, nativeFloor, floorHint };
 })();

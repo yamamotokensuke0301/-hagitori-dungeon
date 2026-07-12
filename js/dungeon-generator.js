@@ -236,11 +236,12 @@
     const maximum = floor.floor < 40 ? 4 : floor.floor < 70 ? 5 : 6;
     const minimum = maximum === 4 ? 4 : maximum - 1;
     const rooms = eligibleEventRooms(dungeon, usedRoomIndices, minimum);
-    if (!rooms.length || new Set(tickets).size < minimum) return false;
+    const availableTickets = tickets.filter((id) => !dungeon.enemies.some((enemy) => enemy.id === id));
+    if (!rooms.length || new Set(availableTickets).size < minimum) return false;
     const room = pick(rooms);
     const positions = shuffled(roomEventTiles(dungeon, room));
     const desiredCount = rand(minimum, maximum);
-    const enemies = weightedDistinctEnemies(tickets, desiredCount, createEnemy, positions);
+    const enemies = weightedDistinctEnemies(availableTickets, desiredCount, createEnemy, positions);
     if (enemies.length < minimum) return false;
     enemies.forEach((enemy) => {
       enemy.specialRoom = "madness";
@@ -271,7 +272,8 @@
   }
 
   function populateThrillRoom(dungeon, createEnemy, tickets, artifactId, randomArtifactReward, usedRoomIndices) {
-    if (!tickets.length || (!artifactId && !randomArtifactReward)) return false;
+    const availableTickets = tickets.filter((id) => !dungeon.enemies.some((enemy) => enemy.id === id));
+    if (!availableTickets.length || (!artifactId && !randomArtifactReward)) return false;
     const rooms = eligibleEventRooms(dungeon, usedRoomIndices, 2);
     if (!rooms.length) return false;
     const room = pick(rooms);
@@ -285,7 +287,7 @@
       - Math.max(Math.abs(b.x - chestPos.x), Math.abs(b.y - chestPos.y))
     ))[0];
     if (!chestPos || !guardianPos) return false;
-    const guardian = createEnemy(pick(tickets), guardianPos, true);
+    const guardian = createEnemy(pick(availableTickets), guardianPos, true);
     guardian.maxHp = Math.round(guardian.maxHp * 1.5);
     guardian.hp = guardian.maxHp;
     guardian.attack = Math.round(guardian.attack * 1.25);

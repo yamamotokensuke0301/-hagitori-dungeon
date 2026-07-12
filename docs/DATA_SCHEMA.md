@@ -103,7 +103,7 @@ rewardProfile: {
 
 ユニーク個体は `unique: true` を持つ。ダンジョン個体は `floors`、闘技場限定個体は `arenaOnly: true` と連続した `arenaRank` を持つ。手作り人格を追加する場合は、台詞本体ではなく次の設定だけをデータへ置く。
 
-ユニーク個体の公開表示名 `name` はIDに結び付く固定データとする。`baseName` はネタ名などの例外表示を適用する前の個体名、`epithet` は台詞・人物像生成に使う内部モチーフであり、画面上の名前へ機械的に連結しない。調査、討伐、賞金、心、固有台詞はすべてモンスターIDを主キーとし、改名で進捗を分断しない。進行中のダンジョン・闘技場セーブに複製された `name`、`baseName`、`epithet`、危険技名・予告文はロード時に現行のマスターデータへ同期する。過去の戦闘ログと死亡履歴は出来事の記録として書き換えない。
+ユニーク個体の公開表示名 `name` はIDに結び付く固定データとする。`baseName` はネタ名などの例外表示を適用する前の個体名、`epithet` は内部モチーフであり、画面上の名前へ機械的に連結しない。固有台詞は最終的な `name` を基準に構築し、例外表示名の個体には名称から再構成した `dialogueProfile`、`dialogueDesire`、`dialogueKeepsake`、`dialogueSecret` を設定する。調査、討伐、賞金、心、固有台詞はすべてモンスターIDを主キーとし、改名で進捗を分断しない。進行中のダンジョン・闘技場セーブに複製された名称、気質、台詞用設定、危険技名・予告文はロード時に現行のマスターデータへ同期する。過去の戦闘ログと死亡履歴は出来事の記録として書き換えない。
 
 一部のダンジョンユニークは `summon: { every: 6, count: 1, maxAlive: 2, maxTotal: 4, pool: "floor_attribute" }` を持つ。敵インスタンスの `summonProgress` を通常の行動周期と独立して進め、特殊行動や危険技との周期衝突で召喚を飛ばさない。召喚個体には召喚主ID、経験値0.25倍、剥ぎ取り1回固定を保存し、同時数・累計数・階層の生成上限を全て守る。
 
@@ -153,7 +153,7 @@ dangerous: {
 ```js
 {
   id: "artifact_steam_twinblade",
-  name: "蒸界の双相剣",
+  name: "蒸界のデュアルブレード",
   slot: "weapon",
   attack: 24,
   defense: 3,
@@ -187,7 +187,7 @@ dangerous: {
 
 生成系列装備は任意の `equipmentArchetype` で猛攻・城塞・疾風・再生・多相・背水の強偏差原型を示す。セット構成品は `setId` を持ち、`equipmentSets` の `itemIds` と対応する。各セットの `bonuses` は `{ pieces, attack?, defense?, acceleration?, hpRegen?, attackAttributes?, resistances?, text }` 形式で、必要部位数を満たした段階まで累積適用する。装備監査では `setId` も用途の一部として完全一致判定へ含める。
 
-固定アーティファクトは `data/equipment.js` に63種類あり、全て `artifact.chestOnly: true` の一点物として扱う。UIでは名称先頭へ黒星`★`を付ける。通常箱は1%、宝物庫箱は5%で固定品を抽選する。商店売却は不可で、装備から外した状態なら `artifact.guildPoints` を基準にギルドへ納品できる。発見済みIDは冒険者の `discoveredArtifacts` に残り、ギルド納品後も同じ一点物を再抽選しない。`curse.penalties` は装備中だけ適用し、呪耐性のダメージ倍率と同じ係数で軽減する。呪免疫ならペナルティは0になる。任意の `risque: true` は♡印の艶装備を表し、性格 `lewd` の装備数に応じた共鳴補正へ使う。
+固定アーティファクトは `data/equipment.js` に65種類あり、全て `artifact.chestOnly: true` の一点物として扱う。UIでは名称先頭へ黒星`★`を付ける。通常箱は1%、宝物庫箱は5%で固定品を抽選する。商店売却は不可で、装備から外した状態なら `artifact.guildPoints` を基準にギルドへ納品できる。発見済みIDは冒険者の `discoveredArtifacts` に残り、ギルド納品後も同じ一点物を再抽選しない。`curse.penalties` は装備中だけ適用し、呪耐性のダメージ倍率と同じ係数で軽減する。呪免疫ならペナルティは0になる。任意の `risque: true` は♡印の艶装備を表し、性格 `lewd` の装備数に応じた共鳴補正へ使う。`やばすぎるビキニ上♡`と`やばすぎるビキニ下♡`は防御0の代わりに各6属性免疫を持つ固定艶装備とする。どちらか一方でも装備中は`rousesDungeon: true`により、生成時・増援時・セーブ再開時を含むダンジョン内の全モンスターが睡眠状態にならない。
 
 `js/artifact-generator.js` が作るランダム生成品は `random_artifact_####` IDと `artifact.random: true` を持ち、UIでは白星`☆`を付ける。生成済み定義は `adventurer.randomArtifacts[id]` に丸ごと保存し、読込時に静的装備マップへ登録する。固定品用の `discoveredArtifacts` には混ぜず、ギルド納品時に個体定義も削除する。`meta.randomArtifactSerial` は保存済み個体の最大番号以上へ正規化し、ID衝突を防ぐ。
 
@@ -206,7 +206,7 @@ dangerous: {
 }
 ```
 
-魔法書ランクは `beginner`（初級）、`intermediate`（中級）、`advanced`（上級）、`supreme`（最上級）、`forbidden`（禁断）の5段階。上位ほど `rarityWeight` が小さく、出現開始階層と売値が高い。
+魔法書ランクは `beginner`（初級）、`intermediate`（中級）、`advanced`（上級）、`supreme`（最上級）、`forbidden`（禁断）の5段階。上位ほど `rarityWeight` が小さく、通常出現開始階層と売値が高い。`minFloor` より浅い階でも、通常箱・宝物庫の上位魔法書先取り枠0.01%に当選した場合だけ出現できる。
 
 ```js
 {
@@ -305,7 +305,7 @@ dangerous: {
 }
 ```
 
-死亡時は `meta.deaths`、`meta.deathLog`、死亡確認用の `pendingDeathReview` に加えて、`meta.research` を引き継ぐ。完全調査済みのモンスターは `meta.monsterHeartClaims[id] = true`、`meta.monsterHearts[id] = 1` に再構成し、生前に消費した心も各1個へ復活させる。装備と `equipmentEnhancements`、商店流通、称号、賞金情報などは新規開始状態へ戻す。死亡直前ログはリロード後もプレイヤーが閉じるまで復元する。
+死亡時は `meta.deaths`、`meta.deathLog`、死亡確認用の `pendingDeathReview` に加えて、一般モンスターの `meta.research` を引き継ぐ。ユニークの調査記録は削除して0/5へ戻す。完全調査済みの一般モンスターだけを `meta.monsterHeartClaims[id] = true`、`meta.monsterHearts[id] = 1` に再構成し、生前に消費した心も各1個へ復活させる。装備と `equipmentEnhancements`、商店流通、称号、賞金情報などは新規開始状態へ戻す。死亡直前ログはリロード後もプレイヤーが閉じるまで復元する。
 
 `adventurer.donatedPermanentEquipmentIds` は永続報酬をGP納品した当代だけの再支給抑止。世代交代時に空へ戻り、次代には解禁済み報酬を再支給する。`attritionRecoveryDebt` は存在侵食で失ったうち受動再生できないHP量で、能動回復時に減少する。`meta.saveRevision` は保存成功ごとに増え、独立キーの同値だけを保存前に読み、別タブからの古い状態による上書きを拒否する。
 

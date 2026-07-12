@@ -50,11 +50,11 @@
 - 永続報酬装備の世代毎再支給・再納品: DATA_SCHEMA.md に明記された設計（GPは冒険者スコープなので無限ループにならない）。
 - bounty nativeFloor のフォールバック: 実際のロード順・テストでは到達不能。
 
-## 修正タスクB: BGMのAAC圧縮（ロード軽量化）
+## 修正タスクB: BGMのAAC圧縮（完了）
 
-- 現状 `assets/audio/*.wav` 11曲で約100MB。GitHub Pages初回ロードが重い。
-- macOS標準の afconvert でAAC化: `afconvert -f m4af -d aac -b 192000 in.wav out.m4a`（全11曲で約10MBになる見込み）。
-- 参照の書き換えは js/main.js 内の音声パス（`assets/audio/○○-bgm.wav`）を `.m4a` へ。
+- 使用中の10曲を48kHzステレオ・AAC 192kbpsのM4Aへ変換し、約90MiBから約12MiBへ軽量化した。
+- 未使用だった`tension-1-bgm.wav`を公開対象から除外した。
+- `js/main.js`と`tools/bgm_lab.html`の参照先をM4Aへ変更した。
 - 注意: tools/generate_bgm.py はWAVを出力する（生成元として維持）。圧縮はビルド/公開時の変換として扱い、README「開発メモ」に手順を1行追記すること。wavをリポジトリから外すかは容量方針次第（Pages公開ワークフローが現行ルートだけを公開する点に注意）。
 
 ## 検証方法

@@ -4,7 +4,7 @@
   const SAVE_KEY = "hagitori-dungeon-save-v1";
   const SAVE_REVISION_KEY = "hagitori-dungeon-save-revision-v1";
   const AUDIO_KEY = "hagitori-audio-enabled-v4";
-  const APP_VERSION = "Prototype 3.6.0";
+  const APP_VERSION = "Prototype 3.7.0";
   const DEVELOPER_MODE_ENABLED = /^(localhost|127\.0\.0\.1|\[?::1\]?)$/.test(String(window.location?.hostname || ""))
     && /(?:^|[?&])debug=1(?:&|$)/.test(String(window.location?.search || ""));
   const MAP_SIZE_RANGE = Object.freeze([36, 60]);
@@ -37,6 +37,7 @@
   const FIXED_ARTIFACT_CHEST_CHANCE = 0.01;
   const VAULT_FIXED_ARTIFACT_CHANCE = 0.05;
   const VAULT_LEGEND_JUNK_CHANCE = 0.008;
+  const OUT_OF_DEPTH_SPELLBOOK_CHANCE = 0.0001;
   const TRAP_TYPE_LABELS = Object.freeze({ damage: "床罠", drain: "吸精罠", slow: "鈍化罠", bear: "トラバサミ", teleport: "強制転移罠", summon: "召喚罠", scatter: "罠バラまき罠" });
   const TRAP_DANGER_LABELS = Object.freeze(["", "Ⅰ", "Ⅱ", "Ⅲ", "Ⅳ", "Ⅴ"]);
   const TRAP_JOB_DISARM_BONUSES = Object.freeze({ hunter: 0.34, handyman: 0.24, researcher: 0.06 });
@@ -113,16 +114,16 @@
     byId, clamp, rand, pick, escapeHtml, chebyshevDistance, hasLineOfSight: gridLineOfSight,
   } = window.HD_UTILS;
   const BGM_TRACKS = {
-    town: "./assets/audio/town-bgm.wav?v=20260711-studio2",
-    dungeon: "./assets/audio/dungeon-bgm.wav?v=20260711-studio2",
-    deep: "./assets/audio/deep-bgm.wav?v=20260711-studio2",
-    abyss: "./assets/audio/abyss-bgm.wav?v=20260711-studio2",
-    battle: "./assets/audio/battle-bgm.wav?v=20260711-studio2",
-    boss: "./assets/audio/boss-bgm.wav?v=20260711-studio2",
-    tension2: "./assets/audio/tension-2-bgm.wav?v=20260711-tension2",
-    tension3: "./assets/audio/tension-3-bgm.wav?v=20260711-tension2",
-    tension4: "./assets/audio/tension-4-bgm.wav?v=20260711-tension2",
-    tension5: "./assets/audio/tension-5-bgm.wav?v=20260711-tension2",
+    town: "./assets/audio/town-bgm.m4a?v=20260713-aac",
+    dungeon: "./assets/audio/dungeon-bgm.m4a?v=20260713-aac",
+    deep: "./assets/audio/deep-bgm.m4a?v=20260713-aac",
+    abyss: "./assets/audio/abyss-bgm.m4a?v=20260713-aac",
+    battle: "./assets/audio/battle-bgm.m4a?v=20260713-aac",
+    boss: "./assets/audio/boss-bgm.m4a?v=20260713-aac",
+    tension2: "./assets/audio/tension-2-bgm.m4a?v=20260713-aac",
+    tension3: "./assets/audio/tension-3-bgm.m4a?v=20260713-aac",
+    tension4: "./assets/audio/tension-4-bgm.m4a?v=20260713-aac",
+    tension5: "./assets/audio/tension-5-bgm.m4a?v=20260713-aac",
   };
   const DIRECTION_VECTORS = Object.freeze({
     north: Object.freeze([0, -1]),
@@ -195,15 +196,13 @@
     return BOUNTY.nativeFloor(monster, MAX_FLOOR);
   }
 
-  function bountyClaimsBeforeNext(monsterId) {
-    const settled = Math.max(0, Number(state.meta.bounties[monsterId]?.claimed || 0));
-    const pendingAtGuild = (state.meta.guildClaims || []).filter((claim) => claim.id === monsterId).length;
-    const beingCarried = (state.adventurer.bountyCorpses || []).filter((claim) => claim.id === monsterId).length;
-    return settled + pendingAtGuild + beingCarried;
+  function canSpawnDungeonUnique(monsterId, meta = state?.meta) {
+    const monster = monsters[monsterId];
+    return Boolean(monster?.unique && !monster.arenaOnly && !meta?.uniqueKills?.[monsterId]);
   }
 
   function nextBountyReward(monster) {
-    return BOUNTY.reward(monster, bountyClaimsBeforeNext(monster.id));
+    return BOUNTY.reward(monster);
   }
 
   function teleportCooldowns() {
@@ -781,6 +780,14 @@
         enemy.name = canonicalMonster.name;
         enemy.baseName = canonicalMonster.baseName || canonicalMonster.name;
         enemy.epithet = canonicalMonster.epithet || null;
+        enemy.uniqueTemperament = canonicalMonster.uniqueTemperament || null;
+        enemy.uniqueStyle = canonicalMonster.uniqueStyle || null;
+        enemy.speechCadence = canonicalMonster.speechCadence;
+        enemy.dialogueProfile = canonicalMonster.dialogueProfile;
+        enemy.dialogueDesire = canonicalMonster.dialogueDesire;
+        enemy.dialogueKeepsake = canonicalMonster.dialogueKeepsake;
+        enemy.dialogueSecret = canonicalMonster.dialogueSecret;
+        enemy.dialogueNameMatched = Boolean(canonicalMonster.dialogueNameMatched);
         if (canonicalMonster.summon) enemy.summon = JSON.parse(JSON.stringify(canonicalMonster.summon));
         else delete enemy.summon;
         if (canonicalMonster.elixirAttrition) enemy.elixirAttrition = { ...canonicalMonster.elixirAttrition };
@@ -810,6 +817,35 @@
       sanitizeGuardianSpecialAttack(enemy);
       enemy.canPhaseWalls = monsterCanPhaseWalls(enemy);
     });
+    if (saved.dungeon?.enemies && hasDungeonRousingEquipment(saved.adventurer)) {
+      saved.dungeon.enemies.forEach((enemy) => { enemy.asleep = false; });
+    }
+    if (saved.dungeon?.enemies) {
+      const activeUniqueIds = new Set();
+      let removedGuardianPosition = null;
+      saved.dungeon.enemies = saved.dungeon.enemies.filter((enemy) => {
+        const canonicalMonster = monsters[enemy.id];
+        if (enemy.alive === false || !canonicalMonster?.unique || canonicalMonster.arenaOnly) return true;
+        const alreadyDefeated = Boolean(saved.meta.uniqueKills[enemy.id]);
+        const duplicateOnFloor = activeUniqueIds.has(enemy.id);
+        if (alreadyDefeated || duplicateOnFloor) {
+          if (enemy.floorGuardian) removedGuardianPosition = { x: enemy.x, y: enemy.y };
+          return false;
+        }
+        activeUniqueIds.add(enemy.id);
+        return true;
+      });
+      if (removedGuardianPosition) {
+        saved.dungeon.guardianId = null;
+        saved.dungeon.guardianDefeated = true;
+        const existingStairs = Array.isArray(saved.dungeon.stairs)
+          ? saved.dungeon.stairs
+          : isPlainRecord(saved.dungeon.stairs) ? [saved.dungeon.stairs] : [];
+        if (saved.adventurer.floor < MAX_FLOOR && !existingStairs.length) {
+          saved.dungeon.stairs = [removedGuardianPosition];
+        }
+      }
+    }
     (saved.dungeon?.enemies || []).forEach((enemy) => {
       if (enemy.alive) return;
       if (!Number.isFinite(Number(enemy.harvestsRemaining))) {
@@ -1115,7 +1151,7 @@
   }
 
   const BEGINNER_COURSE_LESSONS = Object.freeze([
-    { title: "初心者講座 1/7・生還", text: "迷宮では欲張らず、危険を感じたら帰還してください。死亡すると装備、強化、資産、街の流通は初期化されます。ただしモンスター調査は引き継がれ、完全調査済みの心は各1個へ復活します。" },
+    { title: "初心者講座 1/7・生還", text: "迷宮では欲張らず、危険を感じたら帰還してください。死亡すると装備、強化、資産、街の流通に加え、ユニークの調査記録も初期化されます。一般モンスターの調査記録は引き継がれ、完全調査済みの一般モンスターの心は各1個へ復活します。" },
     { title: "初心者講座 2/7・調査", text: "魔物は戦う、攻撃を受ける、剥ぎ取ることで調査が進みます。調査度が上がると能力、弱点、危険技、素材条件が順に判明します。" },
     { title: "初心者講座 3/7・属性", text: "攻撃属性は敵の弱点と耐性で威力が変わります。装備の赤い負耐性は被害を増やしますが、同属性の免疫装備があれば負耐性を完全に塞げます。" },
     { title: "初心者講座 4/7・装備パズル", text: "装備は攻撃力だけで選ばないでください。大きな長所には弱点があり、別部位の耐性・免疫・固有連携で穴を埋めることが重要です。自宅で変更後の合計耐性を確認できます。" },
@@ -1781,6 +1817,7 @@
           ${item.curse ? `<span class="cursed-label">呪われている</span>` : ""}
           <div class="equipment-actions">${buttons}</div>
           <p>${ECONOMY.equipmentStats(item)}${equipmentAttackAttributes(item).length ? ` / 攻撃属性:${formatAttackAttributes(equipmentAttackAttributes(item))}` : ""}${formatResistances(item.resistances) ? ` / 耐性:${formatResistances(item.resistances)}` : ""}</p>
+          ${item.rousesDungeon ? '<p class="equipment-special-effect"><strong>特殊効果：</strong>ダンジョン中のモンスターが全て目を覚ます。</p>' : ""}
           ${enhancement.level ? `<p class="heart-enhancement">心強化済み / ${item.slot === "weapon" ? `攻撃力+${enhancement.total}` : `防御力+${enhancement.total}`} / 属性値 ${Object.entries(enhancement.attributes).map(([id, value]) => `${attrHtml(id)}+${value}`).join("・")}</p>` : ""}
           <button type="button" data-heart-enhance="${item.id}" ${canHeartEnhance ? "" : "disabled"}>${enhancement.level ? "この装備は心強化済み" : selectedHeart ? `${selectedHeart.name}の心で+${monsterHeartPower(selectedHeart)}強化` : "モンスターの心がない"}</button>
           ${item.puzzleEffects?.length ? item.puzzleEffects.map((effect) => {
@@ -2063,12 +2100,15 @@
     const bountyCards = bountyCandidates.map((monster) => {
       const record = state.meta.bounties[monster.id];
       const known = Boolean(record?.intel);
+      const defeated = Boolean(state.meta.uniqueKills[monster.id]);
       const cost = BOUNTY.intelCost(monster);
       const reward = nextBountyReward(monster);
-      return `<article class="research-card bounty-card ${known ? "known" : "locked"}">
+      return `<article class="research-card bounty-card ${known || defeated ? "known" : "locked"}">
         <h2>${monster.name} <small>${BOUNTY.floorHint(monster, MAX_FLOOR)}</small></h2>
-        ${known
-          ? `<p>次回賞金 ${reward}G / 現冒険者の精算 ${Number(record.claimed || 0)}回</p><p>${monster.research[1] || "危険なユニーク個体。"}</p>`
+        ${defeated
+          ? `<p>討伐済み${Number(record?.claimed || 0) > 0 ? "・報酬受取済み" : ""}</p><p>${monster.research[1] || "危険なユニーク個体。"}</p>`
+          : known
+            ? `<p>賞金 ${reward}G / 未討伐</p><p>${monster.research[1] || "危険なユニーク個体。"}</p>`
           : `<p>詳細は未購入。情報料を払うと能力・弱点・剥ぎ取り条件を調査記録へ開示する。</p><button type="button" data-buy-bounty-intel="${monster.id}" ${state.adventurer.gold < cost ? "disabled" : ""}>${cost}Gで情報を買う</button>`}
       </article>`;
     }).join("");
@@ -2150,7 +2190,7 @@
 
   function buyBountyIntel(monsterId) {
     const monster = monsters[monsterId];
-    if (!monster?.unique || monster.arenaOnly || state.meta.bounties[monsterId]?.intel) return;
+    if (!monster?.unique || monster.arenaOnly || state.meta.uniqueKills[monsterId] || state.meta.bounties[monsterId]?.intel) return;
     const cost = BOUNTY.intelCost(monster);
     if (state.adventurer.gold < cost) return;
     state.adventurer.gold -= cost;
@@ -2362,8 +2402,13 @@
     }).slice(0, 32);
     const bountyBoard = relevantBounties.map((monster) => {
       const record = state.meta.bounties[monster.id];
+      const defeated = Boolean(state.meta.uniqueKills[monster.id]);
+      const researchAvailable = defeated || Boolean(record?.intel);
       const cost = BOUNTY.intelCost(monster);
-      return `<article class="guild-bounty-row"><div><strong>${monster.name}</strong><small>${BOUNTY.floorHint(monster, MAX_FLOOR)} / ${record?.intel ? `情報購入済み・次回賞金${nextBountyReward(monster)}G` : `情報料${cost}G`}</small></div><button type="button" data-open-bounty-research="${monster.id}" ${!record?.intel && adv.gold < cost ? "disabled" : ""}>${record?.intel ? "調査を見る" : "情報を買う"}</button></article>`;
+      const status = defeated
+        ? `討伐済み${Number(record?.claimed || 0) > 0 ? "・報酬受取済み" : ""}`
+        : record?.intel ? `情報購入済み・賞金${nextBountyReward(monster)}G` : `情報料${cost}G`;
+      return `<article class="guild-bounty-row"><div><strong>${monster.name}</strong><small>${BOUNTY.floorHint(monster, MAX_FLOOR)} / ${status}</small></div><button type="button" data-open-bounty-research="${monster.id}" ${!researchAvailable && adv.gold < cost ? "disabled" : ""}>${researchAvailable ? "調査を見る" : "情報を買う"}</button></article>`;
     }).join("");
     els.guildView.innerHTML = `
       <section class="guild-wallet"><span>現在のギルドポイント</span><strong>${adv.guildPoints}GP</strong><small>死亡すると全て失う。交換した装備も死亡時に失う。</small></section>
@@ -2387,14 +2432,13 @@
     document.querySelector("[data-guild-medicine]")?.addEventListener("click", () => exchangeRecoveryMedicine("guild"));
     document.querySelectorAll("[data-open-bounty-research]").forEach((button) => button.addEventListener("click", () => {
       const id = button.dataset.openBountyResearch;
-      if (!state.meta.bounties[id]?.intel) buyBountyIntel(id);
-      else {
+      if (state.meta.uniqueKills[id] || state.meta.bounties[id]?.intel) {
         researchFocusId = id;
         researchQuery = monsters[id]?.name || "";
         researchFilter = "all";
         researchPage = 0;
         switchView("research");
-      }
+      } else buyBountyIntel(id);
     }));
   }
 
@@ -2766,7 +2810,6 @@
     const arena = state.arena;
     const enemy = arena.enemy;
     enemy.alive = false;
-    markResearch(enemy.id, MAX_RESEARCH_LEVEL);
     recordUniqueDefeat(enemy);
     const newRecord = arena.round > state.adventurer.arenaBestRound;
     const gold = Math.max(1, Math.round(12 + arena.round * 2));
@@ -3625,6 +3668,7 @@
     refreshShopInventoryForDepth();
     state.dungeon = generateFloor(destination);
     log(`B${destination}Fへ足を踏み入れた。${state.dungeon.layout ? `構造は「${state.dungeon.layout.name}」。` : ""}`);
+    if (hasDungeonRousingEquipment()) log("艶装備の気配が迷宮を走り、ダンジョン中のモンスターが一斉に目を覚ました！");
     if (state.dungeon.anomaly) {
       log(`迷宮異変「${state.dungeon.anomaly.name}」発生。${state.dungeon.anomaly.description}`);
       playSfx(state.dungeon.anomaly.chaotic ? "chaos" : "anomaly");
@@ -3683,13 +3727,15 @@
 
   function generateFloor(floorNumber) {
     const floor = floorByNumber[floorNumber];
+    const availableFloorUniqueIds = (floor.uniques || []).filter((id) => canSpawnDungeonUnique(id));
+    const generationFloor = { ...floor, uniques: availableFloorUniqueIds };
     const trapCount = rollFloorTrapCount(floorNumber);
     const minimumSize = trapCount >= 12 ? 48 : trapCount >= 8 ? 42 : MAP_SIZE_RANGE[0];
-    const madnessUniqueIds = (floor.uniques || []).filter((id) => (
+    const madnessUniqueIds = availableFloorUniqueIds.filter((id) => (
       monsters[id]?.unique && !monsters[id].arenaOnly && id !== "dungeon_lord_nox"
     ));
     const deeperUniques = DATA.monsters.filter((monster) => {
-      if (!monster.unique || monster.arenaOnly || monster.id === "dungeon_lord_nox") return false;
+      if (!canSpawnDungeonUnique(monster.id) || monster.id === "dungeon_lord_nox") return false;
       const nativeFloor = monsterNativeFloor(monster);
       return nativeFloor >= floorNumber + 2 && nativeFloor <= Math.min(99, floorNumber + 9);
     });
@@ -3703,7 +3749,7 @@
       const size = rand(minimumSize, MAP_SIZE_RANGE[1]);
       dungeon = window.HD_DUNGEON.generate({
         size,
-        floor,
+        floor: generationFloor,
         createEnemy,
         specialRooms: {
           madnessUniqueIds,
@@ -3728,10 +3774,17 @@
   }
 
   function appointFloorGuardian(dungeon, floorNumber) {
-    const allCandidates = DATA.monsters.filter((monster) => monster.unique && !monster.arenaOnly && monster.id !== "dungeon_lord_nox" && monster.floors?.length);
+    const allCandidates = DATA.monsters.filter((monster) => canSpawnDungeonUnique(monster.id) && monster.id !== "dungeon_lord_nox" && monster.floors?.length);
     const nearby = allCandidates.filter((monster) => Math.abs(monsterNativeFloor(monster) - floorNumber) <= 4);
     const candidates = nearby.length ? nearby : [...allCandidates].sort((a, b) => Math.abs(monsterNativeFloor(a) - floorNumber) - Math.abs(monsterNativeFloor(b) - floorNumber)).slice(0, 8);
-    const guardianId = floorNumber === MAX_FLOOR ? "dungeon_lord_nox" : pick(candidates).id;
+    const guardianId = floorNumber === MAX_FLOOR
+      ? (canSpawnDungeonUnique("dungeon_lord_nox") ? "dungeon_lord_nox" : null)
+      : pick(candidates)?.id;
+    if (!guardianId) {
+      dungeon.guardianId = null;
+      dungeon.guardianDefeated = true;
+      return;
+    }
     let guardian = dungeon.enemies.find((enemy) => enemy.id === guardianId && enemy.alive);
     if (!guardian) {
       const pos = window.HD_DUNGEON.spawnPosition(dungeon, 12);
@@ -3876,7 +3929,7 @@
       summonToken: data.summon ? `${data.id}@${pos.x},${pos.y}` : null,
       summonsUsed: 0,
       summonProgress: 0,
-      asleep: Math.random() < (data.unique || forceUnique ? UNIQUE_SLEEP_CHANCE : MONSTER_SLEEP_CHANCE),
+      asleep: !hasDungeonRousingEquipment() && Math.random() < (data.unique || forceUnique ? UNIQUE_SLEEP_CHANCE : MONSTER_SLEEP_CHANCE),
     };
     enemy.canPhaseWalls = monsterCanPhaseWalls(data);
     const nativeFloor = monsterNativeFloor(data);
@@ -4137,10 +4190,19 @@
       return;
     }
 
+    const outOfDepthSpellbooks = (DATA.spellbooks || []).filter((item) => Number(item.minFloor || 1) > depth);
+    const spellbookRoll = Math.random();
+    if (outOfDepthSpellbooks.length && spellbookRoll < OUT_OF_DEPTH_SPELLBOOK_CHANCE) {
+      const item = weightedPick(outOfDepthSpellbooks, (candidate) => Number(candidate.rarityWeight || 1));
+      addItem(item.id, 1);
+      log(`宝物庫の箱から、本来の出現階層を先取りした${item.name}を発見した！ ごくごく稀な迷宮の気まぐれだ。`);
+      playSfx("victory");
+      return;
+    }
     const spellbooks = (DATA.spellbooks || []).filter((item) => Number(item.minFloor || 1) <= depth);
     const maximumRank = Math.max(1, ...spellbooks.map((item) => Number(DATA.spellbookRanksById[item.rank]?.order || 1)));
     const rareSpellbooks = spellbooks.filter((item) => Number(DATA.spellbookRanksById[item.rank]?.order || 1) >= maximumRank - 1);
-    if (rareSpellbooks.length && Math.random() < 0.72) {
+    if (rareSpellbooks.length && spellbookRoll < 0.72) {
       const item = weightedPick(rareSpellbooks, (candidate) => Number(candidate.rarityWeight || 1));
       addItem(item.id, 1);
       log(`宝物庫の箱から希少な${item.name}を得た。`);
@@ -4168,8 +4230,7 @@
     }
     const floor = floorByNumber[depth];
     const uniqueCandidates = (floor.uniques || []).filter((id) => (
-      monsters[id]?.unique
-      && !monsters[id].arenaOnly
+      canSpawnDungeonUnique(id)
       && !state.dungeon.enemies.some((enemy) => enemy.id === id)
     ));
     if (!state.dungeon.madnessRoom && !state.dungeon.thrillRoom
@@ -4193,11 +4254,20 @@
 
     const amount = 1;
     const minimumSpellRank = depth >= 90 ? 4 : depth >= 70 ? 3 : depth >= 40 ? 2 : 1;
+    const outOfDepthSpellbooks = (DATA.spellbooks || []).filter((item) => Number(item.minFloor || 1) > depth);
+    const spellbookRoll = Math.random();
+    if (outOfDepthSpellbooks.length && spellbookRoll < OUT_OF_DEPTH_SPELLBOOK_CHANCE) {
+      const item = weightedPick(outOfDepthSpellbooks, (candidate) => Number(candidate.rarityWeight || 1));
+      addItem(item.id, amount);
+      log(`宝箱の底から、本来の出現階層を先取りした${item.name}を発見した！ ごくごく稀な迷宮の気まぐれだ。`);
+      playSfx("victory");
+      return;
+    }
     const spellbookCandidates = (DATA.spellbooks || []).filter((item) => (
       Number(item.minFloor || 1) <= depth
       && Number(DATA.spellbookRanksById[item.rank]?.order || 1) >= minimumSpellRank
     ));
-    if (spellbookCandidates.length && Math.random() < 0.42) {
+    if (spellbookCandidates.length && spellbookRoll < 0.42) {
       const item = weightedPick(spellbookCandidates, (candidate) => Number(candidate.rarityWeight || 1));
       addItem(item.id, amount);
       log(`宝箱から${item.name}を${amount}冊得た。${spellbookRankLabel(item.rank)}の術式は${spellbookRankLabel(item.rank) === "初級" ? "比較的読み解きやすい" : "希少で高度なものだ"}。`);
@@ -4230,7 +4300,8 @@
   }
 
   function releaseChestUnique(monsterId) {
-    if (!state.dungeon || !monsters[monsterId]) return false;
+    if (!state.dungeon || !canSpawnDungeonUnique(monsterId)
+      || state.dungeon.enemies.some((enemy) => enemy.id === monsterId)) return false;
     const directions = [
       [-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1],
     ].sort(() => Math.random() - 0.5);
@@ -4466,6 +4537,7 @@
     );
     state.dungeon = generateFloor(state.adventurer.floor);
     log(`B${state.adventurer.floor}Fへ降りた。${state.dungeon.layout ? `構造は「${state.dungeon.layout.name}」。${state.dungeon.layout.description}` : ""}`);
+    if (hasDungeonRousingEquipment()) log("艶装備の気配が迷宮を走り、ダンジョン中のモンスターが一斉に目を覚ました！");
     if (state.dungeon.anomaly) {
       log(`迷宮異変「${state.dungeon.anomaly.name}」発生。${state.dungeon.anomaly.description}`);
       playSfx(state.dungeon.anomaly.chaotic ? "chaos" : "anomaly");
@@ -5187,6 +5259,7 @@
   }
 
   function recordUniqueDefeat(enemy) {
+    markResearch(enemy.id, MAX_RESEARCH_LEVEL, { force: true });
     state.meta.uniqueKills[enemy.id] = true;
     if (enemy.id === "dungeon_lord_nox") state.adventurer.gameCleared = true;
     if (enemy.id === "dungeon_lord_nox" && !state.meta.titles.includes("迷宮踏破者")) {
@@ -5591,6 +5664,9 @@
     const deaths = Number(state.meta.deaths || 0);
     const deathLog = Array.isArray(state.meta.deathLog) ? state.meta.deathLog.slice(0, 12) : [];
     const research = JSON.parse(JSON.stringify(state.meta.research || {}));
+    DATA.monsters.filter((monster) => monster.unique).forEach((monster) => {
+      delete research[monster.id];
+    });
     const retirementLog = JSON.parse(JSON.stringify(state.meta.retirementLog || []));
     const permanentClearTitles = (state.meta.titles || []).filter((title) => title === "迷宮踏破者");
     const fresh = defaultSave();
@@ -5627,7 +5703,7 @@
     const pendingDeathReview = {
       reason: String(reason || "不明").slice(0, 160),
       cry: deathCry,
-      log: ["冒険者は失われた。調査記録は残り、完全調査済みの心は各1個へ復活した。それ以外の進行は初期化された。", ...state.log].slice(0, 20),
+      log: ["冒険者は失われた。一般モンスターの調査記録は残るが、ユニークの調査記録は失われた。完全調査済みの一般モンスターの心は各1個へ復活した。", ...state.log].slice(0, 20),
     };
     resetAfterDeath(pendingDeathReview);
     audio.musicBlocked = true;
@@ -5649,6 +5725,30 @@
     "誰か、この記録だけは……持ち帰ってくれ……",
     "くそっ……あと一歩が、こんなに遠いのか……！",
     "聞こえるか……次の冒険者。ここから先は、頼んだ……",
+    "欲張ったなあ……分かってたんだけどなあ……",
+    "帰還はいつでもできた……死ぬまでは……",
+    "もう一歩……いや、あの一歩が余計だった……",
+    "次の俺は……もう少し臆病でいてくれ……",
+    "強くなったつもりで……死に方だけ上手くなったか……",
+    "命は一つ……知ってたさ。知ってただけだ……",
+    "記録は残る……なら、無駄死にじゃない……たぶん……",
+    "俺の死因……少しくらい格好よく書いておいてくれ……",
+    "笑えよ……こんな終わり方、俺だって笑うさ……",
+    "走馬灯くらい……好きな場面を選ばせろよ……",
+    "ママー！",
+    "素材ひとつ分……欲張っただけなんだけどな……",
+    "この傷は……宿屋じゃ治せそうにないな……",
+    "田中さん、ありがとう",
+    "まぁた！　ぼーっとしてたよ",
+    "まだ言ってないことが……あった気がする……",
+    "音が遠い……俺だけ置いていくな……",
+    "寒いな……死ぬって、こんなに寒いのか……",
+    "目を閉じたら……出口くらい見せてくれ……",
+    "最後に見えたのが……帰り道じゃないのは悔しいな……",
+    "無念。",
+    "あーん　このゲーム難しいよお！",
+    "俺の名前を……誰か一度だけ、呼んでくれ……",
+    "負けたんじゃない……生き残れなかっただけだ……同じか……",
   ]);
 
   const DEATH_CRY_VOICE_TYPES = Object.freeze(["deathCrySharp", "deathCryFading", "deathCryLow"]);
@@ -6190,6 +6290,10 @@
     return id && equipment[id] ? equipmentDisplayName(equipment[id]) : "なし";
   }
 
+  function hasDungeonRousingEquipment(adventurer = state.adventurer) {
+    return Object.values(adventurer?.equipment || {}).some((id) => equipment[id]?.rousesDungeon);
+  }
+
   function treasureTierLabel(item) {
     if (item?.junkTier === "legend") return "レジェンドガラクタ";
     if (item?.junkTier === "ultra_luxury") return "超高級ガラクタ";
@@ -6597,6 +6701,7 @@
   function enemiesWander() {
     maybeSpawnMonster();
     const activeEnemies = state.dungeon.enemies.filter((enemy) => enemy.alive);
+    if (hasDungeonRousingEquipment()) activeEnemies.forEach((enemy) => { enemy.asleep = false; });
     activeEnemies.filter((enemy) => enemy.flowerPet).forEach(flowerPetAct);
     for (const enemy of activeEnemies) {
       if (!state.dungeon || !state.adventurer.inDungeon || state.adventurer.hp <= 0) return;
@@ -6766,8 +6871,11 @@
     let monsterId = pick(floor.monsterPool);
     let unique = false;
     const deepUniqueReinforcementChance = Math.min(0.42, 0.08 + Math.max(0, Number(floor.floor || 1) - 40) * 0.006);
-    if (!state.dungeon.uniqueSpawned && floor.uniques?.length && Math.random() < deepUniqueReinforcementChance) {
-      monsterId = pick(floor.uniques);
+    const uniqueCandidates = (floor.uniques || []).filter((id) => (
+      canSpawnDungeonUnique(id) && !state.dungeon.enemies.some((enemy) => enemy.id === id)
+    ));
+    if (!state.dungeon.uniqueSpawned && uniqueCandidates.length && Math.random() < deepUniqueReinforcementChance) {
+      monsterId = pick(uniqueCandidates);
       unique = true;
       state.dungeon.uniqueSpawned = true;
     }
