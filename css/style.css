@@ -72,7 +72,9 @@ button:active:not(:disabled) {
 }
 
 .app-shell.dungeon-mode {
-  --tile: clamp(15px, min(32px, calc((100vw - 42px) / 13), calc((100svh - 328px) / 13)), 32px);
+  /* 高さ予算: ヘッダー約90px + 操作パッド156px + ログ105px + 余白約40px。
+     328px では中背丈端末(667px級)でパッド下段がログに重なった。 */
+  --tile: clamp(15px, min(32px, calc((100vw - 42px) / 13), calc((100svh - 390px) / 13)), 32px);
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr) clamp(105px, 15svh, 132px);
   background:
@@ -3175,7 +3177,9 @@ textarea:focus-visible,
   }
 
   .app-shell.dungeon-mode {
-    --tile: clamp(15px, min(29px, calc((100vw - 42px) / 13), calc((100svh - 320px) / 13)), 29px);
+    /* 高さ予算390px = ヘッダー+操作パッド+ログ+余白。320pxでは667px級の
+       端末で操作パッド下段がログに重なり、下移動が押せなかった。 */
+    --tile: clamp(15px, min(29px, calc((100vw - 42px) / 13), calc((100svh - 390px) / 13)), 29px);
     grid-template-columns: minmax(0, 1fr);
   }
 

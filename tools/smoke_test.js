@@ -190,7 +190,7 @@ assert(styleSource.includes("@media (min-width: 980px)") && styleSource.includes
 assert(styleSource.includes("grid-template-columns: minmax(600px, 1fr) minmax(310px, 360px)") && styleSource.includes("min(42px, calc((100svh - 360px) / 13))"), "desktop dungeon map and side-log layout is missing");
 assert(/\.controls\s*\{[^}]*transform:\s*translateY\(-3px\)/.test(styleSource), "keypad does not include the additional one-pixel upward offset");
 assert(/\.magic-move-controls\s*\{[^}]*transform:\s*translateY\(-4px\) scale\(0\.9\)[^}]*transform-origin:\s*right center/.test(styleSource), "purple ability box size or four-pixel upward offset is missing");
-assert(styleSource.includes("clamp(105px, 15svh, 132px)") && styleSource.includes("calc((100svh - 328px) / 13)"), "removed dungeon status space was not assigned to the log");
+assert(styleSource.includes("clamp(105px, 15svh, 132px)") && styleSource.includes("calc((100svh - 390px) / 13)"), "removed dungeon status space was not assigned to the log");
 assert(/\.app-shell\.dungeon-mode \.status-bar\s*\{[^}]*display:\s*none/.test(styleSource), "dungeon still shows the top place/job/race status bar");
 assert(mainSource.includes('writeStorage(AUDIO_KEY, "0")') && mainSource.includes('currentView === "arena"') && styleSource.includes('.app-shell:not(.town-mode) .audio-button') && indexSource.includes("街で音楽を切り替える"), "music switching is not restricted to town screens");
 assert(styleSource.includes("min(32px, calc((100vw - 42px) / 13)") && styleSource.includes("min(29px, calc((100vw - 42px) / 13)"), "dungeon map tiles do not use the reclaimed phone viewport space");
