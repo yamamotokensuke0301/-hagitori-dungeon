@@ -7238,6 +7238,21 @@
       // Ignore unrelated or malformed storage events.
     }
   });
+  // 画面が隠れている間はBGMを止める。埋め込みブラウザやバックグラウンドの
+  // タブが見えないまま鳴り続ける事故を防ぐ。復帰時は同じ曲を再開する。
+  document.addEventListener("visibilitychange", () => {
+    if (!audio) return;
+    if (document.hidden) {
+      audio.resumeOnVisible = Boolean(audio.currentTrack && !audio.currentTrack.paused);
+      if (audio.resumeOnVisible) audio.currentTrack.pause();
+      return;
+    }
+    if (audio.resumeOnVisible && audio.enabled && audio.started && audio.currentTrack) {
+      const playback = audio.currentTrack.play();
+      if (playback && typeof playback.catch === "function") playback.catch(() => {});
+    }
+    audio.resumeOnVisible = false;
+  });
   document.addEventListener("keydown", (event) => {
     const developerPanel = document.querySelector("#developerPanel");
     if (event.key === "Escape" && closeTopModalFromEscape()) {

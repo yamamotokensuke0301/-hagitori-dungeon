@@ -302,6 +302,7 @@ BELLS = {
     "mallet": (3.98, 0.85, 7.0, 5.0, 0.030),
     "celesta": (3.01, 0.55, 9.0, 4.2, 0.012),
     "toll": (1.41, 2.10, 1.2, 0.9, 0.045),
+    "epiano": (1.0, 1.5, 5.5, 2.6, 0.004),
 }
 
 
@@ -541,6 +542,76 @@ def add_timpani(left: array, right: array, start: float, midi: float, gain: floa
         right[index] += low * rg
 
 
+_PIANO_AMPS = (1.0, 0.58, 0.42, 0.28, 0.18, 0.11)
+
+
+def add_piano(left: array, right: array, start: float, duration: float, midi: float, gain: float, pan: float = 0.0) -> None:
+    """Grand-piano voice: stretched partials, twin-string beating, a hammer.
+
+    Piano partials sit slightly sharp of the harmonic series (string
+    stiffness); that stretch plus the slow beat of two detuned strings is
+    what reads as "piano" instead of "plucked harp".
+    """
+    begin = max(0, int(start * RATE))
+    end = min(len(left), int((start + duration) * RATE))
+    if begin >= end:
+        return
+    f0 = hz(midi)
+    partials = []
+    for n, amp in enumerate(_PIANO_AMPS, start=1):
+        fn = n * f0 * math.sqrt(1.0 + 0.00042 * n * n)
+        if fn > RATE * 0.45:
+            break
+        decay = (1.4 + 1.05 * n) * (f0 / 261.63) ** 0.4
+        partials.append((TAU * fn, amp, decay))
+    detunes = (0.99938, 1.00062)
+    phase_offset = random.random() * TAU
+    pan = max(-0.9, min(0.9, pan))
+    lg = gain * math.sqrt((1.0 - pan) * 0.5)
+    rg = gain * math.sqrt((1.0 + pan) * 0.5)
+    previous_noise = 0.0
+    for index in range(begin, end):
+        t = (index - begin) / RATE
+        sample = 0.0
+        for w, amp, decay in partials:
+            envelope_n = amp * math.exp(-decay * t)
+            for ratio in detunes:
+                sample += envelope_n * math.sin(w * ratio * t + phase_offset)
+        sample *= 0.5
+        if t < 0.012:
+            noise = random.random() * 2.0 - 1.0
+            hammer = noise - previous_noise * 0.5
+            previous_noise = noise
+            sample += hammer * 0.85 * (1.0 - t / 0.012)
+        rise = t / 0.0015 if t < 0.0015 else 1.0
+        fall = _smoothstep((duration - t) / 0.12)
+        value = sample * rise * fall
+        left[index] += value * lg
+        right[index] += value * rg
+
+
+def add_logdrum(left: array, right: array, start: float, midi: float, gain: float, pan: float = 0.0) -> None:
+    """Amapiano log drum: a rubbery pitched knock with a round sub tail."""
+    begin = max(0, int(start * RATE))
+    end = min(len(left), int((start + 0.5) * RATE))
+    if begin >= end:
+        return
+    freq = hz(midi)
+    pan = max(-0.9, min(0.9, pan))
+    lg = gain * math.sqrt((1.0 - pan) * 0.5)
+    rg = gain * math.sqrt((1.0 + pan) * 0.5)
+    phase = 0.0
+    for index in range(begin, end):
+        t = (index - begin) / RATE
+        phase += TAU * freq * (1.0 + 0.9 * math.exp(-t / 0.02)) / RATE
+        body = math.sin(phase) * math.exp(-7.0 * t)
+        knock = math.sin(TAU * freq * 3.17 * t) * math.exp(-42.0 * t) * 0.45
+        fall = _smoothstep((0.5 - t) / 0.06)
+        sample = math.tanh((body + knock) * 1.9) * 0.85 * fall
+        left[index] += sample * lg
+        right[index] += sample * rg
+
+
 def add_wind(
     left: array,
     right: array,
@@ -778,59 +849,79 @@ def finish(
 
 
 def town() -> None:
-    """Warm guild-town orchestra: strings, harp, flute lead, celesta light."""
+    """Ambient-amapiano town score built to survive endless looping.
+
+    v5: a synthesized grand piano leads — jazzy maj9 stabs with a low
+    left-hand root, plus a generative pentatonic walk — over an amapiano
+    log drum and unhurried shakers.  The groove breathes: four intro bars
+    and a four-bar break drop the log drum entirely, and no hook melody
+    exists to wear out — only two short flute breaths per loop.
+    """
     started = time.time()
-    random.seed(1101)
-    beat, left, right = canvas(88, 24)
+    random.seed(1104)
+    beat, left, right = canvas(112, 32)  # about 69 seconds
+    total_beats = 32 * 4
+
     chords = [
-        [48, 55, 60, 64], [47, 55, 59, 62], [45, 52, 57, 60], [43, 50, 55, 59],
-        [41, 48, 53, 57], [43, 50, 55, 60], [45, 52, 57, 64], [43, 50, 55, 59],
+        [48, 52, 59, 62],  # Cmaj9
+        [45, 52, 60, 62],  # Am9
+        [41, 48, 57, 64],  # Fmaj9
+        [43, 52, 57, 62],  # G6add9 — folds back into Cmaj9 at the seam
     ]
-    # Two answered phrases, each two bars long (8 beats).
-    phrase_a = [
-        (0.0, 1.0, 76), (1.0, 0.5, 74), (1.5, 0.5, 72), (2.0, 1.5, 74), (3.5, 0.5, 71),
-        (4.0, 1.0, 72), (5.0, 0.5, 69), (5.5, 0.5, 67), (6.0, 2.0, 69),
-    ]
-    phrase_b = [
-        (0.0, 0.75, 72), (0.75, 0.25, 74), (1.0, 1.0, 76), (2.0, 1.0, 79), (3.0, 1.0, 77),
-        (4.0, 1.5, 76), (5.5, 0.5, 74), (6.0, 2.0, 72),
-    ]
-    for bar in range(24):
+    # Room tone: a faint warm air layer so the breaks never go dead.
+    add_wind(left, right, 0.0, total_beats * beat, 0.010, 500.0, 1300.0, 0.03)
+
+    for bar in range(32):
         start = bar * 4 * beat
-        chord = chords[bar % 8]
-        section = bar // 6
-        level = [0.66, 0.90, 1.06, 0.82][section]
-        add_chord(left, right, start, 4.4 * beat, chord, 0.052 * level, "strings", 0.42, 0.85, 0.58)
-        add_tone(left, right, start, 3.9 * beat, chord[0] - 12, 0.100 * level, -0.05, "cello", 0.06, 0.5)
-        # Harp keeps eighth-note motion; broken chord rises then falls.
-        steps = 4 if section == 0 else 8
-        shape = [0, 1, 2, 3, 2, 3, 1, 2]
-        for step in range(steps):
-            when = start + step * 4 * beat / steps
-            note = chord[shape[step] % len(chord)] + 12
-            add_pluck(left, right, when, 1.1 * beat, note, 0.060 * level, -0.45 + 0.9 * step / max(1, steps - 1))
-        if bar % 4 == 2 and bar not in {22}:
-            phrase = phrase_a if (bar // 4) % 2 == 0 else phrase_b
-            play_melody(left, right, start, beat, phrase, "flute", 0.066 * level, 0.22)
-            if section == 2:
-                # Oboe answers a sixth below during the fullest section.
-                counter = [(o + 0.5, h, m - 9) for o, h, m in phrase[:5]]
-                play_melody(left, right, start, beat, counter, "oboe", 0.034 * level, -0.28)
-        if section >= 1:
-            add_drum(left, right, start, 0.052 * level, "tom", -0.10)
+        chord = chords[bar // 8]
+        grooving = 4 <= bar < 16 or 20 <= bar < 32
+        if bar % 8 == 0:
+            # A thin three-voice pad; the root belongs to bass and log drum.
+            for voice_index, note in enumerate(chord[1:]):
+                pan = -0.5 + 1.0 * voice_index / 2
+                add_tone(left, right, start, 33 * beat, note + 12, 0.020, pan, "strings", 3.0, 3.5)
+        if bar % 4 == 0:
+            add_tone(left, right, start, 7.6 * beat, chord[0] - 12, 0.050, 0.0, "bass", 0.8, 1.5)
+        # Grand-piano stabs on even bars only: low root plus an open
+        # three-note right hand.  Odd bars stay silent so each hit matters.
+        if bar % 2 == 0:
+            for pulse in (0.5, 2.75):
+                add_piano(left, right, start + pulse * beat, 2.4, chord[0], 0.040, -0.12)
+                for voice_index, note in enumerate(chord[1:]):
+                    add_piano(left, right, start + pulse * beat + voice_index * 0.011, 2.2, note + 12, 0.030, -0.3 + 0.6 * voice_index / 2)
+        if grooving:
+            # Log drum: melodic syncopation with an occasional octave dive.
+            patterns = [
+                [(0.75, 0), (1.5, 0), (2.25, 7), (3.5, 0)],
+                [(0.75, 0), (1.5, 7), (2.75, 0), (3.25, -12)],
+                [(0.5, 0), (1.75, 0), (2.25, 7), (3.5, 0)],
+                [(0.75, 0), (1.5, 0), (2.5, -12), (3.25, 7)],
+            ]
+            for pulse, interval in patterns[bar % 4]:
+                add_logdrum(left, right, start + pulse * beat, chord[0] + interval, 0.085, 0.06 if interval else -0.06)
+            add_drum(left, right, start, 0.030, "kick")
+        if bar >= 2:
+            # Shakers: offbeats only.
             for step in range(4):
-                add_drum(left, right, start + (step + 0.5) * beat, 0.016 * level, "shaker", 0.36 if step % 2 else -0.36)
-        if bar in {6, 12, 18}:
-            add_drum(left, right, start, 0.050, "cymbal", 0.18)
-        if bar == 23:
-            # Final cadence: harp flourish into a held tonic with celesta halo.
-            add_harp_chord(left, right, start, [48, 55, 60, 64, 67, 72], 0.055, 2.6, stagger=0.06)
-            for i, note in enumerate([84, 88, 91]):
-                add_bell(left, right, start + 1.4 + i * 0.22, 2.2, note, 0.030, -0.3 + i * 0.3, "celesta")
-    for bar in (5, 11, 17, 23):
-        chord = chords[bar % 8]
-        add_bell(left, right, bar * 4 * beat + 3.0 * beat, 1.6, chord[2] + 24, 0.026, 0.4, "celesta")
-    finish("town-bgm.wav", left, right, 0.175, room=0.66, damp=0.38, wet=0.34, width=1.32, started=started)
+                add_drum(left, right, start + (step + 0.5) * beat, 0.011, "shaker", 0.4 if step % 2 else -0.4)
+
+    # The piano walk lives where the groove rests (intro and break) and now
+    # spills a little past the break, fading into the returning groove.
+    # Coverage is tuned to about 29% of the loop.
+    pool = [72, 74, 76, 79, 81, 84, 86, 88]
+    position = 3
+    for low, high in ((2.0, 17.0), (64.0, 86.0)):
+        cursor = low
+        while cursor < high:
+            position = max(0, min(len(pool) - 1, position + random.choice([-2, -1, 1, 1, 2])))
+            add_piano(left, right, cursor * beat, 2.6, pool[position], 0.020 + random.random() * 0.010, -0.5 + random.random())
+            cursor += random.choice([1.5, 2.0, 2.5, 3.0]) + (random.random() - 0.5) * 0.1
+
+    # One flute breath per loop keeps a human trace without becoming a tune.
+    for offset, held, midi in ((0.0, 1.4, 79), (1.6, 2.4, 76)):
+        add_tone(left, right, (94.0 + offset) * beat, held * beat, midi, 0.024, 0.2, "flute", 0.5, 0.9, vibrato=0.008)
+
+    finish("town-bgm.wav", left, right, 0.160, room=0.70, damp=0.36, wet=0.32, width=1.34, started=started)
 
 
 def dungeon() -> None:
@@ -907,7 +998,14 @@ def deep() -> None:
 
 
 def abyss() -> None:
-    """Weighty ritual: real choir vowels, sub pulse, tolling bells, taiko."""
+    """Weighty ritual with intermittent madness.
+
+    The base layer stays a slow rite — choir vowels, sub pulse, tolling
+    bells, taiko.  Once per loop (bars 14-17) the rite breaks into a fit:
+    accelerating bell ticks like a panicking pulse, a semitone choir
+    cluster swelling underneath, and a single thin string shriek sliding
+    upward.  The fit passes and the rite resumes as if nothing happened.
+    """
     started = time.time()
     random.seed(4404)
     beat, left, right = canvas(104, 24)
@@ -920,6 +1018,7 @@ def abyss() -> None:
         root = roots[bar % len(roots)]
         section = bar // 6
         level = [0.56, 0.80, 1.10, 0.74][section]
+        madness = 14 <= bar <= 17
         chord = [root + 12, root + 19, root + 24, root + 27]
         add_chord(left, right, start, 4.3 * beat, chord, 0.052 * level, "choir", 0.7, 1.0, 0.70)
         add_tone(left, right, start, 4.2 * beat, root - 12, 0.150 * level, 0.0, "dark", 0.14, 0.7)
@@ -931,9 +1030,24 @@ def abyss() -> None:
                 add_drum(left, right, start + pulse * beat, 0.110 * level, "boom", -0.1)
             else:
                 add_drum(left, right, start + pulse * beat, 0.032 * level, "snare", 0.12)
+        if madness:
+            # A ticking bell whose gaps shrink like a pulse losing its rhythm.
+            tick = 0.0
+            gap = 0.55
+            count = 0
+            while tick < 3.6:
+                add_bell(left, right, start + tick * beat, 0.5, root + 36 + (count % 2), 0.018 + 0.0045 * count, -0.4 if count % 2 else 0.4, "mallet")
+                gap = max(0.11, gap * 0.82)
+                tick += gap
+                count += 1
+            # A semitone cluster creeps up under the rite, never resolving.
+            add_chord(left, right, start, 4.4 * beat, [root + 24, root + 25, root + 26, root + 27], 0.016 * level, "choir", 2.2, 1.2, 0.5)
+            if bar == 15:
+                # One thin shriek per loop slides upward through the texture.
+                add_tone(left, right, start + 1.2 * beat, 2.6 * beat, root + 41, 0.018, -0.5, "strings", 0.4, 0.6, vibrato=0.02, bend=2.5)
         if bar % 6 == 0:
             add_bell(left, right, start, 4.5, root + 24, 0.055 * level, 0.0, "toll")
-        if section >= 1 and bar % 2 == 0:
+        if section >= 1 and bar % 2 == 0 and not madness:
             for note in [root + 31, root + 34]:
                 add_tone(left, right, start + 2.4 * beat, 1.5 * beat, note, 0.030 * level, (note - root - 32) / 6, "choir", 0.5, 0.7)
         if bar in {6, 12, 18}:
@@ -1094,6 +1208,8 @@ def tension(stage: int) -> None:
 
         # One sustained bass voice at stage one grows into a pulsing two-octave
         # engine.  Keeping a stable centre preserves impact on phone speakers.
+        # At stage five the ground itself gives way: every other bar the bass
+        # sinks a semitone across the bar, so even the anchor stops being safe.
         add_tone(
             left,
             right,
@@ -1105,6 +1221,7 @@ def tension(stage: int) -> None:
             "dark" if stage <= 2 else "bass",
             0.045 if stage >= 3 else 0.12,
             0.42,
+            bend=-1.0 if stage == 5 and bar % 2 else 0.0,
         )
         if stage >= 3:
             low_pulses = 2 if stage == 3 else 4 if stage == 4 else 8
@@ -1150,6 +1267,21 @@ def tension(stage: int) -> None:
                     0.003,
                     0.075 if stage >= 4 else 0.13,
                 )
+                if stage == 5 and section >= 1:
+                    # A quarter-tone shadow of the same line: the two copies
+                    # beat against each other and refuse to fuse into one pitch.
+                    add_tone(
+                        left,
+                        right,
+                        when,
+                        (2.28 / subdivisions) * beat,
+                        note + 0.5,
+                        ostinato_gain * accent * level * 0.55,
+                        -pan,
+                        "saw",
+                        0.003,
+                        0.075,
+                    )
 
         # Percussion density rises monotonically.  Stage one is a distant
         # heartbeat; stage five interlocks sixteenth hats, kicks and snares.
@@ -1194,18 +1326,38 @@ def tension(stage: int) -> None:
             for step in range(call_length):
                 interval = warning_cell[step]
                 when = start + (step * 4 / call_length) * beat
+                # Stage five is deliberately bitonal: the lead sings the same
+                # motif a tritone above the pedal, so every strong note lands
+                # a diminished fifth or minor ninth against the bass.  Both
+                # parts are internally correct; together they refuse to agree.
+                pitch = root + 24 + interval + (6 if stage == 5 else 0)
                 add_tone(
                     left,
                     right,
                     when,
                     (2.45 / call_length) * beat,
-                    root + 24 + interval,
+                    pitch,
                     (0.030 + stage * 0.006) * level,
                     0.20,
                     lead_voice,
                     0.012 if stage >= 3 else 0.05,
                     0.12,
                 )
+                if stage == 5 and section >= 2:
+                    # A brass double a semitone under the lead splits the
+                    # melody itself in two — the final stage of the collapse.
+                    add_tone(
+                        left,
+                        right,
+                        when,
+                        (2.45 / call_length) * beat,
+                        pitch - 1,
+                        (0.030 + stage * 0.006) * level * 0.5,
+                        -0.18,
+                        "brass",
+                        0.012,
+                        0.12,
+                    )
 
         # Section punctuation remains intentionally below the main transients;
         # it marks escalation without making every loop sound like a boss win.

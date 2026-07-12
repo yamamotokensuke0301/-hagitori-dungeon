@@ -36,16 +36,16 @@ jobs:
           cp index.html .nojekyll _site/
           cp -R css data js _site/
           mkdir -p _site/assets/audio _site/assets/images
-          cp assets/audio/town-bgm.wav _site/assets/audio/
-          cp assets/audio/dungeon-bgm.wav _site/assets/audio/
-          cp assets/audio/deep-bgm.wav _site/assets/audio/
-          cp assets/audio/abyss-bgm.wav _site/assets/audio/
-          cp assets/audio/battle-bgm.wav _site/assets/audio/
-          cp assets/audio/boss-bgm.wav _site/assets/audio/
-          cp assets/audio/tension-2-bgm.wav _site/assets/audio/
-          cp assets/audio/tension-3-bgm.wav _site/assets/audio/
-          cp assets/audio/tension-4-bgm.wav _site/assets/audio/
-          cp assets/audio/tension-5-bgm.wav _site/assets/audio/
+          cp assets/audio/town-bgm.m4a _site/assets/audio/
+          cp assets/audio/dungeon-bgm.m4a _site/assets/audio/
+          cp assets/audio/deep-bgm.m4a _site/assets/audio/
+          cp assets/audio/abyss-bgm.m4a _site/assets/audio/
+          cp assets/audio/battle-bgm.m4a _site/assets/audio/
+          cp assets/audio/boss-bgm.m4a _site/assets/audio/
+          cp assets/audio/tension-2-bgm.m4a _site/assets/audio/
+          cp assets/audio/tension-3-bgm.m4a _site/assets/audio/
+          cp assets/audio/tension-4-bgm.m4a _site/assets/audio/
+          cp assets/audio/tension-5-bgm.m4a _site/assets/audio/
           cp assets/images/down-stairs.png _site/assets/images/
           test -f _site/index.html
 
