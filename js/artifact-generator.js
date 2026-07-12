@@ -84,7 +84,9 @@
     const resistanceAttributes = distinctPicks(rng, attributes.filter((id) => !attackAttributes.includes(id)), 1 + Number(quality >= 3 && rng() < 0.5));
     const curse = curseFor(rng, quality);
     const variance = rand(rng, 0, Math.max(2, Math.round(profile.power * 0.35)));
-    const power = Math.round((profile.power + variance) * (curse ? 1.22 : 1));
+    const normalizedDepth = clamp(Math.floor(Number(depth || 1)), 1, 100);
+    const lateDepthScale = normalizedDepth <= 60 ? 1 : 1 + ((normalizedDepth - 60) / 40) * 0.5;
+    const power = Math.round((profile.power + variance) * (curse ? 1.22 : 1) * lateDepthScale);
     const slotAttackRatio = slot === "weapon" ? 1.35 : slot === "accessory" ? 0.38 : 0.2;
     const slotDefenseRatio = slot === "upper" || slot === "lower" ? 1.12 : slot === "feet" ? 0.58 : 0.32;
     const attack = Math.max(0, Math.round(power * slotAttackRatio));
@@ -119,10 +121,10 @@
         chestOnly: true,
         random: true,
         quality,
-        depth: clamp(Math.floor(Number(depth || 1)), 1, 100),
+        depth: normalizedDepth,
       },
       curse,
-      description: `B${clamp(Math.floor(Number(depth || 1)), 1, 100)}Fの迷宮魔力が偶然結晶化した一点物。同じ性能の品は二度と生成されない。`,
+      description: `B${normalizedDepth}Fの迷宮魔力が偶然結晶化した一点物。同じ性能の品は二度と生成されない。${normalizedDepth >= 61 ? " 深層魔力により基礎性能が増幅されている。" : ""}`,
     };
   }
 
@@ -133,8 +135,8 @@
     if (!Array.isArray(item.attackAttributes) || item.attackAttributes.length > 3 || new Set(item.attackAttributes).size !== item.attackAttributes.length || item.attackAttributes.some((id) => !attributes.includes(id))) return false;
     if (item.attributeAttack !== (item.attackAttributes[0] || null)) return false;
     const boundedInteger = (value, min, max) => Number.isInteger(Number(value)) && Number(value) >= min && Number(value) <= max;
-    if (!boundedInteger(item.attack, 0, 85) || !boundedInteger(item.defense, 0, 70)
-      || !boundedInteger(item.acceleration, 0, 50) || !boundedInteger(item.hpRegen, 0, 15)) return false;
+    if (!boundedInteger(item.attack, 0, 150) || !boundedInteger(item.defense, 0, 130)
+      || !boundedInteger(item.acceleration, 0, 90) || !boundedInteger(item.hpRegen, 0, 20)) return false;
     const resistanceEntries = Object.entries(item.resistances || {});
     if (resistanceEntries.length > 2 || resistanceEntries.some(([id, value]) => !attributes.includes(id) || !boundedInteger(value, 1, 4))) return false;
     const quality = Number(item.artifact.quality);

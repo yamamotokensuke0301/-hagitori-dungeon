@@ -120,12 +120,12 @@
     },
     {
       id: "handyman", name: "便利屋", hp: 33, attack: 4, defense: 1,
-      baseAttackAttribute: "blunt", acceleration: 5, accelerationGrowthEvery: 8,
+      baseAttackAttribute: "blunt", acceleration: 3, accelerationGrowthEvery: 12,
       materialCapacity: 120, materialBurdenStep: 40,
       stats: { strength: 1, speed: 2, dexterity: 2, durability: 1, luck: 1 },
       combat: { attackTrials: 4, attackMin: 3, attackMax: 10, accuracy: 0.8, evasion: 0.07, crit: 0.09 },
       skill: { id: "field_appraisal", name: "現場鑑定", attribute: null, power: 0, tag: "observe", researchAmount: 1 },
-      description: "現場仕事に広く通じる。剥ぎ取り回数+1、内壁の掘削、簡易調査、非常に大きな運搬余力、伸びやすい加速度を持つ。",
+      description: "現場仕事に広く通じる。剥ぎ取り回数+1、内壁の掘削、簡易調査、非常に大きな運搬余力を持つ。加速度は穏やかに成長する。",
     },
     {
       id: "priest", name: "プリースト", hp: 32, attack: 4, defense: 1,
@@ -138,12 +138,12 @@
     {
       id: "ninja", name: "忍者", hp: 38, attack: 8, defense: 3,
       baseAttackAttribute: "slash", rangedRange: 5,
-      acceleration: 30, accelerationGrowthEvery: 3,
+      acceleration: 14, accelerationGrowthEvery: 6,
       materialCapacity: 90, materialBurdenStep: 30,
       stats: { strength: 4, speed: 8, dexterity: 6, durability: 2, luck: 3 },
       combat: { attackTrials: 8, attackMin: 8, attackMax: 20, accuracy: 0.94, evasion: 0.2, crit: 0.25 },
       skill: { id: "shadow_assassination", name: "影縫い暗殺", attribute: "dark", power: 1.35, tag: "shadow_assassination", cooldown: 8 },
-      description: "最強格の高速職。遠隔忍具は手数半減。眠る敵への影縫い暗殺だけは威力2.4倍となり、敵を拘束する。",
+      description: "最強格の高速職。初期加速度+14、6レベルごとに成長する。遠隔忍具は手数半減し、睡眠中の敵への影縫い暗殺で真価を出す。",
     },
     {
       id: "flower_tamer", name: "お花使い", hp: 27, attack: 3, defense: 1,

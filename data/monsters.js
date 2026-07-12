@@ -413,18 +413,18 @@
     const regionPalette = paletteForFloor(floor);
     const primary = regionPalette[index % regionPalette.length];
     const secondary = regionPalette[(index + 1) % regionPalette.length];
-    const weakness = deepAttributes[(index * 2 + 6) % deepAttributes.length];
     const isFinal = floor === 100;
+    const weakness = isFinal ? "light" : deepAttributes[(index * 2 + 6) % deepAttributes.length];
     window.HD_DATA.monsters.push({
       id: isFinal ? "dungeon_lord_nox" : `abyss_unique_${floor}`,
       name: isFinal ? "太古からの闇キキルクルス" : `${abyssUniqueTitles[index]}の${["アギト", "ネブラ", "オルム", "ゼノ", "ミラ"][index % 5]}`,
       glyph: isFinal ? "闇" : "王", mapMarker: isFinal ? "闇" : "ユ", floors: [floor], unique: true,
       forcedSpeciesId: isFinal ? "reptile" : null,
-      hp: 180 + floor * 13,
+      hp: isFinal ? 160000 : 180 + floor * 13,
       attack: 18 + Math.floor(floor * 0.9),
       defense: 9 + Math.floor(floor * 0.24),
       attackAttribute: primary,
-      acceleration: floor >= 30 ? 4 + Math.floor((floor - 30) / 4) : 0,
+      acceleration: isFinal ? 48 : floor >= 30 ? 4 + Math.floor((floor - 30) / 4) : 0,
       weaknesses: [weakness],
       resistances: { [primary]: 5, [secondary]: 4, slash: Math.min(4, Math.floor(floor / 25)), blunt: Math.min(4, Math.floor(floor / 30)) },
       dangerous: { every: 2, telegraph: `${isFinal ? "迷宮そのもの" : "ユニーク個体"}が${window.HD_DATA.attributeLabels[secondary]}の奥義を構えた。`, name: `${window.HD_DATA.attributeLabels[secondary]}終極`, attribute: secondary, power: 55 + floor * 2 },
@@ -583,6 +583,15 @@
   curatedArena.sort((left, right) => left.arenaRank - right.arenaRank).forEach((monster, index) => {
     monster.formerArenaRank = monster.arenaRank;
     monster.arenaRank = index + 1;
+    const rank = monster.arenaRank;
+    const durabilityScale = 1.5 + rank * 0.012;
+    const techniqueScale = 1.3 + rank * 0.008;
+    monster.hp = Math.round(monster.hp * durabilityScale);
+    monster.attack += 3 + Math.floor(rank * 0.25);
+    monster.defense += 1 + Math.floor(rank * 0.08);
+    monster.acceleration += 6 + Math.floor(rank / 8);
+    monster.dangerous.power = Math.round(monster.dangerous.power * techniqueScale);
+    if (rank >= 70) monster.dangerous.every = 2;
     monster.research[1] = monster.research[1].replace(/第\d+戦/, `第${monster.arenaRank}戦`);
   });
   const finalArenaRankMax = curatedArena.length;
@@ -647,7 +656,18 @@
       const baseMaterial = materialByAttribute[primary];
       const weakMaterial = materialByAttribute[weakness];
       const techniqueMaterial = materialByAttribute[danger];
-      const name = `${lineage.title}${lineage.kind}・${core.name}`;
+      const name = [
+        `${lineage.kind}〈北を忘れたアデル〉`,
+        `遺言瓶の${lineage.kind}・ビスク`,
+        `夜明けに武器を置く${lineage.kind}・シエラ`,
+        `足跡を入口へ返す${lineage.kind}・ドーマ`,
+        `答えなき問いを殖やす${lineage.kind}・エニグマ`,
+        `壊れ物へ名を授ける${lineage.kind}・フィオ`,
+        `二度死んだ${lineage.kind}・グレイヴ`,
+        `白紙の宛名を恐れる${lineage.kind}・ハクア`,
+        `最後だけ逆手の${lineage.kind}・イリス`,
+        `勝者へ鍵を贈る${lineage.kind}・ジュノ`,
+      ][coreIndex];
       window.HD_DATA.monsters.push({
         id: `dungeon_unique_${lineage.id}_${core.id}`,
         name,
@@ -689,18 +709,18 @@
     });
   });
 
-  // 所持金を奪って遠方へ転移する盗賊系。倒せば奪われた金は全額回収できる。
+  // 所持金を奪って遠方へ転移する盗賊系。盗まれた金は討伐しても戻らない。
   const goldThiefTypes = [
-    ["coin_snatcher_imp", "銭さらい小鬼", "小", 3, "dark", "light", 0.05, 2, 8],
-    ["purse_cutting_marten", "財布裂きテン", "財", 12, "slash", "blunt", 0.06, 3, 9],
-    ["silver_mist_bandit", "銀霧の盗賊", "銀", 24, "illusion", "light", 0.07, 5, 10],
-    ["tax_collector_wraith", "冥府の徴税霊", "税", 38, "curse", "light", 0.08, 7, 11],
-    ["vault_boring_mole", "金庫穿ちモグラ", "穿", 52, "earth", "wind", 0.09, 9, 12],
-    ["gilded_shadow_fox", "金影の妖狐", "金", 67, "fire", "water", 0.1, 12, 13],
-    ["abyssal_pickpocket", "奈落の掏摸", "掏", 82, "dark", "light", 0.11, 15, 14],
-    ["world_coffer_eater", "世界金庫喰らい", "庫", 95, "curse", "light", 0.12, 18, 15],
+    ["coin_snatcher_imp", "銭さらい小鬼", "小", 3, "dark", "light", 0.2, 8],
+    ["purse_cutting_marten", "財布裂きテン", "財", 12, "slash", "blunt", 0.28, 9],
+    ["silver_mist_bandit", "銀霧の盗賊", "銀", 24, "illusion", "light", 0.36, 10],
+    ["tax_collector_wraith", "冥府の徴税霊", "税", 38, "curse", "light", 0.45, 11],
+    ["vault_boring_mole", "金庫穿ちモグラ", "穿", 52, "earth", "wind", 0.55, 12],
+    ["gilded_shadow_fox", "金影の妖狐", "金", 67, "fire", "water", 0.65, 13],
+    ["abyssal_pickpocket", "奈落の掏摸", "掏", 82, "dark", "light", 0.72, 14],
+    ["world_coffer_eater", "世界金庫喰らい", "庫", 95, "curse", "light", 0.8, 15],
   ];
-  goldThiefTypes.forEach(([id, name, glyph, floor, attribute, weakness, rate, flat, escapeDistance], index) => {
+  goldThiefTypes.forEach(([id, name, glyph, floor, attribute, weakness, rate, escapeDistance], index) => {
     window.HD_DATA.monsters.push({
       id,
       name,
@@ -710,22 +730,22 @@
       hp: 18 + floor * 4 + index * 3,
       attack: 4 + Math.floor(floor * 0.62),
       defense: 1 + Math.floor(floor * 0.22),
-      acceleration: 4 + Math.floor(floor / 16),
+      acceleration: 36 + Math.floor(floor / 4),
       attackAttribute: attribute,
       weaknesses: [weakness],
       resistances: { [attribute]: Math.min(4, 1 + Math.floor(floor / 28)) },
       dangerous: null,
       specialAttack: "gold_steal",
       rareSpawn: true,
-      goldTheft: { rate, flat, max: 20 + floor, escapeDistance },
+      goldTheft: { rate, maxRate: 0.8, escapeDistance },
       loot: [
         { condition: "default", material: index % 2 ? "clean_pelt" : "broken_carapace" },
         { condition: { lastAttribute: weakness }, material: index % 2 ? "fine_pelt" : "unbroken_horn" },
       ],
       research: {
         1: `B${floor}F付近を徘徊する金品狙い。所持金を盗むと遠方へ転移する。`,
-        2: `${window.HD_DATA.attributeLabels[weakness]}属性が弱点。1回に所持金の約${Math.round(rate * 100)}%と${flat}Gを狙う。`,
-        3: "逃げた個体を倒せば、その個体に盗まれた金を全額回収できる。",
+        2: `${window.HD_DATA.attributeLabels[weakness]}属性が弱点。1回に所持金の約${Math.round(rate * 100)}%を狙う。盗難の上限は所持金の80%。`,
+        3: "一度盗まれた金は、その個体を倒しても戻らない。接近される前に仕留めたい。",
       },
     });
   });
@@ -976,6 +996,57 @@
   });
 
   const uniqueEpithetTails = ["異境の王", "帰らずの災禍", "迷宮の古き傷", "屍山の覇者", "忘れられた神敵", "深層の凶兆", "黄泉路の番人"];
+  const exceptionalUniqueNames = new Map([
+    ["abyss_unique_35", "％＝"],
+    ["abyss_unique_75", "≠？"],
+    ["abyss_unique_45", "さわやかなミルクオレ"],
+    ["abyss_unique_55", "機械仕掛けの脱獄王"],
+    ["abyss_unique_60", "川の流れのようにアサハカ"],
+    ["abyss_unique_65", "午後三時のクリームパン"],
+    ["abyss_unique_70", "麒麟児印のニュースター・メテオ"],
+    ["dungeon_unique_cinder_scribe_adel", "だいたい無敵の田中"],
+    ["dungeon_unique_sunken_bell_hakua", "倒すと縁起が悪い鳥"],
+    ["dungeon_unique_venom_queen_enigma", "うすしお味の破壊神"],
+    ["dungeon_unique_name_grave_bisque", "たぶん佐々木"],
+    ["dungeon_unique_rust_rain_iris", "無事故無違反の暴走王"],
+    ["dungeon_unique_false_sun_fio", "返品不可の救世主"],
+    ["dungeon_unique_wind_merchant_ciela", "株式会社あの世・迷宮支店長"],
+    ["dungeon_unique_key_smith_juno", "説明書をなくした神様"],
+    ["dungeon_unique_moon_scar_grave", "有給休暇中の死神"],
+    ["dungeon_unique_fifteen_choir_doma", "ご家庭用ブラックホール"],
+    ["dungeon_unique_scream_cook_adel", "第二形態から来た新人"],
+    ["dungeon_unique_afterlife_clerk_hakua", "※画像はイメージです"],
+    ["dungeon_unique_cinder_scribe_doma", "湯上がり決戦兵器ポカポカ"],
+    ["dungeon_unique_cinder_scribe_juno", "お会計は世界の終わりに"],
+    ["dungeon_unique_sunken_bell_fio", "実家が太いデスワーム"],
+    ["dungeon_unique_storm_fox_ciela", "昨日届いた最後通告"],
+    ["dungeon_unique_storm_fox_iris", "午前二時だけ正義の味方"],
+    ["dungeon_unique_venom_queen_fio", "おばあちゃんの最終定理"],
+    ["dungeon_unique_winter_child_bisque", "こちら側のどなたか"],
+    ["dungeon_unique_winter_child_hakua", "三割引のラストエンペラー"],
+    ["dungeon_unique_name_grave_enigma", "まだ温かい石田"],
+    ["dungeon_unique_rust_rain_adel", "先着一名様の永遠"],
+    ["dungeon_unique_rust_rain_grave", "うしろめたい太陽"],
+    ["dungeon_unique_shadow_thief_doma", "月刊ムーンサルト八月号"],
+    ["dungeon_unique_shadow_thief_juno", "おかわり自由の飢餓"],
+    ["dungeon_unique_false_sun_grave", "全自動ぬか喜び製造機"],
+    ["dungeon_unique_mountain_sleeper_ciela", "電池別売りの超新星"],
+    ["dungeon_unique_mountain_sleeper_iris", "低気圧由来のカリスマ"],
+    ["dungeon_unique_wind_merchant_fio", "既読をつけない預言者"],
+    ["dungeon_unique_key_smith_bisque", "迷子センターのラスボス"],
+    ["dungeon_unique_key_smith_hakua", "生まれたての古代兵器"],
+    ["dungeon_unique_dream_reverse_enigma", "予約の取れない亡霊"],
+    ["dungeon_unique_moon_scar_adel", "だれより普通の異常者"],
+    ["dungeon_unique_moon_scar_hakua", "世界で二番目に鋭い豆腐"],
+    ["dungeon_unique_wall_talker_doma", "概念としての鈴木"],
+    ["dungeon_unique_wall_talker_juno", "夕方には帰る魔王"],
+    ["dungeon_unique_fifteen_choir_grave", "よく振ってから絶望"],
+    ["dungeon_unique_yesterday_clock_ciela", "ただいま混み合っております"],
+    ["dungeon_unique_yesterday_clock_iris", "賞味期限は昨日まで"],
+    ["dungeon_unique_scream_cook_fio", "安全第一デストロイヤー"],
+    ["dungeon_unique_afterlife_clerk_bisque", "お近くの終末"],
+    ["dungeon_unique_afterlife_clerk_iris", "来週から本気を出す龍"],
+  ]);
 
   // 全モンスターを「種族の基礎格＋色階級」で読める共通則へ載せる。
   // 種族格が1上がるごとに100点、色は25点刻みなので、弱い種族の赤(+100)と
@@ -1109,6 +1180,18 @@
   }
 
   window.HD_DATA.monsters.forEach(classifyMonster);
+  const elixirSiegeProfiles = new Map([
+    ["abyss_unique_80", { hpScale: 2.2, every: 4, ratio: 0.1, recommended: 2 }],
+    ["abyss_unique_85", { hpScale: 2.5, every: 4, ratio: 0.12, recommended: 3 }],
+    ["abyss_unique_90", { hpScale: 2.8, every: 3, ratio: 0.12, recommended: 4 }],
+    ["abyss_unique_95", { hpScale: 3.2, every: 3, ratio: 0.15, recommended: 6 }],
+  ]);
+  window.HD_DATA.monsters.forEach((monster) => {
+    const profile = elixirSiegeProfiles.get(monster.id);
+    if (!profile) return;
+    monster.hp = Math.round(monster.hp * profile.hpScale);
+    monster.elixirAttrition = { every: profile.every, ratio: profile.ratio, recommended: profile.recommended };
+  });
   window.HD_DATA.monsters.filter((monster) => monster.singularTrait?.regenerationRate > 0).forEach((monster) => {
     monster.rapidRegeneration = {
       rate: monster.singularTrait.regenerationRate,
@@ -1142,23 +1225,398 @@
   });
   window.HD_DATA.monsterColorTiers = monsterColorTiers;
 
+  const additionalComedyUniqueNames = [
+    "冷蔵庫の裏の皇帝【要冷蔵】", "町内会推薦★破壊神", "ほぼ新品のケルベロス（箱なし）", "お母さんには内緒の邪神㊙",
+    "一旦、持ち帰る大魔王", "地獄株式会社／領収書在中", "勇者←右に曲がれない", "雷神［睡眠不足］",
+    "守護者《本日定休》", "錬金術師レシート No.999", "不死身≒四捨五入", "隣町最終兵器.exe",
+    "玄関先→アポカリプス", "冥王（ちょっとそこまで）", "予言者※たまに当たります", "WEEKEND★DEMON",
+    "山田（半透明）", "先輩風→台風", "魔導書［後半未読］", "滅亡後はお早めに",
+    "巨大プリン（目撃情報：確か）", "目覚まし時計 1－0 竜", "ゴーレム／連帯保証人", "神託【ここだけの話】",
+    "［会議中］無敵", "覇王＋一円", "救世主 LAST ORDER", "異形＠いつもの場所",
+    "終末（顔：普通）", "運命※お釣りは出ません", "冷奴《未覚醒》", "小林／名前だけ強い",
+    "係長、西日装備", "悪魔_typo", "VALKYRIE 充電中…", "曇→メテオ",
+    "無名剣士 全国2位", "ここから先 ￥500", "魔神 PUSH禁止", "聖剣／忘れ物No.404",
+    "猫舌の火炎王", "腰痛持ちの巨神", "方向音痴の風神", "水曜だけ現れる月",
+    "返事だけはいい亡者", "暗証番号を忘れた門番", "年中無休の昼寝番", "さっきまで神だったもの",
+    "再起動してください", "音量を上げると逃げる鬼", "予算不足の超兵器", "抽選で一名様の魔王",
+    "たぶん仕様です", "前向きに検討する怪物", "世間体を気にする死霊", "ちくわ大明神・改",
+    "食後すぐ寝るベヒーモス", "取扱注意の佐藤", "一周回ってただの石", "まだ届いていない天罰",
+    "昨日の敵は今日も敵", "入口で靴を脱ぐ悪魔", "順番待ちの英雄", "最寄駅から徒歩百年",
+    "だいたい合ってる預言書", "生産者の顔が見える毒", "お徳用キングスライム", "返品された聖杯",
+    "低反発の鉄巨人", "急に歌い出す墓石", "空気を読まない空気精", "一名様までの世界",
+    "温めますかと聞く炎帝", "置き配された禁断兵器", "寝返りの激しい山脈", "パスワードが弱い賢者",
+    "話せば長いミノタウロス", "とりあえず生の冥界魚", "お通しで出てくる絶望", "法定速度を守る流星",
+    "予約名が違う勇者", "ご自由にお取りください", "当たり障りのない呪い", "晴天中止の大決戦",
+    "配送状況を確認する神", "うろ覚えの創世記", "目に優しいレーザー", "誰かがやると思った魔王",
+    "お先に失礼する亡霊", "ご都合のよい世界樹", "その件は持ち帰る竜王", "二度見される普通の犬",
+    "乾燥を避けて保存する闇", "優先席を譲る暴君", "最終更新三日前の神", "何もしていないのに壊れた",
+    "音声案内に従う魔獣", "来世から折り返します",
+  ];
+
+  function evenlySpacedMonsters(monsters, count) {
+    return Array.from({ length: count }, (_, index) => monsters[Math.floor(index * monsters.length / count)]);
+  }
+
+  const comedyDungeonCandidates = window.HD_DATA.monsters.filter((monster) => monster.dungeonExpansion && !exceptionalUniqueNames.has(monster.id));
+  const comedyTransferredCandidates = window.HD_DATA.monsters.filter((monster) => monster.migratedFromArenaRank && !exceptionalUniqueNames.has(monster.id));
+  const comedyArenaCandidates = window.HD_DATA.monsters.filter((monster) => monster.arenaOnly && !exceptionalUniqueNames.has(monster.id));
+  const additionalComedyTargets = [
+    ...evenlySpacedMonsters(comedyDungeonCandidates, 40),
+    ...evenlySpacedMonsters(comedyTransferredCandidates, 30),
+    ...evenlySpacedMonsters(comedyArenaCandidates, 28),
+  ];
+  additionalComedyUniqueNames.forEach((name, index) => exceptionalUniqueNames.set(additionalComedyTargets[index].id, name));
+  window.HD_DATA.additionalComedyUniqueNames = additionalComedyUniqueNames;
+
+  const individuallyAuthoredUniqueNames = new Map([
+    ["dungeon_unique_cinder_scribe_ciela", "夜明けを焼かない火守シエラ"],
+    ["dungeon_unique_cinder_scribe_enigma", "未解の頁を燃やすエニグマ"],
+    ["dungeon_unique_cinder_scribe_grave", "三度目の火葬を拒むグレイヴ"],
+    ["dungeon_unique_cinder_scribe_hakua", "宛名を灰にするハクア"],
+    ["dungeon_unique_cinder_scribe_iris", "逆手で暦を閉じるイリス"],
+    ["dungeon_unique_sunken_bell_bisque", "遺言を沈鐘へ注ぐビスク"],
+    ["dungeon_unique_sunken_bell_ciela", "夜明け前だけ黙る青鐘シエラ"],
+    ["dungeon_unique_sunken_bell_doma", "溺者の足跡を岸へ返すドーマ"],
+    ["dungeon_unique_sunken_bell_grave", "二度水葬された鐘守グレイヴ"],
+    ["dungeon_unique_sunken_bell_iris", "逆手で弔鐘を鳴らすイリス"],
+    ["dungeon_unique_sunken_bell_juno", "勝者へ水底の鍵を贈るジュノ"],
+    ["dungeon_unique_storm_fox_bisque", "雷鳴を小瓶へ封じるビスク"],
+    ["dungeon_unique_storm_fox_doma", "稲妻の足跡を巣へ返すドーマ"],
+    ["dungeon_unique_storm_fox_enigma", "雷雲へ問いを投げ続けるエニグマ"],
+    ["dungeon_unique_storm_fox_grave", "二度落雷死した天狐グレイヴ"],
+    ["dungeon_unique_storm_fox_hakua", "白紙の手紙を雷で読むハクア"],
+    ["dungeon_unique_storm_fox_juno", "勝者へ焦げた狐火を贈るジュノ"],
+    ["dungeon_unique_venom_queen_bisque", "末期の言葉を蜜毒に漬けるビスク"],
+    ["dungeon_unique_venom_queen_ciela", "朝露だけは毒さない花后シエラ"],
+    ["dungeon_unique_venom_queen_doma", "枯れ花の足跡を庭へ返すドーマ"],
+    ["dungeon_unique_venom_queen_hakua", "宛名を消す毒花ハクア"],
+    ["dungeon_unique_venom_queen_iris", "逆手で王蜜を搾るイリス"],
+    ["dungeon_unique_venom_queen_juno", "勝者へ孵らぬ種を贈るジュノ"],
+    ["dungeon_unique_winter_child_ciela", "夜明けに春を待つ氷童シエラ"],
+    ["dungeon_unique_winter_child_doma", "雪の足跡を入口へ返すドーマ"],
+    ["dungeon_unique_winter_child_enigma", "春の定義を問うエニグマ"],
+    ["dungeon_unique_winter_child_grave", "二度目の雪解けを拒むグレイヴ"],
+    ["dungeon_unique_winter_child_iris", "逆手に押し花を握るイリス"],
+    ["dungeon_unique_winter_child_juno", "勝者へ溶けない春を贈るジュノ"],
+    ["dungeon_unique_name_grave_ciela", "夜明けに墓誌を伏せるシエラ"],
+    ["dungeon_unique_name_grave_doma", "無銘の足跡を墓へ返すドーマ"],
+    ["dungeon_unique_name_grave_fio", "壊れた墓へ名を授けるフィオ"],
+    ["dungeon_unique_name_grave_hakua", "自分の墓だけ書けないハクア"],
+    ["dungeon_unique_name_grave_iris", "逆手で名を削る墓守イリス"],
+    ["dungeon_unique_name_grave_juno", "勝者へ空欄の墓誌を贈るジュノ"],
+    ["dungeon_unique_rust_rain_ciela", "夜明け前に工具を置くシエラ"],
+    ["dungeon_unique_rust_rain_doma", "錆びた轍を都へ返すドーマ"],
+    ["dungeon_unique_rust_rain_enigma", "溶け残る歯車を問うエニグマ"],
+    ["dungeon_unique_rust_rain_hakua", "白紙まで腐らせる緑雨ハクア"],
+    ["dungeon_unique_rust_rain_juno", "勝者へ最後の無傷な螺子を贈るジュノ"],
+    ["dungeon_unique_shadow_thief_adel", "北の影だけ盗めないアデル"],
+    ["dungeon_unique_shadow_thief_ciela", "夜明けに盗具を置くシエラ"],
+    ["dungeon_unique_shadow_thief_enigma", "影の持ち主を問うエニグマ"],
+    ["dungeon_unique_shadow_thief_fio", "盗んだ影へ名を付けるフィオ"],
+    ["dungeon_unique_shadow_thief_hakua", "輪郭から消えかけたハクア"],
+    ["dungeon_unique_shadow_thief_iris", "逆手で月影を抜くイリス"],
+    ["dungeon_unique_false_sun_adel", "北天を告発する白翼アデル"],
+    ["dungeon_unique_false_sun_ciela", "夜明けに偽陽を見逃すシエラ"],
+    ["dungeon_unique_false_sun_doma", "焼けた足跡を空へ返すドーマ"],
+    ["dungeon_unique_false_sun_enigma", "本物の空を問うエニグマ"],
+    ["dungeon_unique_false_sun_iris", "逆手で太陽を指すイリス"],
+    ["dungeon_unique_false_sun_juno", "勝者へ片翼の聖像を贈るジュノ"],
+    ["dungeon_unique_mountain_sleeper_adel", "北の山だけ眠らせないアデル"],
+    ["dungeon_unique_mountain_sleeper_doma", "崩れた山道を返すドーマ"],
+    ["dungeon_unique_mountain_sleeper_enigma", "山脈の夢へ問うエニグマ"],
+    ["dungeon_unique_mountain_sleeper_fio", "砕けた峰へ名を授けるフィオ"],
+    ["dungeon_unique_mountain_sleeper_hakua", "白紙の手紙を岩に刻むハクア"],
+    ["dungeon_unique_mountain_sleeper_juno", "勝者へ故郷の小石を贈るジュノ"],
+    ["dungeon_unique_wind_merchant_adel", "北風だけ売れないアデル"],
+    ["dungeon_unique_wind_merchant_doma", "売れ残った帰路を返すドーマ"],
+    ["dungeon_unique_wind_merchant_enigma", "風の値段を問い続けるエニグマ"],
+    ["dungeon_unique_wind_merchant_hakua", "宛先のない風便ハクア"],
+    ["dungeon_unique_wind_merchant_iris", "逆手で風見盤を回すイリス"],
+    ["dungeon_unique_wind_merchant_juno", "勝者へ故郷行きの風を贈るジュノ"],
+    ["dungeon_unique_key_smith_ciela", "夜明けに炉を止める鍵匠シエラ"],
+    ["dungeon_unique_key_smith_doma", "鍵穴の足跡を扉へ返すドーマ"],
+    ["dungeon_unique_key_smith_enigma", "開かない扉を問い詰めるエニグマ"],
+    ["dungeon_unique_key_smith_grave", "二度折れた墓鍵グレイヴ"],
+    ["dungeon_unique_key_smith_iris", "逆手で千錠を鍛えるイリス"],
+    ["dungeon_unique_dream_reverse_adel", "北向きの夢を失ったアデル"],
+    ["dungeon_unique_dream_reverse_ciela", "夜明けに仮面を置くシエラ"],
+    ["dungeon_unique_dream_reverse_doma", "捨てられた夢を眠りへ返すドーマ"],
+    ["dungeon_unique_dream_reverse_fio", "悪夢へ新しい名を付けるフィオ"],
+    ["dungeon_unique_dream_reverse_hakua", "白紙の観客席に立つハクア"],
+    ["dungeon_unique_dream_reverse_iris", "逆手で夢幕を閉じるイリス"],
+    ["dungeon_unique_dream_reverse_juno", "勝者へ笑わない仮面を贈るジュノ"],
+    ["dungeon_unique_moon_scar_ciela", "夜明け前に剣を置くシエラ"],
+    ["dungeon_unique_moon_scar_doma", "斬られた月影を空へ返すドーマ"],
+    ["dungeon_unique_moon_scar_enigma", "月の欠け目を問うエニグマ"],
+    ["dungeon_unique_moon_scar_iris", "逆手で満月を描くイリス"],
+    ["dungeon_unique_moon_scar_juno", "勝者へ刃のない鞘を贈るジュノ"],
+    ["dungeon_unique_wall_talker_adel", "北壁の声を忘れたアデル"],
+    ["dungeon_unique_wall_talker_ciela", "夜明けに城門を殴らないシエラ"],
+    ["dungeon_unique_wall_talker_enigma", "城壁の遺言を問うエニグマ"],
+    ["dungeon_unique_wall_talker_fio", "崩れた城へ名を授けるフィオ"],
+    ["dungeon_unique_wall_talker_hakua", "白紙の手紙を壁に埋めるハクア"],
+    ["dungeon_unique_wall_talker_iris", "逆手で城壁を語るイリス"],
+    ["dungeon_unique_fifteen_choir_adel", "北の一声を忘れたアデル"],
+    ["dungeon_unique_fifteen_choir_ciela", "夜明けに歌わない第七声シエラ"],
+    ["dungeon_unique_fifteen_choir_enigma", "欠けた一声を問うエニグマ"],
+    ["dungeon_unique_fifteen_choir_fio", "失われた声へ名を授けるフィオ"],
+    ["dungeon_unique_fifteen_choir_iris", "逆手で指揮するイリス"],
+    ["dungeon_unique_fifteen_choir_juno", "勝者へ第十五声を贈るジュノ"],
+    ["dungeon_unique_yesterday_clock_adel", "北へ進まない秒針アデル"],
+    ["dungeon_unique_yesterday_clock_doma", "昨日の足跡を今日へ返すドーマ"],
+    ["dungeon_unique_yesterday_clock_enigma", "最初の昨日を問うエニグマ"],
+    ["dungeon_unique_yesterday_clock_fio", "壊れた今日へ名を付けるフィオ"],
+    ["dungeon_unique_yesterday_clock_hakua", "宛名を書く前へ戻るハクア"],
+    ["dungeon_unique_yesterday_clock_juno", "勝者へ逆回りの秒針を贈るジュノ"],
+    ["dungeon_unique_scream_cook_bisque", "最期の悲鳴を瓶詰めるビスク"],
+    ["dungeon_unique_scream_cook_doma", "食べ残した恐怖を厨房へ返すドーマ"],
+    ["dungeon_unique_scream_cook_enigma", "究極の味を問うエニグマ"],
+    ["dungeon_unique_scream_cook_grave", "二度煮込まれた料理人グレイヴ"],
+    ["dungeon_unique_scream_cook_iris", "逆手で絶叫鍋を振るイリス"],
+    ["dungeon_unique_scream_cook_juno", "勝者へ味のない晩餐を贈るジュノ"],
+    ["dungeon_unique_afterlife_clerk_adel", "北冥支局を忘れた書記アデル"],
+    ["dungeon_unique_afterlife_clerk_doma", "死亡届を差出人へ返すドーマ"],
+    ["dungeon_unique_afterlife_clerk_enigma", "死因欄を問い詰めるエニグマ"],
+    ["dungeon_unique_afterlife_clerk_fio", "未処理死者へ名を付けるフィオ"],
+    ["dungeon_unique_afterlife_clerk_juno", "勝者へ差し戻し印を贈るジュノ"],
+    ["dungeon_unique_bone_gardener_adel", "北庭の骨を忘れたアデル"],
+    ["dungeon_unique_bone_gardener_bisque", "遺言を骨花へ注ぐビスク"],
+    ["dungeon_unique_bone_gardener_doma", "白骨の根を墓へ返すドーマ"],
+    ["dungeon_unique_bone_gardener_enigma", "最初の骨を問うエニグマ"],
+    ["dungeon_unique_bone_gardener_fio", "咲かなかった骨へ名を付けるフィオ"],
+    ["dungeon_unique_bone_gardener_hakua", "宛名の骨を植えるハクア"],
+    ["dungeon_unique_bone_gardener_iris", "逆手で白骨を剪定するイリス"],
+    ["dungeon_unique_bone_gardener_juno", "勝者へ一夜の骨花を贈るジュノ"],
+  ]);
+  [
+    ["arena_unique_194", "白刃を呑む不落門ネフィラ"],
+    ["arena_unique_195", "地響きより速いオズマ"],
+    ["arena_unique_196", "炎嵐の五重郭ラグナ"],
+    ["arena_unique_197", "鋼雨を撃つ潮砲セレス"],
+    ["arena_unique_199", "毒刃を眠らせる城キリエ"],
+    ["arena_unique_200", "氷塵を置き去りにするドグマ"],
+    ["arena_unique_201", "呪火を巡らす黒城ヴェイン"],
+    ["arena_unique_202", "酸潮終端砲アルマ"],
+    ["arena_unique_209", "光を一閃に畳むゼロス"],
+    ["arena_unique_210", "鋼光不落のレオン"],
+    ["arena_unique_211", "幻土を踏まず走るミドラ"],
+    ["arena_unique_217", "毒炎の閉幕砲バロウ"],
+    ["arena_unique_219", "呪雷を抱く動城ドグマ"],
+    ["arena_unique_220", "酸毒の間を縫うヴェイン"],
+    ["arena_unique_221", "闇氷五郭アルマ"],
+    ["arena_unique_222", "光呪反転砲ザクロ"],
+    ["arena_unique_224", "風闇に錆びぬヘリオ城"],
+    ["arena_unique_225", "鋼光瞬断クオン"],
+    ["arena_unique_226", "幻土万色城メビウス"],
+    ["arena_unique_227", "斬風終末砲イグナ"],
+    ["arena_unique_231", "鈍刃一命のガルド"],
+    ["arena_unique_232", "火槌を受ける夢城ネフィラ"],
+    ["arena_unique_234", "雷水を隔てるラグナ城"],
+    ["arena_unique_235", "毒雷を吐く夢砲セレス"],
+    ["arena_unique_239", "闇酸不落のヴェイン"],
+    ["arena_unique_240", "光闇を跨ぐアルマ"],
+    ["arena_unique_241", "地光の迷彩城ザクロ"],
+    ["arena_unique_242", "風土夢砲ノイン"],
+    ["arena_unique_244", "幻鋼を拒むクオン城"],
+    ["arena_unique_245", "斬幻の残像メビウス"],
+    ["arena_unique_246", "打斬を違える五色のイグナ"],
+    ["arena_unique_247", "火槌夢葬砲ゼロス"],
+    ["arena_unique_254", "氷呪を封じる斬鬼城セレス"],
+    ["arena_unique_255", "呪酸の死角へ消えるバロウ"],
+    ["arena_unique_259", "地風断界砲アルマ"],
+    ["arena_unique_260", "風鋼を一太刀にするザクロ"],
+    ["arena_unique_261", "鋼幻不退のノイン"],
+    ["arena_unique_265", "火水の狭間を駆けるイグナ"],
+    ["arena_unique_266", "水雷五彩のゼロス城"],
+    ["arena_unique_267", "打雷崩城砲レオン"],
+    ["arena_unique_269", "水氷をせき止めるガルド"],
+    ["arena_unique_270", "雷呪より先に刺すネフィラ"],
+    ["arena_unique_271", "毒酸を飼う五郭オズマ"],
+    ["arena_unique_272", "氷闇落城砲ラグナ"],
+    ["arena_unique_275", "闇風一断のキリエ"],
+    ["arena_unique_276", "光鋼を積むドグマ城"],
+    ["arena_unique_277", "地幻の継ぎ目を斬るヴェイン"],
+    ["arena_unique_279", "鋼槌崩壊砲ザクロ"],
+    ["arena_unique_285", "雷呪を黙らせるゼロス城"],
+    ["arena_unique_287", "水酸の飛沫より速いミドラ"],
+    ["arena_unique_290", "氷土星葬砲オズマ"],
+    ["arena_unique_291", "呪風を一息に断つラグナ"],
+    ["arena_unique_292", "酸鋼を重ねるセレス城"],
+    ["arena_unique_294", "光刃五芒城キリエ"],
+    ["arena_unique_295", "地槌星界砲ドグマ"],
+    ["arena_unique_299", "斬毒を退けるノイン城"],
+    ["arena_unique_300", "打氷の間隙を抜くヘリオ"],
+    ["arena_unique_301", "火呪五輪城クオン"],
+    ["arena_unique_302", "水酸星滅砲メビウス"],
+    ["arena_unique_305", "水光を一筋にするレオン"],
+    ["arena_unique_306", "雷土を受け切るミドラ城"],
+    ["arena_unique_309", "呪幻の一歩先にいるオズマ"],
+    ["arena_unique_311", "闇槌五色城セレス"],
+    ["arena_unique_312", "光炎時葬砲バロウ"],
+    ["arena_unique_314", "風雷を蓄えるドグマ城"],
+    ["arena_unique_315", "鋼毒の影を抜くヴェイン"],
+    ["arena_unique_316", "幻氷五刻城アルマ"],
+    ["arena_unique_317", "斬呪逆時砲ザクロ"],
+    ["arena_unique_319", "火闇に沈まぬヘリオ城"],
+    ["arena_unique_320", "水光を追い越すクオン"],
+    ["arena_unique_322", "毒風五色のイグナ城"],
+    ["arena_unique_329", "闇水終極城ラグナ"],
+    ["arena_unique_330", "光雷の終端へ走るセレス"],
+    ["arena_unique_331", "地毒五門のバロウ"],
+    ["arena_unique_332", "風氷終局砲キリエ"],
+    ["arena_unique_335", "斬闇を一命に束ねるアルマ"],
+    ["arena_unique_339", "雷鋼不落のクオン"],
+    ["arena_unique_340", "毒幻を置き去るメビウス"],
+    ["arena_unique_341", "氷刃五色城イグナ"],
+    ["arena_unique_342", "呪槌最後砲ゼロス"],
+  ].forEach(([id, name]) => individuallyAuthoredUniqueNames.set(id, name));
+  [
+    ["arena_unique_2", "潮踏みミドラ"],
+    ["arena_unique_3", "青雷角ガルド"],
+    ["arena_unique_5", "火床を凍らすオズマ"],
+    ["arena_unique_6", "風縛のラグナ"],
+    ["arena_unique_7", "鋼を啜るセレス"],
+    ["arena_unique_9", "斬光キリエ"],
+    ["arena_unique_10", "骨鐘ドグマ"],
+    ["arena_unique_26", "拳影セレス"],
+    ["arena_unique_27", "火を掲げるバロウ"],
+    ["arena_unique_28", "潮割りキリエ"],
+    ["arena_unique_30", "毒鋼ヴェイン"],
+    ["arena_unique_31", "氷夢アルマ"],
+    ["arena_unique_33", "酸鐘ノイン"],
+    ["arena_unique_34", "暗潮ヘリオ"],
+    ["arena_unique_43", "火喰い酸雨オズマ"],
+    ["arena_unique_49", "酸夢ヴェイン"],
+    ["arena_unique_50", "闇裂アルマ"],
+    ["arena_unique_51", "白鐘ザクロ"],
+    ["arena_unique_54", "鋼雷クオン"],
+    ["arena_unique_55", "幻毒メビウス"],
+    ["arena_unique_57", "砕呪ゼロス"],
+    ["arena_unique_59", "火除けの霜ミドラ"],
+    ["arena_unique_60", "水葬印ガルド"],
+    ["arena_unique_62", "毒影オズマ"],
+    ["arena_unique_63", "氷灯ラグナ"],
+    ["arena_unique_66", "闇鋼キリエ"],
+    ["arena_unique_67", "光夢ドグマ"],
+    ["arena_unique_68", "地裂ヴェイン"],
+    ["arena_unique_77", "雷霜レオン"],
+    ["arena_unique_83", "白風セレス"],
+    ["arena_unique_86", "鋼断ドグマ"],
+    ["arena_unique_87", "幻鐘ヴェイン"],
+    ["arena_unique_88", "斬火アルマ"],
+    ["arena_unique_91", "潮毒ヘリオ"],
+    ["arena_unique_93", "毒呪メビウス"],
+    ["arena_unique_95", "呪影ゼロス"],
+    ["arena_unique_100", "岩座のオズマ"],
+    ["arena_unique_101", "風王ラグナ"],
+    ["arena_unique_107", "潮王アルマ"],
+    ["arena_unique_108", "雷王ザクロ"],
+    ["arena_unique_109", "毒王ノイン"],
+    ["arena_unique_113", "闇王イグナ"],
+    ["arena_unique_115", "白蝕レオン"],
+    ["arena_unique_120", "斬鋼ラグナ"],
+    ["arena_unique_121", "砕夢セレス"],
+    ["arena_unique_122", "火線バロウ"],
+    ["arena_unique_124", "雷渡りドグマ"],
+    ["arena_unique_126", "氷雷アルマ"],
+    ["arena_unique_133", "鋼岩ゼロス"],
+    ["arena_unique_134", "鋼影レオン"],
+    ["arena_unique_137", "黒風ネフィラ"],
+    ["arena_unique_141", "毒鐘バロウ"],
+    ["arena_unique_142", "氷火キリエ"],
+    ["arena_unique_143", "呪潮ドグマ"],
+    ["arena_unique_145", "暗毒アルマ"],
+    ["arena_unique_148", "風蝕ヘリオ"],
+    ["arena_unique_153", "白昼レオン"],
+    ["arena_unique_154", "火山ミドラ"],
+    ["arena_unique_155", "白潮風ガルド"],
+    ["arena_unique_158", "氷光ラグナ"],
+    ["arena_unique_159", "呪鐘セレス"],
+    ["arena_unique_163", "地毒ヴェイン"],
+    ["arena_unique_165", "鋼呪ザクロ"],
+    ["arena_unique_168", "砕光クオン"],
+    ["arena_unique_179", "地潮バロウ"],
+    ["arena_unique_180", "風雷キリエ"],
+    ["arena_unique_182", "幻霜ヴェイン"],
+    ["arena_unique_183", "斬呪アルマ"],
+    ["arena_unique_184", "砕酸ザクロ"],
+    ["arena_unique_189", "氷鋼イグナ"],
+    ["arena_unique_191", "呪嵐レオン"],
+    ["arena_unique_192", "酸鋼ミドラ"],
+  ].forEach(([id, name]) => individuallyAuthoredUniqueNames.set(id, name));
+  window.HD_DATA.individuallyAuthoredUniqueNames = individuallyAuthoredUniqueNames;
+
+  const arenaRolesByAttribute = {
+    fire: "火渡り", water: "潮騎士", thunder: "雷走り", poison: "毒杯師", ice: "霜刃",
+    curse: "呪印師", acid: "腐蝕工", dark: "影役者", light: "灯守", earth: "岩砕き",
+    wind: "風乗り", steel: "鋼拳士", illusion: "夢芝居", slash: "剣舞手", blunt: "鐘打ち",
+  };
+
+  function authoredArenaOriginName(monster) {
+    if (monster.singularTrait) return monster.singularTrait.name;
+    if (monster.migratedFromArenaRank && monster.peakyProfile) {
+      const profileNames = {
+        glass_cannon: `一撃だけを残す闘士・${monster.coreName}〈${monster.arenaTitle}〉`,
+        immovable_fortress: `動かぬ城塞・${monster.coreName}〈${monster.arenaTitle}〉`,
+        blink_assassin: `瞬きの後の暗殺者・${monster.coreName}〈${monster.arenaTitle}〉`,
+        elemental_bastion: `五色城の守人・${monster.coreName}〈${monster.arenaTitle}〉`,
+        doomsday_engine: `終末砲台・${monster.coreName}〈${monster.arenaTitle}〉`,
+      };
+      return profileNames[monster.peakyProfile];
+    }
+    if (monster.arenaOnly) {
+      return `${monster.arenaTitle}の${arenaRolesByAttribute[monster.attackAttribute] || "闘士"}・${monster.coreName}`;
+    }
+    return monster.name;
+  }
+
   function addUniqueEpithet(monster, index) {
+    const previousName = monster.name;
+    monster.name = individuallyAuthoredUniqueNames.get(monster.id) || authoredArenaOriginName(monster);
     const hash = [...monster.id].reduce((sum, char) => sum + char.charCodeAt(0), index);
     const heads = uniqueEpithetHeads[monster.attackAttribute] || uniqueEpithetHeads.dark;
-    const phrase = monster.arenaOnly ? heads[hash % heads.length] : `${heads[hash % heads.length]}${uniqueEpithetTails[(hash + index) % uniqueEpithetTails.length]}`;
+    const head = heads[hash % heads.length];
+    const tail = uniqueEpithetTails[(hash + index) % uniqueEpithetTails.length];
+    const phrase = monster.arenaOnly ? head : `${head}${tail}`;
     monster.baseName = monster.name;
     monster.epithet = phrase;
-    const formats = [
-      `《${phrase}》${monster.baseName}`,
-      `${monster.baseName}――${phrase}`,
-      `${phrase}・${monster.baseName}`,
-      `“${monster.baseName}” ${phrase}`,
-      `${monster.baseName}〈${phrase}〉`,
-      `【${phrase}】${monster.baseName}`,
-    ];
-    monster.name = monster.id === "dungeon_lord_nox" ? "《認識圏外より来たるもの》太古からの闇キキルクルス" : formats[hash % formats.length];
-    if (monster.dangerous?.telegraph) monster.dangerous.telegraph = monster.dangerous.telegraph.replace(monster.baseName, monster.name);
+    monster.name = monster.id === "dungeon_lord_nox"
+      ? "《認識圏外より来たるもの》太古からの闇キキルクルス"
+      : exceptionalUniqueNames.get(monster.id) || monster.baseName;
+    if (monster.dangerous?.telegraph) {
+      monster.dangerous.telegraph = monster.dangerous.telegraph
+        .replace(previousName, monster.name)
+        .replace(monster.baseName, monster.name);
+    }
   }
+
+  // B61以深のダンジョン系ユニークは、終盤装備の更新を前提に深度比例で強化する。
+  // 闘技場個体とラスボスは専用の強化曲線を持つため対象外とする。
+  window.HD_DATA.monsters.filter((monster) => {
+    const nativeFloor = Math.min(...(monster.floors || [0]));
+    return monster.unique && !monster.arenaOnly && monster.id !== "dungeon_lord_nox" && nativeFloor >= 61;
+  }).forEach((monster) => {
+    const nativeFloor = Math.min(...monster.floors);
+    const depthRatio = Math.min(1, Math.max(0, (nativeFloor - 60) / 40));
+    const hpScale = 1.2 + depthRatio * 0.3;
+    const attackScale = 1.12 + depthRatio * 0.18;
+    const defenseScale = 1.1 + depthRatio * 0.2;
+    if (monster.peakyBaseline) {
+      monster.peakyBaseline.hp *= hpScale;
+      monster.peakyBaseline.attack *= attackScale;
+      monster.peakyBaseline.defense *= defenseScale;
+      monster.peakyBaseline.acceleration += 4 + Math.floor(depthRatio * 6);
+      monster.peakyBaseline.danger *= 1.15 + depthRatio * 0.2;
+    }
+    monster.hp = Math.round(monster.hp * hpScale);
+    monster.attack = Math.round(monster.attack * attackScale);
+    monster.defense = Math.round(monster.defense * defenseScale);
+    monster.acceleration = Number(monster.acceleration || 0) + 4 + Math.floor(depthRatio * 6);
+    if (monster.dangerous) monster.dangerous.power = Math.round(monster.dangerous.power * (1.15 + depthRatio * 0.2));
+    monster.deepUniquePower = Number((hpScale + attackScale + defenseScale) / 3).toFixed(2);
+    monster.research = monster.research || {};
+    monster.research[1] = `${monster.research[1] || ""} 深層補正により基礎能力が引き上げられている。`.trim();
+  });
 
   window.HD_DATA.monsters.filter((monster) => monster.unique).forEach(addUniqueEpithet);
 
@@ -1176,6 +1634,11 @@
     monster.research = monster.research || {};
     monster.research[2] = `${monster.research[2] || ""} 戦闘中に同属性の眷属を召喚する。`.trim();
   });
+  const dungeonLord = window.HD_DATA.monsters.find((monster) => monster.id === "dungeon_lord_nox");
+  if (dungeonLord) {
+    dungeonLord.summon = { every: 3, count: 1, maxAlive: 2, maxTotal: 8, pool: "undefeated_deep_unique", minFloor: 60 };
+    dungeonLord.research[2] = `${dungeonLord.research[2] || ""} 未討伐の深層ユニークを迷宮の記憶から再召喚する。先に倒した個体は召喚できない。`.trim();
+  }
 
   const forcedInvisible = new Set(["curse_mask_mimei", "mirage_prince_nemu", "abyss_eye_zahar", "moon_eater_luna"]);
   window.HD_DATA.monsters.filter((monster) => !monster.arenaOnly && monster.floors?.length).forEach((monster) => {

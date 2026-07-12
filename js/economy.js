@@ -25,6 +25,10 @@
     return Math.max(20, Math.round(24 + (item.attack || 0) * 16 + (item.defense || 0) * 14 + accelerationValue + (item.hpRegen || 0) * 90 + resistanceValue * 22 + attributeValue));
   }
 
+  function shopPurchasePrice(item) {
+    return shopItemPrice(item) * 20;
+  }
+
   function guildPointValue(item, crafted) {
     const artifactValue = Number(item?.artifact?.guildPoints);
     if (Number.isFinite(artifactValue) && artifactValue > 0) return Math.max(1, Math.round(artifactValue));
@@ -48,5 +52,5 @@
     return parts.join(" ") || "基礎数値補正なし";
   }
 
-  window.HD_ECONOMY = { materialSellPrice, treasureSellPrice, shopItemPrice, equipmentSellPrice, guildPointValue, equipmentStats };
+  window.HD_ECONOMY = { materialSellPrice, treasureSellPrice, shopItemPrice, shopPurchasePrice, equipmentSellPrice, guildPointValue, equipmentStats };
 })();

@@ -41,7 +41,9 @@
 }
 ```
 
-現行は15職。`ninja` は `acceleration: 30` と `accelerationGrowthEvery: 3` を持つ最強格高速職で、`hunter`（表示名「盗賊」）は睡眠中の敵に3倍の寝込み襲撃を行う。`capoeirista` はカポエラ状態中に8方向の入力を反転し、通常攻撃を威力1.8倍の打属性足技へ変える。
+現行は15職。`ninja` は `acceleration: 14` と `accelerationGrowthEvery: 6` を持つ条件型の最強格高速職。万能型の`handyman`は加速度を`3`、成長間隔を`12`として二回行動への早期到達を抑える。`hunter`（表示名「盗賊」）は睡眠中の敵に3倍の寝込み襲撃を行い、`capoeirista` はカポエラ状態中に8方向の入力を反転し、通常攻撃を威力1.8倍の打属性足技へ変える。
+
+終盤対象装備は `lateGamePower: 1 | 2 | 3` を持つ。生成系列の7〜9等級、ギルド交換品、使える・チート固定アーティファクト、完成報酬品を対象に、スロットの役割に応じた攻撃・防御・加速度・再生・正耐性補正をデータ確定時に加える。ランダムアーティファクトは保存済み定義へ `artifact.depth` を保持し、B61〜100で生成時の基礎 `power` を1.0〜1.5倍へ線形増幅する。
 
 ## 種族
 
@@ -101,9 +103,11 @@ rewardProfile: {
 
 ユニーク個体は `unique: true` を持つ。ダンジョン個体は `floors`、闘技場限定個体は `arenaOnly: true` と連続した `arenaRank` を持つ。手作り人格を追加する場合は、台詞本体ではなく次の設定だけをデータへ置く。
 
+ユニーク個体の公開表示名 `name` はIDに結び付く固定データとする。`baseName` はネタ名などの例外表示を適用する前の個体名、`epithet` は台詞・人物像生成に使う内部モチーフであり、画面上の名前へ機械的に連結しない。調査、討伐、賞金、心、固有台詞はすべてモンスターIDを主キーとし、改名で進捗を分断しない。進行中のダンジョン・闘技場セーブに複製された `name`、`baseName`、`epithet`、危険技名・予告文はロード時に現行のマスターデータへ同期する。過去の戦闘ログと死亡履歴は出来事の記録として書き換えない。
+
 一部のダンジョンユニークは `summon: { every: 6, count: 1, maxAlive: 2, maxTotal: 4, pool: "floor_attribute" }` を持つ。召喚個体には召喚主ID、経験値0.25倍、剥ぎ取り1回固定を保存し、同時数・累計数・階層の生成上限を全て守る。
 
-金品盗賊8種は `rareSpawn: true`、`specialAttack: "gold_steal"`、`goldTheft: { rate, flat, max, escapeDistance }` を持つ。通常の `monsterPool` から除外し、階層の `rareMonsterPool` から最大1体だけ抽選する。敵インスタンスの `stolenGold` と `hasStolenGold` を保存し、討伐時に全額返還する。
+金品盗賊8種は `rareSpawn: true`、`specialAttack: "gold_steal"`、`goldTheft: { rate, maxRate, escapeDistance }` を持つ。通常の `monsterPool` から除外し、階層の `rareMonsterPool` から最大1体だけ抽選する。加速度は36〜59。敵の行動回数には通常・ユニーク・金品盗賊・闘技場を問わず上限を設けず、`1 + floor(max(0, 加速度) / 12)` で決める。盗難率は浅層の20%から最深層の80%まで上がり、全種とも現在の所持金の80%を絶対上限とする。敵インスタンスの `hasStolenGold` で一個体一回に制限し、盗まれた金は討伐しても返還しない。
 
 ```js
 {
@@ -281,6 +285,8 @@ localStorageキーは `hagitori-dungeon-save-v1`。
     economySchemaVersion: 2,
     progressionSchemaVersion: 2,
     compendiumEquipmentUnlocked: false,
+    donatedPermanentEquipmentIds: [],
+    recoveryMedicineSale: false,
     research: {
       cave_rat: { level: 3, seen: true }
     },
@@ -289,7 +295,6 @@ localStorageキーは `hagitori-dungeon-save-v1`。
     discoveredRecipes: [],
     bounties: { red_garm: { intel: true, claimed: 1 } },
     guildClaims: [],
-    guildDonatedEquipmentIds: ["iron_sword"],
     clearedBossFloors: [10, 20],
     shop: { soldMaterials: { small_beast_meat: 8 }, inventory: ["series_1_iron_sword"] },
     titles: [],

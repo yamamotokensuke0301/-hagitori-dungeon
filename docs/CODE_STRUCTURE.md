@@ -12,7 +12,7 @@
 4. `js/unique-dialogue.js`
 5. `js/utils.js`、`js/threat-system.js`
 6. `js/dungeon-generator.js`、`js/artifact-generator.js`、`js/economy.js`、`js/character-system.js`、`js/bounty-system.js`
-7. `js/audio-effects.js`
+7. `js/inn-content.js`、`js/audio-effects.js`
 8. `js/main.js`
 
 各ファイルはIIFEでグローバル汚染を抑え、共有APIだけを `window.HD_*` として公開します。
@@ -27,6 +27,7 @@
 - `js/economy.js`: 価格、ギルドポイント、景品計算
 - `js/character-system.js`: 基礎能力、レベル成長、名前・種族・性格による生い立ち生成
 - `js/bounty-system.js`: 賞金首の抽出、報酬、出現階情報
+- `js/inn-content.js`: 宿屋の助言、つまみ生成素材、性格別の食事コメント
 - `js/unique-dialogue.js`: 全ユニークの個体設定、文脈別台詞候補、重複回避済み静的台詞表
 - `js/threat-system.js`: 階層の通常生成上限と生存敵を比較する5段階緊張度判定
 - `js/audio-effects.js`: Web Audioによる効果音レシピ
@@ -39,7 +40,7 @@
 ## 変更時の注意
 
 - `materials.js` の属性定義順は装備・モンスター生成に使うため、単なる整列目的で変更しない。
-- `monsters.js` の配列順はユニーク個体の二つ名と個体モチーフ生成に影響するため、並べ替えない。
+- `monsters.js` の表示名はモンスターIDに結び付け、セーブ上の敵名もロード時に現行データへ同期する。配列順は固有異能・戦型・個体モチーフの割当へ影響するため、単なる整列目的では変更しない。
 - 台詞本体は敵インスタンスへ複製せず、`unique-dialogue.js` の静的表をID参照する。セーブには直近履歴とクールダウンだけを持たせる。
 - 装備データは `jobs.js` 読み込み後に生成する。
 - `treasures.js` は装備の後、モンスターと階層の前に読み込む。魔法書ランクは希少度と解禁階層を兼ねるため、IDや順序を変える場合は旧セーブの `items` と `learnedSpells` も確認する。

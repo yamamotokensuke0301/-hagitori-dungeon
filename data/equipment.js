@@ -395,6 +395,11 @@
     });
   });
 
+  const GUILD_REWARD_COST_MULTIPLIER = 8;
+  window.HD_DATA.equipment
+    .filter((item) => Number(item.guildCost || 0) > 0)
+    .forEach((item) => { item.guildCost *= GUILD_REWARD_COST_MULTIPLIER; });
+
   window.HD_DATA.equipment.push({
     id: "game_master_emblem", name: "ゲームマスターの紋章", slot: "accessory",
     attack: 100, defense: 100, acceleration: 50, hpRegen: 25, attributeAttack: "light",
@@ -1115,6 +1120,43 @@
     if (!item) return;
     item.puzzleEffects = effects;
     item.description = `${item.description} 連携効果：${effects.map((effect) => effect.text).join(" ")}`;
+  });
+
+  // B61以降の急激な敵強化へ装備更新で対抗できるよう、終盤品は元の役割を保ったまま数値を段階強化する。
+  // ネタ・ゴミアーティファクトと初期支給品は、弱さそのものが個性なので対象外とする。
+  const lateGameEquipmentPower = (item) => {
+    const grade = Number(/^series_(\d+)_/.exec(item.id)?.[1] || 0);
+    if (grade >= 9) return 3;
+    if (grade === 8) return 2;
+    if (grade === 7) return 1;
+    if (item.guildCost) return item.guildCost >= 1600 ? 3 : item.guildCost >= 800 ? 2 : 1;
+    if (item.artifact?.tier === "cheat") return 3;
+    if (item.artifact?.tier === "useful") return 2;
+    if (item.masterOnly || item.completionOnly) return 3;
+    return 0;
+  };
+  const slotBonuses = {
+    weapon: [null, { attack: 6, defense: 2, acceleration: 3 }, { attack: 13, defense: 4, acceleration: 7 }, { attack: 22, defense: 7, acceleration: 12 }],
+    upper: [null, { attack: 3, defense: 4, acceleration: 2 }, { attack: 7, defense: 9, acceleration: 5 }, { attack: 12, defense: 15, acceleration: 9 }],
+    lower: [null, { attack: 3, defense: 4, acceleration: 2 }, { attack: 7, defense: 9, acceleration: 5 }, { attack: 12, defense: 15, acceleration: 9 }],
+    feet: [null, { attack: 3, defense: 3, acceleration: 6 }, { attack: 7, defense: 6, acceleration: 12 }, { attack: 12, defense: 10, acceleration: 20 }],
+    accessory: [null, { attack: 2, defense: 2, acceleration: 3 }, { attack: 5, defense: 5, acceleration: 7 }, { attack: 9, defense: 9, acceleration: 12 }],
+  };
+  window.HD_DATA.equipment.forEach((item) => {
+    if (item.starterOnly) return;
+    const power = lateGameEquipmentPower(item);
+    const bonus = slotBonuses[item.slot]?.[power];
+    if (!power || !bonus) return;
+    item.attack = Number(item.attack || 0) + (item.slot === "weapon" || Number(item.attack || 0) > 0 || item.slot === "accessory" ? bonus.attack : 0);
+    item.defense = Number(item.defense || 0) + (item.slot !== "weapon" || Number(item.defense || 0) > 0 ? bonus.defense : 0);
+    item.acceleration = Number(item.acceleration || 0) + (item.slot === "feet" || item.slot === "accessory" || Number(item.acceleration || 0) > 0 ? bonus.acceleration : 0);
+    if (Number(item.hpRegen || 0) > 0) item.hpRegen += power;
+    if (power >= 2) Object.keys(item.resistances || {}).forEach((attribute) => {
+      const value = item.resistances[attribute];
+      if (value !== "immune" && Number(value) > 0) item.resistances[attribute] = Math.min(5, Number(value) + (power === 3 ? 2 : 1));
+    });
+    item.lateGamePower = power;
+    item.description = `${item.description} 終盤補正${["", "Ⅰ", "Ⅱ", "Ⅲ"][power]}：深層戦へ向けて基礎性能が強化されている。`;
   });
 
 })();

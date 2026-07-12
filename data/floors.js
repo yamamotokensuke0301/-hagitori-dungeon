@@ -68,6 +68,6 @@
     floor.rareMonsterPool = window.HD_DATA.monsters
       .filter((monster) => monster.rareSpawn && monster.floors?.includes(floor.floor))
       .map((monster) => monster.id);
-    floor.rareMonsterChance = floor.floor % 10 === 0 ? 0 : 0.07;
+    floor.rareMonsterChance = floor.floor % 10 === 0 ? 0 : 0.7;
   });
 })();
