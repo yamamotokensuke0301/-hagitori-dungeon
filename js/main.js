@@ -16,6 +16,7 @@
   const ECONOMY_SCHEMA_VERSION = 2;
   const PROGRESSION_SCHEMA_VERSION = 2;
   const MUSIC_VOLUME = 0.56;
+  const SFX_VOLUME = 1.05;
   const MAGIC_JOB_IDS = new Set(["mage", "spellblade"]);
   const PROTECTED_EQUIPMENT_IDS = new Set(["rusty_knife", "cloth"]);
   const RESEARCH_PAGE_SIZE = 30;
@@ -6991,7 +6992,7 @@
       audio.master = audio.context.createGain();
       audio.sfx = audio.context.createGain();
       audio.master.gain.value = 0.85;
-      audio.sfx.gain.value = 0.82;
+      audio.sfx.gain.value = SFX_VOLUME;
       audio.sfx.connect(audio.master);
       audio.master.connect(audio.context.destination);
       sfxPlayer = SFX.create(audio.context, audio.sfx);
