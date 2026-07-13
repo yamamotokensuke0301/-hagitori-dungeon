@@ -25,6 +25,7 @@
   id: "swordsman",
   name: "戦士",
   hp: 40,
+  hpGrowth: 8.9,
   attack: 6,
   defense: 2,
   baseAttackAttribute: "slash",
@@ -40,6 +41,8 @@
   description: "手数が多く、安定した近接戦ができる前衛職。"
 }
 ```
+
+`hp` はLv1時の基礎HP、`hpGrowth` は1レベルごとの職業固有HP成長を表す。正の初期耐久力は1点につき3、負の初期耐久力は1点につき2を最大HPへ反映し、レベル成長で得た耐久力は1点につき3を加算する。
 
 現行は15職。`ninja` は `acceleration: 14` と `accelerationGrowthEvery: 6` を持つ条件型の最強格高速職。万能型の`handyman`は加速度を`3`、成長間隔を`12`として二回行動への早期到達を抑える。`hunter`（表示名「盗賊」）は睡眠中の敵に3倍の寝込み襲撃を行い、`capoeirista` はカポエラ状態中に8方向の入力を反転し、通常攻撃を威力1.8倍の打属性足技へ変える。
 
@@ -286,6 +289,7 @@ dangerous: {
     researchSchemaVersion: 2,
     economySchemaVersion: 2,
     progressionSchemaVersion: 2,
+    hpSchemaVersion: 2,
     saveRevision: 12,
     compendiumEquipmentUnlocked: false,
     research: {

@@ -51,6 +51,16 @@ const combatSimSource = read("tools/combat_balance_sim.js");
 const bgmTrackBlock = mainSource.match(/const BGM_TRACKS = \{([\s\S]*?)\n  \};/)?.[1] || "";
 const publicBgmPaths = [...bgmTrackBlock.matchAll(/"\.\/(assets\/audio\/[^"?]+\.m4a)\?/g)].map((match) => match[1]);
 assert(mainSource.includes('const APP_VERSION = "正式版 1.0.1"'), "public version was not updated to 正式版 1.0.1");
+assert(mainSource.includes("HP_SCHEMA_VERSION = 2")
+  && mainSource.includes("const previousHpRatio")
+  && mainSource.includes("const previousDebtRatio")
+  && mainSource.includes("newCoreMaxHp - oldCoreMaxHp"),
+"legacy saves do not preserve HP and erosion ratios across the job-specific HP migration");
+assert(indexSource.includes("<title>クロニクル ダンジョン</title>")
+  && indexSource.includes('<h1 id="titleHeading">クロニクル<br>ダンジョン</h1>')
+  && styleSource.includes('url("../assets/images/chronicle-dungeon-title-v1.jpg")')
+  && $.NSFileManager.defaultManager.fileExistsAtPath("assets/images/chronicle-dungeon-title-v1.jpg"),
+"Chronicle Dungeon title artwork or accessible title is missing");
 assert(publicBgmPaths.length === 10 && !bgmTrackBlock.includes(".wav")
   && publicBgmPaths.every((path) => $.NSFileManager.defaultManager.fileExistsAtPath(path)),
 "public BGM paths are not ten existing compressed M4A files");
@@ -104,7 +114,7 @@ assert(indexSource.includes('aria-rowcount="13" aria-colcount="13"') && mainSour
 "dungeon map does not expose an ARIA row/gridcell structure");
 assert(indexSource.includes('id="openLogHistoryButton"') && indexSource.includes('aria-controls="logHistoryPanel"'), "log-history opener is missing or does not name its dialog");
 assert(indexSource.includes('id="logHistoryPanel"') && indexSource.includes('aria-labelledby="logHistoryTitle"') && indexSource.includes('aria-modal="true"'), "accessible log-history dialog is missing");
-assert(indexSource.includes('id="appShell" class="app-shell town-mode" aria-label="剥ぎ取りダンジョン" aria-hidden="true" inert')
+assert(indexSource.includes('id="appShell" class="app-shell town-mode" aria-label="クロニクル ダンジョン" aria-hidden="true" inert')
   && (indexSource.match(/aria-modal="true"/g) || []).length >= 9
   && mainSource.includes("function syncOverlayAccessibility"),
 "title or modal backgrounds are not made inert and hidden from assistive technology");
@@ -162,6 +172,11 @@ assert(mainSource.includes('class="arena-grid-row" role="row"') && mainSource.in
   && styleSource.includes(".arena-grid-row"),
 "arena board does not expose a valid row/gridcell structure");
 assert(mainSource.includes("enemy.unique ? [3, 5]") && mainSource.includes(": [1, 2]"), "harvest count ranges are missing");
+assert(mainSource.includes("NORMAL_CORPSE_CHANCE = 0.35") && mainSource.includes("Math.random() < NORMAL_CORPSE_CHANCE"), "ordinary corpse chance is missing or incorrect");
+assert(mainSource.includes("if (enemy?.unique) return true") && mainSource.includes("setEnemyCorpseState(enemy, leaveCorpse)")
+  && mainSource.includes("if (pet.unique)") && mainSource.includes("setEnemyCorpseState(pet, true)"),
+"unique monsters are not guaranteed to leave corpses through every dungeon defeat path");
+assert(mainSource.includes('cell.classList.add("tile-unique-corpse")') && styleSource.includes(".tile-unique-corpse .corpse-icon"), "unique corpses have no distinct map color");
 assert(!mainSource.includes("残り${corpse.harvestsRemaining}回"), "harvest count is exposed to the player");
 assert(mainSource.includes("TRAP_FLOOR_CHANCE = 0.42") && mainSource.includes("Math.random() < TRAP_FLOOR_CHANCE"), "trap floor chance was not doubled to 42%");
 assert(mainSource.includes("TRAP_COUNT_MULTIPLIER = 4") && mainSource.includes("* TRAP_COUNT_MULTIPLIER"), "trap count was not increased to four times the original");
@@ -191,6 +206,12 @@ assert(mainSource.includes("MAP_SIZE_RANGE = Object.freeze([36, 60])") && mainSo
 assert(styleSource.includes(".cell.light-room") && mainSource.includes("alwaysLitTiles") && dungeonGeneratorSource.includes("alwaysLitTileKeys"), "always-lit rooms and their first corridor tile are not rendered above dungeon darkness");
 assert(!dungeonGeneratorSource.includes("corridorWidth"), "two-tile corridor generation remains enabled");
 assert(mainSource.includes('state.adventurer.jobId === "handyman" ? 1 : 0'), "handyman harvest-count bonus is missing");
+assert(mainSource.includes('const overlapping = corpses.find((enemy) => enemy.x === player.x && enemy.y === player.y)')
+  && mainSource.includes('if (state.adventurer.jobId !== "handyman") return null'),
+"corpse harvesting does not require overlap except for the handyman adjacency privilege");
+assert(mainSource.includes("function advanceFullWorldTurn()") && mainSource.includes("state.dungeon.actionProgress = Math.max(0, actionsPerTurn - 1)")
+  && mainSource.slice(mainSource.indexOf("function harvestCorpse()"), mainSource.indexOf("function carryBountyCorpse")).includes("advanceFullWorldTurn();"),
+"corpse harvesting is not fixed to one complete world turn");
 assert(mainSource.includes('adv.personalityId === "lewd"') && mainSource.includes("RISQUE_SYNERGY_PER_ITEM") && mainSource.includes("risqueSynergyCount * RISQUE_SYNERGY_PER_ITEM.acceleration"), "lewd/risque equipment synergy is missing");
 assert(mainSource.includes('secretName === "サイタマ"') && mainSource.includes("SAITAMA_ONE_PUNCH_CHANCE"), "Saitama name secret is missing");
 assert(mainSource.includes('secretName === "リムル" && state.adventurer.raceId === "slime"') && mainSource.includes("虚崩朧千変万華"), "Rimuru/slime floor-wipe secret is missing or applies to another race");
@@ -198,7 +219,7 @@ assert(mainSource.includes('adv.raceId === "slime"') && mainSource.includes("RIM
 assert(mainSource.includes('=== "孫悟空"') && mainSource.includes('adv.equipment.weapon === "artifact_power_pole"') && mainSource.includes("powerPoleAwakened ? 300"), "Son Goku/Power Pole awakening is missing");
 assert(mainSource.includes("function searchForTraps") && mainSource.includes("function disarmTrap"), "active trap search/disarm actions are missing");
 assert(mainSource.includes("TRAP_JOB_DISARM_BONUSES") && mainSource.includes("dangerPenalty") && mainSource.includes("triggerCount"), "persistent traps or character-based danger disarming is missing");
-assert(mainSource.includes('state.adventurer.jobId === "hunter" ? corpseHarvestsRemaining(corpse) : 1'), "thief bulk harvesting is missing");
+assert(mainSource.includes('state.adventurer.jobId === "hunter" ? remainingHarvests : 1'), "thief bulk harvesting is missing");
 assert(mainSource.includes("MONSTER_SLEEP_CHANCE = 0.14") && mainSource.includes("THIEF_SLEEP_AMBUSH_MULTIPLIER = 3"), "sleeping-monster/thief ambush rules are missing");
 assert(styleSource.includes(".tile-sleeping") && styleSource.includes(".sleep-indicator"), "sleeping monster has no visible map state");
 assert(indexSource.includes('id="deathReviewPanel"') && indexSource.includes('id="continueAfterDeathButton"'), "manual death-log review UI is missing");
@@ -274,6 +295,20 @@ assert(window.HD_UTILS.chebyshevDistance({ x: 0, y: 0 }, { x: -3, y: 2 }) === 3,
 assert(!window.HD_UTILS.hasLineOfSight({ x: 0, y: 0 }, { x: 4, y: 0 }, (x) => x === 2), "shared line of sight ignored an intermediate blocker");
 assert(window.HD_UTILS.hasLineOfSight({ x: 0, y: 0 }, { x: 2, y: 0 }, (x) => x === 2), "shared line of sight treated the target as an intermediate blocker");
 assert(window.HD_DATA.races.length === 30, "race roster must contain 30 races");
+const hpBaselineRace = window.HD_DATA.races.find((race) => race.id === "human");
+const hpBaselinePersonality = window.HD_DATA.personalities.find((personality) => personality.id === "ordinary");
+const level100HpByJob = Object.fromEntries(window.HD_DATA.jobs.map((job) => [
+  job.id,
+  window.HD_CHARACTER.maxHpAtLevel(window.HD_DATA, hpBaselineRace, job, hpBaselinePersonality, 100),
+]));
+assert(window.HD_DATA.jobs.every((job) => Number(job.hpGrowth) > 0), "a job is missing its maximum-HP growth rate");
+assert(level100HpByJob.swordsman >= 950 && level100HpByJob.swordsman <= 1050, "level-100 swordsman HP is not around 1,000");
+assert(level100HpByJob.mage >= 575 && level100HpByJob.mage <= 625, "level-100 mage HP is not around 600");
+assert(level100HpByJob.heavy >= 1250 && level100HpByJob.heavy <= 1350, "level-100 berserker HP is not around 1,300");
+assert(level100HpByJob.tourist < level100HpByJob.mage
+  && level100HpByJob.mage < level100HpByJob.swordsman
+  && level100HpByJob.swordsman < level100HpByJob.heavy,
+"job maximum-HP roles are not ordered from challenge class through rear guard and front line to berserker");
 assert(window.HD_DATA.materials.filter((material) => material.junkDealerTier).length === 48, "junk dealer material candidate variety must be forty-eight");
 assert(window.HD_DATA.materials.filter((material) => material.junkDealerTier === "refined").length === 16, "junk dealer refined material pool is incomplete");
 assert(window.HD_DATA.races.every((race) => Number.isFinite(race.powerRating) && race.experienceMultiplier >= 0.75 && race.experienceMultiplier <= 1.8), "race growth difficulty is missing or out of range");
@@ -401,7 +436,16 @@ assert(mainSource.includes("if (floor.floor === MAX_FLOOR) return"), "a random f
 const deepUniquePowerUps = window.HD_DATA.monsters.filter((monster) => monster.unique && !monster.arenaOnly && monster.id !== "dungeon_lord_nox" && Math.min(...(monster.floors || [0])) >= 61);
 assert(deepUniquePowerUps.length > 0 && deepUniquePowerUps.every((monster) => Number(monster.deepUniquePower) >= 1.13), "deep unique strengthening is missing");
 assert(indexSource.includes('id="recoveryMedicineButton"') && mainSource.includes('id: "recovery_medicine"') && mainSource.includes("function exchangeRecoveryMedicine") && mainSource.includes("function useRecoveryMedicine"), "recovery medicine acquisition or dungeon use is missing");
-assert(mainSource.includes('name: "エリクサー", guildCost: 320, junkTokenCost: 7200, healRatio: 1, weight: 8') && mainSource.includes("getItemCount(RECOVERY_MEDICINE.id) * RECOVERY_MEDICINE.weight"), "elixir weight or full-heal handling is invalid");
+assert(mainSource.includes("if (state.arena || !state.dungeon || !state.adventurer.inDungeon"), "elixirs can still be used during an arena run");
+assert(indexSource.includes('id="recoveryMedicineButton" class="hidden"')
+  && mainSource.includes('els.recoveryMedicine.classList.toggle("hidden", count <= 0)')
+  && mainSource.includes('els.recoveryMedicine.setAttribute("aria-hidden", count <= 0 ? "true" : "false")'),
+"the empty elixir control can still appear in the dungeon action buttons");
+assert(mainSource.includes('name: "エリクサー", guildCost: 320, junkTokenCost: 7200, healRatio: 1, weight: 4') && mainSource.includes("getItemCount(RECOVERY_MEDICINE.id) * RECOVERY_MEDICINE.weight"), "elixir weight or full-heal handling is invalid");
+assert(combatSimSource.includes("const ELIXIR_WEIGHT = 4;")
+  && combatSimSource.includes("elixirs * ELIXIR_WEIGHT")
+  && combatSimSource.includes("level ${BOSS_PLAYER_LEVEL}"),
+"combat simulation still uses a different elixir weight from the game");
 assert(mainSource.includes('return source === "guild" ? RECOVERY_MEDICINE.guildCost : RECOVERY_MEDICINE.junkTokenCost')
   && !mainSource.includes("RECOVERY_MEDICINE_SALE_CHANCE")
   && !mainSource.includes("recoveryMedicineSale")
@@ -425,6 +469,7 @@ const guildWeaponCosts = window.HD_DATA.equipment.filter((item) => item.slot ===
 const lateGameEquipment = window.HD_DATA.equipment.filter((item) => item.lateGamePower);
 assert(lateGameEquipment.length === 831 && [1, 2, 3].every((power) => lateGameEquipment.some((item) => item.lateGamePower === power)), "late-game equipment strengthening coverage is invalid");
 assert(!window.HD_DATA.equipment.some((item) => item.lateGamePower && (item.starterOnly || ["joke", "trash"].includes(item.artifact?.tier))), "starter or intentionally weak artifact received late-game strengthening");
+assert(!window.HD_DATA.equipment.some((item) => String(item.description || "").includes("終盤補正")), "an equipment description exposes the internal late-game bonus label");
 assert(JSON.stringify(guildWeaponCosts) === JSON.stringify([200, 264, 328, 360, 392, 440, 456, 520, 720]),
 "guild exchange weapon costs are not exactly eight times their base prices");
 assert(window.HD_DATA.equipment.filter((item) => item.guildCost).length === 40
@@ -562,8 +607,17 @@ assert(experienceRichMonsters.length >= 10 && experienceRichMonsters.every((mons
 const arenaMonsters = uniqueMonsters.filter((monster) => monster.arenaOnly);
 const dungeonUniques = uniqueMonsters.filter((monster) => !monster.arenaOnly);
 const arenaFirstCombatant = arenaMonsters.find((monster) => monster.arenaRank === 1);
+const arenaMiddleCombatant = arenaMonsters.find((monster) => monster.arenaRank === 50);
+const arenaLateCombatant = arenaMonsters.find((monster) => monster.arenaRank === 80);
 const arenaFinalCombatant = arenaMonsters.find((monster) => monster.arenaRank === 100);
-assert(arenaFirstCombatant?.hp >= 45 && arenaFirstCombatant.acceleration >= 6 && arenaFinalCombatant?.hp >= 2000 && arenaFinalCombatant.acceleration >= 30, "arena difficulty escalation is missing");
+assert(arenaFirstCombatant?.hp >= 45 && arenaFirstCombatant.hp < 100 && arenaFirstCombatant.acceleration >= 9 && arenaFirstCombatant.acceleration < 15,
+  "the opening arena combatants no longer preserve the gentle end of the escalation curve");
+assert(arenaMiddleCombatant?.hp >= 1400 && arenaLateCombatant?.hp >= 4000,
+  "arena difficulty no longer rises strongly through the second half");
+assert(arenaFinalCombatant?.hp >= 7900 && arenaFinalCombatant.attack >= 210
+  && arenaFinalCombatant.defense >= 60 && arenaFinalCombatant.acceleration >= 75
+  && arenaFinalCombatant.dangerous.power >= 750,
+"the final arena combatants lost their end-loaded strengthening");
 const transferredUniques = dungeonUniques.filter((monster) => Number.isFinite(monster.migratedFromArenaRank));
 const expansionUniques = dungeonUniques.filter((monster) => monster.dungeonExpansion);
 const summoningUniques = dungeonUniques.filter((monster) => monster.summon);
@@ -937,8 +991,8 @@ FakeAudioContext.prototype.createBuffer = function (channels, length) {
 
 const fakeAudioContext = new FakeAudioContext();
 const sfxPlayer = window.HD_SFX.create(fakeAudioContext, new FakeAudioNode());
-assert(sfxPlayer.types.length === 88, "sound effect recipe count changed");
-assert(["uiTab", "uiConfirm", "uiCancel", "drink", "heartEquip", "trapDiscover", "trapDisarm", "summon", "invulnerable", "regenerate", "knockback", "selfDestruct", "debuff", "devour", "jobChange", "tutorial", "shopRefresh"].every((type) => sfxPlayer.types.includes(type)), "expanded sound-effect recipes are missing");
+assert(sfxPlayer.types.length === 90, "sound effect recipe count changed");
+assert(["uiTab", "uiConfirm", "uiCancel", "drink", "heartEquip", "trapDiscover", "trapDisarm", "summon", "invulnerable", "regenerate", "knockback", "selfDestruct", "debuff", "devour", "jobChange", "tutorial", "shopRefresh", "corpseDrop", "corpseDropUnique"].every((type) => sfxPlayer.types.includes(type)), "expanded sound-effect recipes are missing");
 const voicesBeforeLevelUp = audioVoiceStarts;
 sfxPlayer.play("levelUp");
 assert(audioVoiceStarts - voicesBeforeLevelUp >= 18, "level-up fanfare is not sufficiently layered");
@@ -1110,6 +1164,7 @@ const legacySave = {
     activeSpellId: "ember_shot",
   },
   meta: {
+    hpSchemaVersion: 2,
     startGuidanceShown: true,
     clearedBossFloors: [20],
     guildClaims: [{ id: "red_garm", name: "赤熱のガルム", reward: 400 }],
@@ -1255,6 +1310,36 @@ elements.get("dynamic:sell-equipment:iron_sword").listeners.click();
 elements.get("#confirmOk").listeners.click();
 assert(Number(elements.get("#goldText").textContent) > goldBeforeEquipmentSale, "selling unequipped equipment did not pay gold");
 assert(!elements.get("#shopView").innerHTML.includes('data-sell-equipment="iron_sword"'), "sold equipment remained in shop disposal list");
+
+const hpGrowthMigrationSave = clone(legacySave);
+delete hpGrowthMigrationSave.meta.hpSchemaVersion;
+hpGrowthMigrationSave.meta.awaitingCreation = false;
+hpGrowthMigrationSave.adventurer.personalityId = "ordinary";
+hpGrowthMigrationSave.adventurer.level = 100;
+hpGrowthMigrationSave.adventurer.experience = 0;
+hpGrowthMigrationSave.adventurer.jobProgress = { swordsman: { level: 100, experience: 0 } };
+hpGrowthMigrationSave.adventurer.equipment.weapon = "rusty_knife";
+hpGrowthMigrationSave.adventurer.maxHp = 346;
+hpGrowthMigrationSave.adventurer.hp = 173;
+hpGrowthMigrationSave.adventurer.attritionRecoveryDebt = 34;
+let persistedHpGrowthMigrationSave = null;
+localStorage.getItem = function (key) {
+  return key === "hagitori-dungeon-save-v1" ? JSON.stringify(hpGrowthMigrationSave) : null;
+};
+localStorage.setItem = function (key, value) {
+  if (key === "hagitori-dungeon-save-v1") persistedHpGrowthMigrationSave = JSON.parse(value);
+};
+eval(read("js/main.js"));
+assert(elements.get("#hpText").textContent === 501 && elements.get("#maxHpText").textContent === 1002,
+  "legacy HP migration did not preserve a half-health level-100 swordsman");
+viewTabs.find((tab) => tab.dataset.view === "home").listeners.click();
+document.querySelector("#backstoryInput").value = "HP移行確認";
+elements.get("#saveBackstoryButton").listeners.click();
+assert(persistedHpGrowthMigrationSave.meta.hpSchemaVersion === 2
+  && persistedHpGrowthMigrationSave.adventurer.maxHp === 1002
+  && persistedHpGrowthMigrationSave.adventurer.hp === 501
+  && persistedHpGrowthMigrationSave.adventurer.attritionRecoveryDebt === 98,
+"legacy save did not persist its migrated HP and erosion ratios");
 
 const normalDonationSave = clone(legacySave);
 normalDonationSave.meta.awaitingCreation = false;
@@ -1413,6 +1498,23 @@ assert(appShell.classList.contains("arena-mode"), "active arena save reloaded in
 assert(!elements.get("#arenaView").classList.contains("hidden"), "active arena save did not reopen the arena view");
 assert(elements.get("#townView").classList.contains("hidden"), "town view remained accessible after active arena reload");
 assert(elements.get("#arenaView").innerHTML.includes("第1戦 / 100"), "reloaded arena round was not rendered");
+
+const arenaElixirBanSave = clone(arenaReloadSave);
+arenaElixirBanSave.adventurer.hp = 20;
+arenaElixirBanSave.adventurer.items = { ...arenaElixirBanSave.adventurer.items, recovery_medicine: 1 };
+let persistedArenaElixirBanSave = null;
+localStorage.getItem = function (key) {
+  return key === "hagitori-dungeon-save-v1" ? JSON.stringify(arenaElixirBanSave) : null;
+};
+localStorage.setItem = function (key, value) {
+  if (key === "hagitori-dungeon-save-v1") persistedArenaElixirBanSave = JSON.parse(value);
+};
+eval(read("js/main.js"));
+elements.get("#recoveryMedicineButton").listeners.click();
+elements.get("#arenaRetireButton").listeners.click();
+assert(persistedArenaElixirBanSave.adventurer.hp === 20
+  && persistedArenaElixirBanSave.adventurer.items.recovery_medicine === 1,
+"an arena participant consumed an elixir through the dungeon control");
 
 const legacyArenaFieldSave = clone(arenaReloadSave);
 delete legacyArenaFieldSave.arena.size;
@@ -1599,21 +1701,89 @@ corpseSave.dungeon = {
   map: corpseMap, rooms: [], player: { x: 10, y: 10 }, stairs: [], enemies: [corpseEnemy], chests: [], traps: [],
   turnsElapsed: 0, actionProgress: 0, uniqueSpawned: false,
 };
+const overlappingCorpseSave = clone(corpseSave);
+overlappingCorpseSave.dungeon.player = { x: 11, y: 10 };
 let persistedCorpseSave = null;
 localStorage.getItem = function (key) {
-  return key === "hagitori-dungeon-save-v1" ? JSON.stringify(corpseSave) : null;
+  return key === "hagitori-dungeon-save-v1" ? JSON.stringify(overlappingCorpseSave) : null;
 };
 localStorage.setItem = function (key, value) {
   if (key === "hagitori-dungeon-save-v1") persistedCorpseSave = JSON.parse(value);
 };
 eval(read("js/main.js"));
 assert(elements.get("#waitButton").textContent === "剥", "multi-harvest corpse is not actionable");
+assert(elements.get("#recoveryMedicineButton").classList.contains("hidden"), "the elixir button remained visible with no elixir in inventory");
 elements.get("#waitButton").listeners.click();
 assert(persistedCorpseSave.dungeon.enemies[0].harvestsRemaining === 1, "first harvest did not preserve the corpse");
 assert(!/残り\d+回/.test(persistedCorpseSave.log[0]), "remaining harvest count leaked into the log");
 elements.get("#waitButton").listeners.click();
 assert(persistedCorpseSave.dungeon.enemies[0].harvestsRemaining === 0, "final harvest did not exhaust the corpse");
 assert(persistedCorpseSave.adventurer.materials.small_beast_meat === 2, "multi-harvest rewards were not granted per action");
+
+const elixirButtonSave = clone(overlappingCorpseSave);
+elixirButtonSave.adventurer.items = { ...elixirButtonSave.adventurer.items, recovery_medicine: 1 };
+localStorage.getItem = function (key) {
+  return key === "hagitori-dungeon-save-v1" ? JSON.stringify(elixirButtonSave) : null;
+};
+localStorage.setItem = function () {};
+eval(read("js/main.js"));
+assert(!elements.get("#recoveryMedicineButton").classList.contains("hidden")
+  && elements.get("#recoveryMedicineButton").textContent === "エリクサー 1",
+"the elixir button did not reappear when an elixir was added to inventory");
+
+const fullTurnHarvestSave = clone(overlappingCorpseSave);
+fullTurnHarvestSave.adventurer.jobId = "ninja";
+fullTurnHarvestSave.dungeon.actionProgress = 0;
+fullTurnHarvestSave.dungeon.turnsElapsed = 0;
+let persistedFullTurnHarvestSave = null;
+localStorage.getItem = function (key) {
+  return key === "hagitori-dungeon-save-v1" ? JSON.stringify(fullTurnHarvestSave) : null;
+};
+localStorage.setItem = function (key, value) {
+  if (key === "hagitori-dungeon-save-v1") persistedFullTurnHarvestSave = JSON.parse(value);
+};
+const fullTurnHarvestOriginalRandom = Math.random;
+Math.random = function () { return 0.99; };
+eval(read("js/main.js"));
+elements.get("#waitButton").listeners.click();
+Math.random = fullTurnHarvestOriginalRandom;
+assert(persistedFullTurnHarvestSave.dungeon.turnsElapsed === 1 && persistedFullTurnHarvestSave.dungeon.actionProgress === 0,
+  "high acceleration allowed harvesting without consuming and resetting one full world turn");
+
+const adjacentCorpseSave = clone(corpseSave);
+adjacentCorpseSave.adventurer.jobId = "swordsman";
+adjacentCorpseSave.dungeon.player = { x: 10, y: 10 };
+localStorage.getItem = function (key) {
+  return key === "hagitori-dungeon-save-v1" ? JSON.stringify(adjacentCorpseSave) : null;
+};
+localStorage.setItem = function () {};
+eval(read("js/main.js"));
+assert(elements.get("#waitButton").textContent !== "剥", "a non-handyman can still harvest an adjacent corpse without standing on it");
+
+for (const overlapRequiredJobId of ["scavenger", "hunter"]) {
+  const overlapRequiredSave = clone(adjacentCorpseSave);
+  overlapRequiredSave.adventurer.jobId = overlapRequiredJobId;
+  localStorage.getItem = function (key) {
+    return key === "hagitori-dungeon-save-v1" ? JSON.stringify(overlapRequiredSave) : null;
+  };
+  localStorage.setItem = function () {};
+  eval(read("js/main.js"));
+  assert(elements.get("#waitButton").textContent !== "剥", `${overlapRequiredJobId} can act on an adjacent corpse without overlapping it`);
+}
+
+const handymanAdjacentCorpseSave = clone(adjacentCorpseSave);
+handymanAdjacentCorpseSave.adventurer.jobId = "handyman";
+let persistedHandymanAdjacentCorpseSave = null;
+localStorage.getItem = function (key) {
+  return key === "hagitori-dungeon-save-v1" ? JSON.stringify(handymanAdjacentCorpseSave) : null;
+};
+localStorage.setItem = function (key, value) {
+  if (key === "hagitori-dungeon-save-v1") persistedHandymanAdjacentCorpseSave = JSON.parse(value);
+};
+eval(read("js/main.js"));
+assert(elements.get("#waitButton").textContent === "剥", "the handyman lost adjacent corpse harvesting");
+elements.get("#waitButton").listeners.click();
+assert(persistedHandymanAdjacentCorpseSave.dungeon.enemies[0].harvestsRemaining === 1, "the handyman could not harvest an adjacent corpse");
 
 const wallPositionSave = clone(corpseSave);
 wallPositionSave.adventurer.raceId = "ghost";
@@ -1981,6 +2151,7 @@ assert(persistedStairActionSave.dungeon.player.x === 11 && persistedStairActionS
 
 const goldenHarvestSave = clone(corpseSave);
 goldenHarvestSave.dungeon.anomaly = { id: "gold", name: "黄金墓" };
+goldenHarvestSave.dungeon.player = { x: 11, y: 10 };
 let persistedGoldenHarvestSave = null;
 localStorage.getItem = function (key) {
   return key === "hagitori-dungeon-save-v1" ? JSON.stringify(goldenHarvestSave) : null;
@@ -2002,6 +2173,7 @@ repeatBountySave.meta.bounties = { [repeatBountyEnemy.id]: { intel: true, claime
 repeatBountySave.meta.guildClaims = [];
 repeatBountySave.adventurer.bountyCorpses = [];
 repeatBountySave.dungeon.enemies = [repeatBountyEnemy];
+repeatBountySave.dungeon.player = { x: 11, y: 10 };
 let persistedRepeatBountySave = null;
 localStorage.getItem = function (key) {
   return key === "hagitori-dungeon-save-v1" ? JSON.stringify(repeatBountySave) : null;
@@ -2013,8 +2185,35 @@ eval(read("js/main.js"));
 elements.get("#waitButton").listeners.click();
 assert(persistedRepeatBountySave.adventurer.bountyCorpses[0].reward === expectedFirstBounty, "legacy claimed-count data still reduced a bounty reward");
 
+const handymanBountyOverlapSave = clone(repeatBountySave);
+handymanBountyOverlapSave.adventurer.jobId = "handyman";
+handymanBountyOverlapSave.dungeon.player = { x: 10, y: 10 };
+let persistedHandymanBountyOverlapSave = null;
+localStorage.getItem = function (key) {
+  return key === "hagitori-dungeon-save-v1" ? JSON.stringify(handymanBountyOverlapSave) : null;
+};
+localStorage.setItem = function (key, value) {
+  if (key === "hagitori-dungeon-save-v1") persistedHandymanBountyOverlapSave = JSON.parse(value);
+};
+const bountyOverlapOriginalRandom = Math.random;
+Math.random = function () { return 0.99; };
+eval(read("js/main.js"));
+assert(elements.get("#waitButton").textContent === "剥", "the handyman could not approach the final adjacent bounty harvest");
+elements.get("#waitButton").listeners.click();
+assert(persistedHandymanBountyOverlapSave.dungeon.enemies[0].harvestsRemaining === 1
+  && persistedHandymanBountyOverlapSave.adventurer.bountyCorpses.length === 0
+  && persistedHandymanBountyOverlapSave.log.some((line) => line.includes("同じマスに立つ必要がある")),
+"the handyman collected a bounty corpse from an adjacent tile");
+document.listeners.keydown({ key: "ArrowRight", preventDefault() {} });
+elements.get("#waitButton").listeners.click();
+Math.random = bountyOverlapOriginalRandom;
+assert(persistedHandymanBountyOverlapSave.dungeon.enemies[0].harvestsRemaining === 0
+  && persistedHandymanBountyOverlapSave.adventurer.bountyCorpses.length === 1,
+"the handyman could not collect a bounty corpse after overlapping it");
+
 const thiefCorpseSave = clone(corpseSave);
 thiefCorpseSave.adventurer.jobId = "hunter";
+thiefCorpseSave.dungeon.player = { x: 11, y: 10 };
 let persistedThiefCorpseSave = null;
 localStorage.getItem = function (key) {
   return key === "hagitori-dungeon-save-v1" ? JSON.stringify(thiefCorpseSave) : null;
@@ -2457,6 +2656,36 @@ document.listeners.keydown({ key: "ArrowRight", preventDefault() {} });
 Math.random = trapOriginalRandom;
 assert(persistedRimuruSave.dungeon.enemies.every((enemy) => !enemy.alive), "Rimuru secret did not wipe the floor");
 assert(persistedRimuruSave.log.some((line) => line.includes("虚崩朧千変万華")), "Rimuru secret log is missing");
+
+const corpseChanceSave = clone(corpseSave);
+const chanceOrdinary = clone(window.HD_DATA.monsters.find((monster) => monster.id === "cave_rat"));
+const chanceUnique = clone(dungeonUniques[0]);
+Object.assign(chanceOrdinary, { x: 11, y: 10, maxHp: chanceOrdinary.hp, alive: true, turns: 0, telegraphed: false });
+Object.assign(chanceUnique, { x: 12, y: 10, maxHp: chanceUnique.hp, alive: true, turns: 0, telegraphed: false });
+corpseChanceSave.adventurer.name = "リムル";
+corpseChanceSave.adventurer.raceId = "slime";
+corpseChanceSave.adventurer.level = 100;
+corpseChanceSave.adventurer.experience = 0;
+corpseChanceSave.dungeon.enemies = [chanceOrdinary, chanceUnique];
+let persistedCorpseChanceSave = null;
+localStorage.getItem = function (key) {
+  return key === "hagitori-dungeon-save-v1" ? JSON.stringify(corpseChanceSave) : null;
+};
+localStorage.setItem = function (key, value) {
+  if (key === "hagitori-dungeon-save-v1") persistedCorpseChanceSave = JSON.parse(value);
+};
+const corpseChanceRolls = [0, 0.99];
+Math.random = function () { return corpseChanceRolls.length ? corpseChanceRolls.shift() : 0.99; };
+eval(read("js/main.js"));
+document.listeners.keydown({ key: "ArrowRight", preventDefault() {} });
+Math.random = trapOriginalRandom;
+const [ordinaryWithoutCorpse, guaranteedUniqueCorpse] = persistedCorpseChanceSave.dungeon.enemies;
+assert(!ordinaryWithoutCorpse.alive && ordinaryWithoutCorpse.destroyed && ordinaryWithoutCorpse.harvestsRemaining === 0,
+  "an ordinary monster still guaranteed a corpse when its corpse roll failed");
+assert(!guaranteedUniqueCorpse.alive && !guaranteedUniqueCorpse.destroyed && guaranteedUniqueCorpse.harvestsRemaining >= 3,
+  "a unique monster failed to leave a harvestable corpse when the ordinary corpse roll failed");
+assert(persistedCorpseChanceSave.log.some((line) => line.includes("うち1体の遺体が剥ぎ取り可能")),
+  "floor-wide defeat log did not report the actual corpse count");
 
 const selfDestructGuardianSave = clone(corpseSave);
 const selfDestructGuardian = clone(window.HD_DATA.monsters.find((monster) => monster.id === "cave_rat"));
@@ -3281,7 +3510,7 @@ localStorage.getItem = function (key) {
 localStorage.setItem = function (key, value) {
   if (key === "hagitori-dungeon-save-v1") persistedJobSkillSave = JSON.parse(value);
 };
-Math.random = function () { return 0.5; };
+Math.random = function () { return 0.2; };
 eval(read("js/main.js"));
 elements.get("#jobSkillButton").listeners.click();
 elements.get("#map").listeners.click({ target: { closest() { return { dataset: { enemyX: "13", enemyY: "10" } }; } } });

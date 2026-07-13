@@ -15,7 +15,12 @@ const DATA = window.HD_DATA;
 const CHARACTER = window.HD_CHARACTER;
 const RUNS = 600;
 const BOSS_RUNS = 500;
-const ARENA_RUNS = 100;
+const requestedArenaRuns = Number(ObjC.unwrap($.NSProcessInfo.processInfo.environment.objectForKey("HAGITORI_ARENA_RUNS")) || 100);
+const ARENA_RUNS = Number.isFinite(requestedArenaRuns) ? Math.max(1, Math.floor(requestedArenaRuns)) : 100;
+const BOSS_PLAYER_LEVEL = 78;
+const ARENA_PLAYER_LEVEL = 100;
+const ARENA_ONLY = ObjC.unwrap($.NSProcessInfo.processInfo.environment.objectForKey("HAGITORI_ARENA_ONLY")) === "1";
+const ELIXIR_WEIGHT = 4;
 const DETAILED_OUTPUT = false;
 const RANDOM_SEED = 0x5eed350;
 const FLOOR_SAMPLES = [5, 10, 20, 40, 60, 80, 100];
@@ -108,7 +113,7 @@ function playerStats(job, level, floor, gearMode = "field") {
   const weapon = loadout.find((item) => item.slot === "weapon") || null;
   const attributes = unique(loadout.flatMap((item) => item.attackAttributes || (item.attributeAttack ? [item.attributeAttack] : [])));
   const stats = {
-    maxHp: base.maxHp + (level - 1) * 3,
+    maxHp: CHARACTER.maxHpAtLevel(DATA, race, job, personality, level),
     defense: Math.max(0, job.defense + Math.floor(grown.durability / 2) + Math.floor((level - 1) / 10)),
     acceleration: Number(race.acceleration || 0) + Number(job.acceleration || 0)
       + (job.accelerationGrowthEvery ? Math.floor((level - 1) / job.accelerationGrowthEvery) : 0),
@@ -249,7 +254,7 @@ function duel(stats, sourceEnemy, startingHp = stats.maxHp, options = {}) {
   const enemyCombatState = { lastAttackAttribute: null };
   const turnLimit = Number(options.turnLimit || 200);
   for (let turn = 1; turn <= turnLimit; turn += 1) {
-    const burden = Math.min(30, Math.floor(Math.max(0, elixirs * 8 - stats.materialCapacity) / stats.materialBurdenStep));
+    const burden = Math.min(30, Math.floor(Math.max(0, elixirs * ELIXIR_WEIGHT - stats.materialCapacity) / stats.materialBurdenStep));
     const playerActions = 1 + Math.floor(Math.max(0, stats.acceleration - burden) / 10);
     for (let action = 0; action < playerActions && enemyHp > 0; action += 1) {
       if (elixirs > 0 && playerHp <= stats.maxHp * 0.55) {
@@ -336,7 +341,7 @@ if (DETAILED_OUTPUT) DATA.jobs.forEach((job) => FLOOR_SAMPLES.forEach((floor) =>
 
 function bossSimulation(job, gearMode) {
   const floor = 100;
-  const level = 78;
+  const level = BOSS_PLAYER_LEVEL;
   const boss = monsters.dungeon_lord_nox;
   let wins = 0;
   let turns = 0;
@@ -356,7 +361,7 @@ function bossSimulation(job, gearMode) {
 
 const arenaRoster = DATA.monsters.filter((monster) => monster.arenaOnly).sort((a, b) => a.arenaRank - b.arenaRank);
 function arenaSimulation(job, floor, gearMode) {
-  const level = Math.min(100, Math.max(1, Math.round(3 + floor * 0.75)));
+  const level = ARENA_PLAYER_LEVEL;
   setRandomSeed(seedFor(`arena-profiles:${job.id}:${floor}:${gearMode}`));
   const profiles = Array.from({ length: gearMode === "sampled" ? 25 : 1 }, () => playerStats(job, level, floor, gearMode));
   let clears = 0;
@@ -378,7 +383,7 @@ function arenaSimulation(job, floor, gearMode) {
   return { job: job.name, floor, level, gearMode, clearRate: clears / ARENA_RUNS, averageRound: rounds / ARENA_RUNS };
 }
 
-const bossResults = DATA.jobs.flatMap((job) => ["starter", "sampled", "best"].map((gearMode) => bossSimulation(job, gearMode)));
+const bossResults = ARENA_ONLY ? [] : DATA.jobs.flatMap((job) => ["starter", "sampled", "best"].map((gearMode) => bossSimulation(job, gearMode)));
 function preparedBossSimulation(job, elixirs, profiles) {
   let wins = 0;
   let turns = 0;
@@ -393,12 +398,12 @@ function preparedBossSimulation(job, elixirs, profiles) {
   }
   return { job: job.name, elixirs, winRate: wins / BOSS_RUNS, turns: turns / BOSS_RUNS, used: used / BOSS_RUNS };
 }
-const preparedBossResults = DATA.jobs.flatMap((job) => {
+const preparedBossResults = ARENA_ONLY ? [] : DATA.jobs.flatMap((job) => {
   setRandomSeed(seedFor(`prepared-boss-profiles:${job.id}`));
-  const pairedProfiles = Array.from({ length: 25 }, () => playerStats(job, 78, 100, "sampled"));
+  const pairedProfiles = Array.from({ length: 25 }, () => playerStats(job, BOSS_PLAYER_LEVEL, 100, "sampled"));
   return [10, 30, 50].map((count) => preparedBossSimulation(job, count, pairedProfiles));
 });
-const arenaResults = DATA.jobs.flatMap((job) => [20, 50, 100].map((floor) => arenaSimulation(job, floor, "sampled")));
+const arenaResults = DATA.jobs.flatMap((job) => (ARENA_ONLY ? [100] : [20, 50, 100]).map((floor) => arenaSimulation(job, floor, "sampled")));
 
 const lines = [
   `combat simulation: ${RUNS} runs/matchup; deterministic seed 0x${RANDOM_SEED.toString(16)}; human + ordinary; optimistic balanced equipment available by depth`,
@@ -416,16 +421,22 @@ if (DETAILED_OUTPUT) results.forEach((result) => lines.push([
   (result.winRate * 100).toFixed(1), result.turns.toFixed(2), result.damage.toFixed(1), result.actions,
   (result.timeoutRate * 100).toFixed(1),
 ].join(",")));
-lines.push("", `LAST BOSS (${BOSS_RUNS} runs, level 78)`, "gear,job,win%,avgTurns,timeout%");
-bossResults.forEach((result) => lines.push([result.gearMode, result.job, (result.winRate * 100).toFixed(2), result.turns.toFixed(2), (result.timeoutRate * 100).toFixed(2)].join(",")));
-lines.push("", "LAST BOSS WITH ELIXIRS SUMMARY (15-job mean)", "carried,win%,avgTurns,avgUsed");
-[10, 30, 50].forEach((carried) => {
-  const group = preparedBossResults.filter((result) => result.elixirs === carried);
-  const average = (key) => group.reduce((sum, result) => sum + result[key], 0) / Math.max(1, group.length);
-  lines.push([carried, (average("winRate") * 100).toFixed(2), average("turns").toFixed(2), average("used").toFixed(2)].join(","));
-});
-lines.push("", "LAST BOSS WITH ELIXIRS (sampled gear, rapid regeneration assumed suppressed)", "job,carried,win%,avgTurns,avgUsed");
-preparedBossResults.forEach((result) => lines.push([result.job, result.elixirs, (result.winRate * 100).toFixed(2), result.turns.toFixed(2), result.used.toFixed(2)].join(",")));
+if (!ARENA_ONLY) {
+  lines.push("", `LAST BOSS (${BOSS_RUNS} runs, level ${BOSS_PLAYER_LEVEL})`, "gear,job,win%,avgTurns,timeout%");
+  bossResults.forEach((result) => lines.push([result.gearMode, result.job, (result.winRate * 100).toFixed(2), result.turns.toFixed(2), (result.timeoutRate * 100).toFixed(2)].join(",")));
+  lines.push("", "LAST BOSS WITH ELIXIRS SUMMARY (15-job mean)", "carried,win%,avgTurns,avgUsed");
+  [10, 30, 50].forEach((carried) => {
+    const group = preparedBossResults.filter((result) => result.elixirs === carried);
+    const average = (key) => group.reduce((sum, result) => sum + result[key], 0) / Math.max(1, group.length);
+    lines.push([carried, (average("winRate") * 100).toFixed(2), average("turns").toFixed(2), average("used").toFixed(2)].join(","));
+  });
+  lines.push("", "LAST BOSS WITH ELIXIRS (sampled gear, rapid regeneration assumed suppressed)", "job,carried,win%,avgTurns,avgUsed");
+  preparedBossResults.forEach((result) => lines.push([result.job, result.elixirs, (result.winRate * 100).toFixed(2), result.turns.toFixed(2), result.used.toFixed(2)].join(",")));
+}
+const level100ArenaResults = arenaResults.filter((result) => result.floor === 100 && result.level === ARENA_PLAYER_LEVEL);
+const level100ArenaMean = (key) => level100ArenaResults.reduce((sum, result) => sum + result[key], 0) / Math.max(1, level100ArenaResults.length);
+lines.push("", `ARENA LEVEL-${ARENA_PLAYER_LEVEL} SUMMARY (${ARENA_RUNS} runs/job, sampled B100 gear, no between-round full heal, no elixirs)`, "averageClear%,averageRound");
+lines.push([(level100ArenaMean("clearRate") * 100).toFixed(2), level100ArenaMean("averageRound").toFixed(2)].join(","));
 lines.push("", `ARENA 100 CONTINUOUS WINS (${ARENA_RUNS} runs, no between-round full heal)`, "floor,level,job,clear%,avgRound");
 arenaResults.forEach((result) => lines.push([result.floor, result.level, result.job, (result.clearRate * 100).toFixed(2), result.averageRound.toFixed(2)].join(",")));
 const output = `${lines.join("\n")}\n`;

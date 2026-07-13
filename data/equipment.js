@@ -1178,7 +1178,6 @@
       if (value !== "immune" && Number(value) > 0) item.resistances[attribute] = Math.min(5, Number(value) + (power === 3 ? 2 : 1));
     });
     item.lateGamePower = power;
-    item.description = `${item.description} 終盤補正${["", "Ⅰ", "Ⅱ", "Ⅲ"][power]}：深層戦へ向けて基礎性能が強化されている。`;
   });
 
   // 後段の多相型補正で攻撃属性が追加された装備も、旧形式の先頭属性を同期する。

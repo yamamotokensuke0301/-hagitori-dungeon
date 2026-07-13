@@ -1457,6 +1457,28 @@ strong {
   box-shadow: -9px -1px 0 #5e574b;
 }
 
+.tile-unique-corpse {
+  background: #352331;
+  box-shadow: inset 0 0 0 1px rgba(226, 169, 91, 0.48);
+}
+
+.tile-unique-corpse .corpse-icon {
+  background: #9c5266;
+  box-shadow:
+    inset -3px -3px 4px rgba(31, 6, 16, 0.5),
+    0 0 5px rgba(220, 137, 103, 0.42),
+    0 2px 3px rgba(0, 0, 0, 0.55);
+}
+
+.tile-unique-corpse .corpse-icon::before {
+  background: #c4777f;
+}
+
+.tile-unique-corpse .corpse-icon::after {
+  background: #d3a75f;
+  box-shadow: -9px -1px 0 #d3a75f;
+}
+
 .tile-stairs {
   position: relative;
   overflow: hidden;
@@ -2399,25 +2421,28 @@ strong {
   position: fixed;
   inset: 0;
   z-index: 200;
-  display: grid;
-  place-content: center;
-  justify-items: center;
-  gap: 12px;
-  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 28px 28px max(24px, env(safe-area-inset-bottom));
   overflow: hidden;
   color: #eee7d2;
   text-align: center;
-  background:
-    radial-gradient(circle at 50% 38%, rgba(143, 89, 28, 0.22), transparent 30%),
-    linear-gradient(rgba(8, 11, 7, 0.68), rgba(8, 11, 7, 0.94)),
-    repeating-linear-gradient(135deg, #161b13 0 2px, #11150f 2px 7px);
+  background: #050806;
+  isolation: isolate;
 }
 
 .title-screen::before {
   content: "";
   position: absolute;
-  inset: 20px;
-  border: 1px solid rgba(214, 174, 84, 0.24);
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(180deg, transparent 72%, rgba(3, 5, 4, 0.22) 84%, rgba(3, 5, 4, 0.78) 100%),
+    url("../assets/images/chronicle-dungeon-title-v1.jpg") center / auto 100% no-repeat,
+    #050806;
   pointer-events: none;
 }
 
@@ -2437,6 +2462,20 @@ strong {
   text-shadow: 0 4px 0 #392612, 0 10px 28px #000;
 }
 
+.title-screen > .title-kicker,
+.title-screen > .title-version,
+.title-screen > h1 {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .title-kicker,
 .title-version,
 .title-hint {
@@ -2449,14 +2488,19 @@ strong {
 .title-screen button {
   box-sizing: border-box;
   width: min(280px, 78vw);
-  margin-top: 12px;
+  margin: 0;
   padding: 13px 20px;
   border-color: #b9913e;
   color: #fff0b3;
-  background: linear-gradient(#574722, #352c18);
+  background: linear-gradient(rgba(87, 71, 34, 0.96), rgba(53, 44, 24, 0.96));
   font-size: 16px;
   font-weight: 700;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.62);
+}
+
+.title-screen .title-hint {
+  color: #b7b2a1;
+  text-shadow: 0 2px 5px #000;
 }
 
 .death-effect.active {

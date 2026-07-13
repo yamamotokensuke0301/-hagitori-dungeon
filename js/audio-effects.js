@@ -18,7 +18,8 @@
       trapDrain: [0.68, 0.84], trapSlow: [0.68, 1.0], teleportShort: [0.7, 1.12], teleportLong: [0.6, 1.22],
       timeStop: [0.64, 1.28], eat: [0.74, 0.3], feast: [0.6, 0.72], bountyCarry: [0.7, 0.78],
       anomaly: [0.6, 1.22], chaos: [0.42, 0.98], invisibleReveal: [0.66, 1.18], heal: [0.6, 1.4],
-      corpse: [0.7, 0.32], harvest: [0.45, 0.72], craft: [0.74, 0.88], equip: [0.78, 0.72],
+      corpse: [0.7, 0.32], corpseDrop: [0.8, 0.35], corpseDropUnique: [0.6, 0.95],
+      harvest: [0.45, 0.72], craft: [0.74, 0.88], equip: [0.78, 0.72],
       rest: [0.68, 1.2], victory: [0.66, 1.18], levelUp: [0.58, 1.48], levelStatUp: [0.7, 1.1], death: [0.42, 1.15],
       deathCrySharp: [0.5, 0.82], deathCryFading: [0.46, 1.05], deathCryLow: [0.48, 0.72], flee: [0.8, 0.38],
       uiTab: [0.68, 0.34], uiConfirm: [0.7, 0.5], uiCancel: [0.66, 0.42], uiOpen: [0.68, 0.58], uiClose: [0.68, 0.4],
@@ -260,6 +261,17 @@
       if (type === "corpse") {
         playImpact(82.41, now, 0.18, 0.11, out, { click: 360, pan: 0 });
         playNoise(now, 0.09, 0.052, out, 440, { attack: 0.0015, pan: -0.1, reverb: 0.02 });
+      }
+      if (type === "corpseDrop") {
+        // 一般モンスターの遺体が「残った」当たりを告げる、小さく乾いた「ことり」。
+        playImpact(74, now, 0.12, 0.06, out, { click: 480, pan: 0 });
+        playTone(196, now + 0.055, 0.1, 0.026, "triangle", out, { attack: 0.002, pan: 0.12, reverb: 0.07 });
+      }
+      if (type === "corpseDropUnique") {
+        // ユニークの色違い遺体。勝利ファンファーレの後に重なる荘重な低い鐘。
+        playImpact(56, now + 0.3, 0.2, 0.085, out, { click: 340, pan: 0 });
+        playMetal(311.13, now + 0.34, 0.5, 0.03, out, -0.14);
+        playTone(1244.51, now + 0.5, 0.6, 0.014, "sine", out, { sustain: 0.68, pan: 0.18, reverb: 0.32 });
       }
       if (type === "harvest") {
         // 刃先が触れる高域と、三度の短い切断。

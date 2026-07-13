@@ -89,6 +89,21 @@
     return bonuses;
   }
 
+  function maxHpAtLevel(data, race, job, personality, level) {
+    const safeRace = race || data.races[0];
+    const safeJob = job || data.jobs[0];
+    const safePersonality = personality || data.personalities[0];
+    const normalizedLevel = Math.max(1, Math.floor(Number(level) || 1));
+    const base = buildBaseStats(safeRace, safeJob, safePersonality);
+    const bonuses = levelBonuses(data, normalizedLevel, safeJob.id, safePersonality.id);
+    const jobGrowth = Math.max(0, Number(safeJob.hpGrowth ?? 3));
+    return Math.max(1, Math.round(
+      base.maxHp
+      + (normalizedLevel - 1) * jobGrowth
+      + Number(bonuses.durability || 0) * 3,
+    ));
+  }
+
   function backstoryHash(text) {
     return [...String(text || "")]
       .reduce((hash, character) => ((hash * 33) ^ character.charCodeAt(0)) >>> 0, 2166136261);
@@ -106,5 +121,5 @@
     return `${adventurerName}は${origin}で生まれた${safeRace.name}。${trait}。${incident}ことをきっかけに、迷宮へ向かう決意を固めた。旅立ちの日から「${keepsake}」を肌身離さず持っている。`;
   }
 
-  window.HD_CHARACTER = { STAT_KEYS, buildBaseStats, preview, levelBonuses, generateBackstory };
+  window.HD_CHARACTER = { STAT_KEYS, buildBaseStats, preview, levelBonuses, maxHpAtLevel, generateBackstory };
 })();

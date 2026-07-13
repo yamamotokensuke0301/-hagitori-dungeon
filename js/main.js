@@ -15,6 +15,7 @@
   const RESEARCH_SCHEMA_VERSION = 2;
   const ECONOMY_SCHEMA_VERSION = 2;
   const PROGRESSION_SCHEMA_VERSION = 2;
+  const HP_SCHEMA_VERSION = 2;
   const MUSIC_VOLUME = 0.252;
   const BGM_SCENE_VOLUME_MULTIPLIERS = Object.freeze({ town: 0.55 });
   const SFX_VOLUME = 1.69;
@@ -26,10 +27,11 @@
   const DRINK_COST = 1;
   const DRUNKEN_FIST_POWER = 3.6;
   const RISQUE_SYNERGY_PER_ITEM = Object.freeze({ strength: 6, speed: 6, dexterity: 8, durability: 6, luck: 12, acceleration: 18 });
-  const RECOVERY_MEDICINE = Object.freeze({ id: "recovery_medicine", name: "エリクサー", guildCost: 320, junkTokenCost: 7200, healRatio: 1, weight: 8 });
+  const RECOVERY_MEDICINE = Object.freeze({ id: "recovery_medicine", name: "エリクサー", guildCost: 320, junkTokenCost: 7200, healRatio: 1, weight: 4 });
   const START_GUIDANCE = "まずはギルドにいけ。受付で冒険の基本と最初の方針を確かめろ。";
   const SAITAMA_ONE_PUNCH_CHANCE = 0.08;
   const RIMURU_FLOOR_WIPE_CHANCE = 0.025;
+  const NORMAL_CORPSE_CHANCE = 0.35;
   const RIMURU_SLIME_STAT_BONUS = 150;
   const RIMURU_SLIME_HP_BONUS = 1000;
   const RIMURU_SLIME_ACCELERATION_BONUS = 120;
@@ -362,6 +364,7 @@
         researchSchemaVersion: RESEARCH_SCHEMA_VERSION,
         economySchemaVersion: ECONOMY_SCHEMA_VERSION,
         progressionSchemaVersion: PROGRESSION_SCHEMA_VERSION,
+        hpSchemaVersion: HP_SCHEMA_VERSION,
         saveRevision: 0,
         deaths: 0,
         deathLog: [],
@@ -636,6 +639,7 @@
     saved.meta = isPlainRecord(saved.meta) ? saved.meta : {};
     const legacyEconomy = Number(saved.meta.economySchemaVersion || 1) < ECONOMY_SCHEMA_VERSION;
     const legacyProgression = Number(saved.meta.progressionSchemaVersion || 1) < PROGRESSION_SCHEMA_VERSION;
+    const legacyHpGrowth = Number(saved.meta.hpSchemaVersion || 1) < HP_SCHEMA_VERSION;
     saved.meta.research = isPlainRecord(saved.meta.research) ? saved.meta.research : {};
     saved.meta.monsterHearts = isPlainRecord(saved.meta.monsterHearts) ? saved.meta.monsterHearts : {};
     saved.meta.monsterHeartClaims = isPlainRecord(saved.meta.monsterHeartClaims) ? saved.meta.monsterHeartClaims : {};
@@ -919,6 +923,22 @@
     });
     saved.adventurer.level = saved.adventurer.jobProgress[saved.adventurer.jobId].level;
     saved.adventurer.experience = saved.adventurer.jobProgress[saved.adventurer.jobId].experience;
+    if (legacyHpGrowth) {
+      const previousMaxHp = Math.max(1, Number(saved.adventurer.maxHp || 1));
+      const previousHpRatio = clamp(Number(saved.adventurer.hp || 0) / previousMaxHp, 0, 1);
+      const previousDebtRatio = clamp(Number(saved.adventurer.attritionRecoveryDebt || 0) / previousMaxHp, 0, 1);
+      const hpRace = races[saved.adventurer.raceId];
+      const hpJob = jobs[saved.adventurer.jobId];
+      const hpPersonality = personalities[saved.adventurer.personalityId];
+      const oldCoreMaxHp = CHARACTER.buildBaseStats(hpRace, hpJob, hpPersonality).maxHp
+        + (saved.adventurer.level - 1) * 3;
+      const newCoreMaxHp = CHARACTER.maxHpAtLevel(DATA, hpRace, hpJob, hpPersonality, saved.adventurer.level);
+      const migratedMaxHp = Math.max(1, Math.round(previousMaxHp + newCoreMaxHp - oldCoreMaxHp));
+      saved.adventurer.maxHp = migratedMaxHp;
+      saved.adventurer.hp = Math.round(migratedMaxHp * previousHpRatio);
+      saved.adventurer.attritionRecoveryDebt = Math.round(migratedMaxHp * previousDebtRatio);
+    }
+    saved.meta.hpSchemaVersion = HP_SCHEMA_VERSION;
     saved.adventurer.alive = saved.adventurer.alive !== false;
     saved.adventurer.floor = clamp(Number(saved.adventurer.floor || 1), 1, MAX_FLOOR);
     saved.adventurer.deepestFloor = clamp(Number(saved.adventurer.deepestFloor || saved.adventurer.floor || 1), 1, MAX_FLOOR);
@@ -3334,7 +3354,8 @@
           cell.classList.add("tile-wall");
         } else if (corpse) {
           cell.classList.add("tile-corpse");
-          cell.setAttribute("aria-label", `${corpse.name}の遺体`);
+          if (corpse.unique) cell.classList.add("tile-unique-corpse");
+          cell.setAttribute("aria-label", `${corpse.unique ? "ユニークモンスター・" : ""}${corpse.name}の遺体`);
           cell.innerHTML = '<span class="corpse-icon" aria-hidden="true"></span>';
         } else if (trapByPos.has(key)) {
           const trap = trapByPos.get(key);
@@ -3361,8 +3382,8 @@
     const disarmableTrap = findDisarmableTrap();
     const disarmProfile = disarmableTrap ? trapDisarmProfile(disarmableTrap) : null;
     els.wait.textContent = harvestable ? "剥" : disarmableTrap ? "解" : "探";
-    els.wait.setAttribute("aria-label", harvestable ? `${harvestable.name}を剥ぎ取る` : disarmableTrap ? `危険度${trapDangerLabel(disarmableTrap)}の${trapTypeLabel(disarmableTrap)}を解除、成功率${disarmProfile.percent}%` : "周囲の罠を探索する");
-    els.wait.title = disarmableTrap ? `解除成功率 ${disarmProfile.percent}%` : "";
+    els.wait.setAttribute("aria-label", harvestable ? `${harvestable.name}を剥ぎ取る（1世界ターン消費）` : disarmableTrap ? `危険度${trapDangerLabel(disarmableTrap)}の${trapTypeLabel(disarmableTrap)}を解除、成功率${disarmProfile.percent}%` : "周囲の罠を探索する");
+    els.wait.title = harvestable ? "1世界ターン消費" : disarmableTrap ? `解除成功率 ${disarmProfile.percent}%` : "";
     els.wait.classList.toggle("has-action", Boolean(harvestable || disarmableTrap));
     const magicJob = MAGIC_JOB_IDS.has(state.adventurer.jobId);
     const psychicJob = state.adventurer.jobId === "psychic";
@@ -3397,13 +3418,15 @@
     els.timeStop.textContent = state.dungeon.timeStopCooldown > 0 ? `時間停止 ${state.dungeon.timeStopCooldown}` : "時間停止";
     if (els.recoveryMedicine) {
       const count = getItemCount(RECOVERY_MEDICINE.id);
+      els.recoveryMedicine.classList.toggle("hidden", count <= 0);
+      els.recoveryMedicine.setAttribute("aria-hidden", count <= 0 ? "true" : "false");
       els.recoveryMedicine.textContent = `エリクサー ${count}`;
       els.recoveryMedicine.disabled = count <= 0 || state.adventurer.hp >= getPlayerStats().maxHp;
     }
   }
 
   function useRecoveryMedicine() {
-    if (!state.dungeon || !state.adventurer.inDungeon || getItemCount(RECOVERY_MEDICINE.id) <= 0) return;
+    if (state.arena || !state.dungeon || !state.adventurer.inDungeon || getItemCount(RECOVERY_MEDICINE.id) <= 0) return;
     const maxHp = getPlayerStats().maxHp;
     if (state.adventurer.hp >= maxHp) return;
     const before = state.adventurer.hp;
@@ -4809,6 +4832,13 @@
     pet.alive = false;
     pet.hp = 0;
     pet.flowerPet = false;
+    if (pet.unique) {
+      setEnemyCorpseState(pet, true);
+      recordUniqueDefeat(pet);
+      log(`${pet.name}は${reason}。花印は散ったが、ユニークモンスターの遺体が残った。`);
+      playSfx("corpse");
+      return;
+    }
     pet.destroyed = true;
     pet.harvested = true;
     pet.harvestsRemaining = 0;
@@ -5297,41 +5327,55 @@
     if (!targets.length) return false;
     log("裏技発動。リムルの『虚崩朧千変万華』がフロア全体を呑み込んだ！");
     let totalExperience = 0;
+    let corpseCount = 0;
     targets.forEach((enemy) => {
       totalExperience += experienceFromEnemy(enemy);
       enemy.hp = 0;
       enemy.alive = false;
       enemy.telegraphed = false;
-      enemy.lootMaterialId = resolveLoot(enemy);
-      initializeCorpseHarvests(enemy);
+      const leaveCorpse = shouldEnemyLeaveCorpse(enemy);
+      setEnemyCorpseState(enemy, leaveCorpse);
+      if (leaveCorpse) corpseCount += 1;
       markResearch(enemy.id, 4);
       if (enemy.unique) recordUniqueDefeat(enemy);
       handleFloorGuardianDefeat(enemy);
       if (enemy.thrillRoomGuardian) log("スリル部屋の守護者が倒れ、星の宝箱を縛る封印が消えた。");
     });
     gainExperience(totalExperience);
-    log(`虚崩朧千変万華により、フロアの魔物${targets.length}体が一掃された。遺体は剥ぎ取り可能だ。`);
+    log(`虚崩朧千変万華により、フロアの魔物${targets.length}体が一掃された。${corpseCount > 0 ? `うち${corpseCount}体の遺体が剥ぎ取り可能だ。` : "剥ぎ取れる遺体は残らなかった。"}`);
     playSfx("victory");
     saveGame();
     render();
     return true;
   }
 
-  function defeatEnemy(enemy, options = {}) {
-    if (!enemy?.alive) return;
-    const leaveCorpse = options.leaveCorpse !== false;
-    const experienceMultiplier = Math.max(0, Number(options.experienceMultiplier ?? 1));
-    enemy.alive = false;
+  function shouldEnemyLeaveCorpse(enemy, options = {}) {
+    if (enemy?.unique) return true;
+    if (options.leaveCorpse === false) return false;
+    return Math.random() < NORMAL_CORPSE_CHANCE;
+  }
+
+  function setEnemyCorpseState(enemy, leaveCorpse) {
     if (leaveCorpse) {
+      enemy.destroyed = false;
       enemy.lootMaterialId = resolveLoot(enemy);
       initializeCorpseHarvests(enemy);
-    } else {
-      enemy.lootMaterialId = null;
-      enemy.harvestsTotal = 0;
-      enemy.harvestsRemaining = 0;
-      enemy.harvested = true;
-      enemy.destroyed = true;
+      if (state.dungeon?.map?.[enemy.y]?.[enemy.x] === "wall") state.dungeon.map[enemy.y][enemy.x] = "floor";
+      return;
     }
+    enemy.lootMaterialId = null;
+    enemy.harvestsTotal = 0;
+    enemy.harvestsRemaining = 0;
+    enemy.harvested = true;
+    enemy.destroyed = true;
+  }
+
+  function defeatEnemy(enemy, options = {}) {
+    if (!enemy?.alive) return;
+    const leaveCorpse = shouldEnemyLeaveCorpse(enemy, options);
+    const experienceMultiplier = Math.max(0, Number(options.experienceMultiplier ?? 1));
+    enemy.alive = false;
+    setEnemyCorpseState(enemy, leaveCorpse);
     markResearch(enemy.id, 4);
     gainExperience(Math.max(1, Math.round(experienceFromEnemy(enemy) * experienceMultiplier)));
     uniqueSpeak(enemy, "defeat", { force: true });
@@ -5341,7 +5385,8 @@
     log(leaveCorpse
       ? `${enemy.name}を倒した。遺体から素材を剥ぎ取れそうだ。`
       : `${enemy.name}は跡形もなく消滅し、剥ぎ取れる遺体を残さなかった。`);
-    playSfx(enemy.unique ? "victory" : leaveCorpse ? "corpse" : "fire");
+    playSfx(enemy.unique ? "victory" : leaveCorpse ? "corpseDrop" : "fire");
+    if (enemy.unique) playSfx("corpseDropUnique");
     saveGame();
     render();
   }
@@ -5607,27 +5652,41 @@
   function findHarvestableCorpse() {
     if (!state.dungeon) return null;
     const player = state.dungeon.player;
-    return state.dungeon.enemies.find((enemy) => (
+    const corpses = state.dungeon.enemies.filter((enemy) => (
       !enemy.alive
       && corpseHarvestsRemaining(enemy) > 0
-      && chebyshevDistance(enemy, player) <= 1
-    )) || null;
+    ));
+    const overlapping = corpses.find((enemy) => enemy.x === player.x && enemy.y === player.y);
+    if (overlapping) return overlapping;
+    if (state.adventurer.jobId !== "handyman") return null;
+    return corpses.find((enemy) => chebyshevDistance(enemy, player) <= 1) || null;
   }
 
   function harvestCorpse() {
     const corpse = findHarvestableCorpse();
     if (!corpse) return false;
+    const remainingHarvests = corpseHarvestsRemaining(corpse);
+    const harvestsSpent = state.adventurer.jobId === "hunter" ? remainingHarvests : 1;
+    const bounty = state.meta.bounties[corpse.id];
+    const alreadyCarried = state.adventurer.bountyCorpses.some((entry) => entry.id === corpse.id);
+    const overlapsPlayer = corpse.x === state.dungeon.player.x && corpse.y === state.dungeon.player.y;
+    const wouldCollectBounty = corpse.unique && bounty?.intel && !alreadyCarried && harvestsSpent >= remainingHarvests;
+    if (wouldCollectBounty && !overlapsPlayer) {
+      log(`${corpse.name}の遺体を持ち帰るには、遺体と同じマスに立つ必要がある。`);
+      playSfx("bump");
+      saveGame();
+      render();
+      return true;
+    }
     const materialId = corpse.lootMaterialId || resolveLoot(corpse);
     const quantityPerHarvest = Math.max(1, Math.floor(Number(corpse.rewardProfile?.harvestQuantity || 1)));
-    const harvestsSpent = state.adventurer.jobId === "hunter" ? corpseHarvestsRemaining(corpse) : 1;
     const anomalyMultiplier = ["gold", "pandemonium"].includes(state.dungeon?.anomaly?.id) ? 2 : 1;
     const rarity = materials[materialId]?.rarity;
     const quantity = rarity ? harvestsSpent * anomalyMultiplier : quantityPerHarvest * harvestsSpent * anomalyMultiplier;
     corpse.harvestsRemaining = Math.max(0, corpseHarvestsRemaining(corpse) - harvestsSpent);
     corpse.harvested = corpse.harvestsRemaining <= 0;
     markResearch(corpse.id, corpse.harvested ? MAX_RESEARCH_LEVEL : 4);
-    const bounty = state.meta.bounties[corpse.id];
-    const bountyAvailable = corpse.harvested && corpse.unique && bounty?.intel && !state.adventurer.bountyCorpses.some((entry) => entry.id === corpse.id);
+    const bountyAvailable = corpse.harvested && corpse.unique && bounty?.intel && !alreadyCarried;
     if (state.adventurer.jobId === "scavenger") {
       feedScavenger(quantity, `${materials[materialId].name}を${quantity}個その場で食べた`);
       log(`${corpse.name}を剥ぎ取り、${materials[materialId].name}を${quantity}個その場で喰らった。${corpse.harvested ? "遺体から取れるものは尽きた。" : "まだ剥ぎ取れそうだ。"}`);
@@ -5640,7 +5699,7 @@
     if (rarity === "ultra") log(`奇跡のウルトラレア素材「${materials[materialId].name}」を発見した！`);
     else if (rarity === "super") log(`超レア素材「${materials[materialId].name}」を発見した！`);
     playSfx(rarity === "ultra" ? "victory" : rarity === "super" ? "researchUp" : "harvest");
-    advanceWorldIfDue();
+    advanceFullWorldTurn();
     if (!state.dungeon || !state.adventurer.inDungeon) return true;
     if (bountyAvailable) {
       const reward = nextBountyReward(monsters[corpse.id]);
@@ -5961,7 +6020,7 @@
       hpRegen: 0,
       canSeeInvisible: Boolean(race.canSeeInvisible || rimuruSlimeAwakened),
       materialBurden: 0,
-      maxHp: baseStats.maxHp + (adv.level - 1) * 3 + foodGrowth.maxHp + (powerPoleAwakened ? 300 : 0)
+      maxHp: CHARACTER.maxHpAtLevel(DATA, race, job, personality, adv.level) + foodGrowth.maxHp + (powerPoleAwakened ? 300 : 0)
         + (rimuruSlimeAwakened ? RIMURU_SLIME_HP_BONUS : 0),
       attack: Math.max(1, job.attack + grownStats.strength + (weapon ? Math.floor((weapon.attack || 0) / 2) : 0)),
       defense: Math.max(0, job.defense + Math.floor(grownStats.durability / 2) + Math.floor((adv.level - 1) / 10)),
@@ -6913,6 +6972,13 @@
     state.adventurer.hp = Math.min(recoveryCeiling, state.adventurer.hp + stats.hpRegen);
     const healed = state.adventurer.hp - before;
     if (healed > 0) log(`再生装備がHPを${healed}回復した。`);
+  }
+
+  function advanceFullWorldTurn() {
+    if (!state.dungeon || !state.adventurer.inDungeon) return false;
+    const actionsPerTurn = 1 + Math.floor(Math.max(0, getPlayerStats().acceleration) / 10);
+    state.dungeon.actionProgress = Math.max(0, actionsPerTurn - 1);
+    return advanceWorldIfDue();
   }
 
   function advanceWorldIfDue() {

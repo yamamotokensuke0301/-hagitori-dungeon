@@ -5,13 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#0b0f0d">
     <meta name="description" content="倒し方で素材が変わる、スマートフォン向けターン制ローグライクRPG。地下100階の踏破を目指すブラウザゲーム。">
-    <title>剥ぎ取りダンジョン</title>
-    <link rel="stylesheet" href="./css/style.css?v=20260713-release101">
+    <title>クロニクル ダンジョン</title>
+    <link rel="stylesheet" href="./css/style.css?v=20260713-chronicle-title">
   </head>
   <body>
     <section id="titleScreen" class="title-screen" role="dialog" aria-modal="true" aria-labelledby="titleHeading" aria-hidden="false">
       <p class="title-kicker">Turn-based Roguelike RPG</p>
-      <h1 id="titleHeading">剥ぎ取り<br>ダンジョン</h1>
+      <h1 id="titleHeading">クロニクル<br>ダンジョン</h1>
       <p id="versionText" class="title-version"></p>
       <button id="titleStartButton" type="button">ゲームを始める</button>
       <p class="title-hint">倒し方を選び、素材を剥ぎ取り、次の階層へ。</p>
@@ -20,7 +20,7 @@
       <p id="saveWarningText"></p>
       <button id="saveWarningReloadButton" class="hidden" type="button">最新データを再読み込み</button>
     </aside>
-    <main id="appShell" class="app-shell town-mode" aria-label="剥ぎ取りダンジョン" aria-hidden="true" inert>
+    <main id="appShell" class="app-shell town-mode" aria-label="クロニクル ダンジョン" aria-hidden="true" inert>
       <header class="status-bar">
         <div>
           <span>場所</span>
@@ -111,7 +111,7 @@
             <button id="teleportButton" type="button">テレポート</button>
             <button id="timeStopButton" class="hidden" type="button">時間停止</button>
             <button id="activeSpellButton" class="hidden" type="button">習得魔法</button>
-            <button id="recoveryMedicineButton" type="button">エリクサー 0</button>
+            <button id="recoveryMedicineButton" class="hidden" type="button" aria-hidden="true">エリクサー 0</button>
           </div>
           <div class="controls" aria-label="仮想8方向移動キー">
             <button type="button" data-move="up-left" aria-label="左上へ移動">↖</button>
