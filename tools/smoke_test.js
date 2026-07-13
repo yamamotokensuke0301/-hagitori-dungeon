@@ -50,7 +50,7 @@ const indexSource = read("index.html");
 const combatSimSource = read("tools/combat_balance_sim.js");
 const bgmTrackBlock = mainSource.match(/const BGM_TRACKS = \{([\s\S]*?)\n  \};/)?.[1] || "";
 const publicBgmPaths = [...bgmTrackBlock.matchAll(/"\.\/(assets\/audio\/[^"?]+\.m4a)\?/g)].map((match) => match[1]);
-assert(mainSource.includes('const APP_VERSION = "正式版 1.0.0"'), "public version was not updated to 正式版 1.0.0");
+assert(mainSource.includes('const APP_VERSION = "正式版 1.0.1"'), "public version was not updated to 正式版 1.0.1");
 assert(publicBgmPaths.length === 10 && !bgmTrackBlock.includes(".wav")
   && publicBgmPaths.every((path) => $.NSFileManager.defaultManager.fileExistsAtPath(path)),
 "public BGM paths are not ten existing compressed M4A files");
@@ -114,6 +114,27 @@ assert(indexSource.includes('id="saveWarning"') && indexSource.includes('id="sav
 assert(mainSource.includes('SAVE_REVISION_KEY = "hagitori-dungeon-save-revision-v1"')
   && (mainSource.match(/if \(saved\.dungeon && !isValidDungeonState/g) || []).length === 1,
 "save revision reads were not separated or dungeon validation still runs twice");
+assert(mainSource.includes("const resetRevision = Math.max(")
+  && mainSource.includes("writeStorage(SAVE_REVISION_KEY, String(resetRevision))")
+  && !mainSource.slice(mainSource.indexOf('askConfirm("セーブ初期化"'), mainSource.indexOf("initialSetupPending = true", mainSource.indexOf('askConfirm("セーブ初期化"'))).includes("removeStorage(SAVE_REVISION_KEY)"),
+"save reset does not preserve a monotonic cross-tab revision");
+assert(mainSource.includes("state.meta.saveRevision = Math.max(0, Math.floor(finiteNumber(readStorage(SAVE_REVISION_KEY), 0)))")
+  && mainSource.includes("typeof enemy.id !== \"string\" || !monsters[enemy.id]"),
+"corrupt-save recovery or unknown-monster migration is missing");
+assert(mainSource.includes("function placeDungeonStairsAt")
+  && mainSource.includes("placeDungeonStairsAt(state.dungeon, enemy)"),
+"guardian stairs are not carved onto a walkable tile");
+assert(mainSource.indexOf("const nextDungeon = generateFloor(destination)") < mainSource.indexOf("state.adventurer.inDungeon = true", mainSource.indexOf("function startDungeonAt"))
+  && mainSource.indexOf("const nextDungeon = generateFloor(nextFloor)") < mainSource.indexOf("state.adventurer.floor = nextFloor", mainSource.indexOf("function descend")),
+"dungeon generation still mutates progression before it succeeds");
+assert(dungeonGeneratorSource.includes("Math.min(rand(minimum, maximum), positions.length)")
+  && dungeonGeneratorSource.includes("if (!position) break"),
+"madness-room population can exceed its available positions");
+assert(mainSource.includes("function tickEnemyWorldStatuses")
+  && !/spell(?:Slowed|Bound|Stunned|Cursed|ArmorBreak|Dampened|Confused)Turns\s*-=/g.test(mainSource),
+"enemy spell statuses still expire per accelerated sub-action");
+assert((mainSource.match(/applyFloorAnomalyToEnemy\(/g) || []).length >= 7,
+"monsters created after floor generation do not inherit anomaly modifiers");
 assert(indexSource.includes('id="logHistoryList"') && indexSource.includes('aria-live="off"') && indexSource.includes('tabindex="0"'), "log-history focus target can announce the whole history live");
 assert(styleSource.includes(".log-history-card") && styleSource.includes(".log-history-list") && styleSource.includes("overscroll-behavior: contain"), "log-history dialog cannot scroll safely on short screens");
 assert(/\.setup-card\s*\{[^}]*max-height:\s*calc\(100dvh - 32px\);[^}]*overflow-y:\s*auto;/.test(styleSource)
@@ -198,7 +219,7 @@ assert(mainSource.includes("const MUSIC_VOLUME = 0.252") && mainSource.includes(
 assert(mainSource.includes("BGM_SCENE_VOLUME_MULTIPLIERS = Object.freeze({ town: 0.55 })")
   && mainSource.includes("track.targetVolume = MUSIC_VOLUME * (BGM_SCENE_VOLUME_MULTIPLIERS[scene] ?? 1)"),
 "town-only BGM volume reduction is missing");
-assert(indexSource.includes("./js/main.js?v=20260713-release100"), "1.0.0 release did not refresh the main script cache key");
+assert(indexSource.includes("./js/main.js?v=20260713-release101"), "1.0.1 release did not refresh the main script cache key");
 assert(styleSource.includes("min(32px, calc((100vw - 42px) / 13)") && styleSource.includes("min(29px, calc((100vw - 42px) / 13)"), "dungeon map tiles do not use the reclaimed phone viewport space");
 assert(mainSource.includes("const overlayOpen") && mainSource.includes("const dungeonMovement"), "global movement keys are not gated to active combat");
 assert(mainSource.includes("function trapModalFocus") && mainSource.includes("focusEscapesForward"), "modal keyboard focus can escape into the background");
@@ -1719,6 +1740,110 @@ assert(!elements.get("#saveWarning").classList.contains("hidden")
   && !elements.get("#saveWarningReloadButton").classList.contains("hidden"),
 "multi-tab save refusal was announced only to screen readers and offered no reload action");
 
+const resetRevisionSave = clone(corruptNumericSave);
+resetRevisionSave.meta.saveRevision = 9;
+let resetRevisionDisk = clone(resetRevisionSave);
+let resetRevisionValue = "9";
+let resetRemovedRevisionKey = false;
+localStorage.getItem = function (key) {
+  if (key === "hagitori-dungeon-save-v1") return resetRevisionDisk ? JSON.stringify(resetRevisionDisk) : null;
+  return key === "hagitori-dungeon-save-revision-v1" ? resetRevisionValue : null;
+};
+localStorage.setItem = function (key, value) {
+  if (key === "hagitori-dungeon-save-v1") resetRevisionDisk = JSON.parse(value);
+  if (key === "hagitori-dungeon-save-revision-v1") resetRevisionValue = String(value);
+};
+localStorage.removeItem = function (key) {
+  if (key === "hagitori-dungeon-save-v1") resetRevisionDisk = null;
+  if (key === "hagitori-dungeon-save-revision-v1") resetRemovedRevisionKey = true;
+};
+eval(read("js/main.js"));
+elements.get("#resetSaveButton").listeners.click();
+elements.get("#confirmOk").listeners.click();
+assert(!resetRemovedRevisionKey
+  && Number(resetRevisionValue) === Number(resetRevisionDisk.meta.saveRevision)
+  && Number(resetRevisionValue) > 9,
+`save reset lost monotonic revision protection: removed=${resetRemovedRevisionKey}, revision=${resetRevisionValue}`);
+
+let corruptRecoveryRevision = "12";
+let corruptRecoveryDisk = null;
+localStorage.getItem = function (key) {
+  if (key === "hagitori-dungeon-save-v1") return "{malformed";
+  return key === "hagitori-dungeon-save-revision-v1" ? corruptRecoveryRevision : null;
+};
+localStorage.setItem = function (key, value) {
+  if (key === "hagitori-dungeon-save-v1") corruptRecoveryDisk = JSON.parse(value);
+  if (key === "hagitori-dungeon-save-revision-v1") corruptRecoveryRevision = String(value);
+};
+localStorage.removeItem = function () {};
+eval(read("js/main.js"));
+elements.get("#restInnButton").listeners.click();
+assert(corruptRecoveryDisk
+  && Number(corruptRecoveryDisk.meta.saveRevision) > 12
+  && Number(corruptRecoveryRevision) === Number(corruptRecoveryDisk.meta.saveRevision),
+"a malformed save with a surviving revision key remained permanently unsaveable");
+
+const unknownEnemySave = clone(corpseSave);
+unknownEnemySave.adventurer.floor = 10;
+unknownEnemySave.dungeon.map[15][15] = "wall";
+unknownEnemySave.dungeon.stairs = [];
+unknownEnemySave.dungeon.enemies = [
+  null,
+  { id: "removed_monster_id", x: 15, y: 15, hp: 10, maxHp: 10, alive: true, floorGuardian: true },
+  clone(window.HD_DATA.monsters.find((monster) => monster.id === "cave_rat")),
+];
+Object.assign(unknownEnemySave.dungeon.enemies[2], {
+  x: 20, y: 20, maxHp: unknownEnemySave.dungeon.enemies[2].hp, alive: true, asleep: false, turns: 0,
+});
+let persistedUnknownEnemySave = null;
+localStorage.getItem = function (key) {
+  return key === "hagitori-dungeon-save-v1" ? JSON.stringify(unknownEnemySave) : null;
+};
+localStorage.setItem = function (key, value) {
+  if (key === "hagitori-dungeon-save-v1") persistedUnknownEnemySave = JSON.parse(value);
+};
+eval(read("js/main.js"));
+elements.get("#waitButton").listeners.click();
+assert(persistedUnknownEnemySave?.dungeon
+  && persistedUnknownEnemySave.dungeon.enemies.length === 1
+  && persistedUnknownEnemySave.dungeon.enemies[0].id === "cave_rat",
+"one malformed or removed monster discarded the entire active dungeon");
+assert(persistedUnknownEnemySave.dungeon.guardianDefeated
+  && persistedUnknownEnemySave.dungeon.stairs.length === 1
+  && persistedUnknownEnemySave.dungeon.map[persistedUnknownEnemySave.dungeon.stairs[0].y][persistedUnknownEnemySave.dungeon.stairs[0].x] === "floor",
+"removing an unknown saved guardian did not leave a walkable exit");
+
+const generationFailureSave = clone(corruptNumericSave);
+generationFailureSave.meta.clearedBossFloors = [];
+generationFailureSave.adventurer.floor = 1;
+generationFailureSave.adventurer.deepestFloor = 1;
+generationFailureSave.adventurer.inDungeon = false;
+generationFailureSave.dungeon = null;
+let persistedGenerationFailureSave = null;
+localStorage.getItem = function (key) {
+  return key === "hagitori-dungeon-save-v1" ? JSON.stringify(generationFailureSave) : null;
+};
+localStorage.setItem = function (key, value) {
+  if (key === "hagitori-dungeon-save-v1") persistedGenerationFailureSave = JSON.parse(value);
+};
+eval(read("js/main.js"));
+const originalDungeonGenerate = window.HD_DUNGEON.generate;
+let generationFailureThrown = false;
+window.HD_DUNGEON.generate = function () { throw new Error("forced generation failure"); };
+try {
+  viewTabs.find((tab) => tab.dataset.view === "dungeon").listeners.click();
+} catch (error) {
+  generationFailureThrown = true;
+}
+window.HD_DUNGEON.generate = originalDungeonGenerate;
+elements.get("#restInnButton").listeners.click();
+assert(generationFailureThrown
+  && persistedGenerationFailureSave.adventurer.floor === 1
+  && persistedGenerationFailureSave.adventurer.deepestFloor === 1
+  && !persistedGenerationFailureSave.adventurer.inDungeon
+  && persistedGenerationFailureSave.dungeon === null,
+"a failed floor generation committed partial dungeon progression before throwing");
+
 const legacyNoxSave = clone(corpseSave);
 legacyNoxSave.adventurer.floor = 100;
 legacyNoxSave.dungeon.enemies = [clone(window.HD_DATA.monsters.find((monster) => monster.id === "dungeon_lord_nox"))];
@@ -2795,6 +2920,120 @@ localStorage.getItem = function (key) {
 eval(read("js/main.js"));
 elements.get("#map").listeners.click({ target: { closest() { return { dataset: { enemyX: "11", enemyY: "10" } }; } } });
 assert(elements.get("#monsterInfoContent").innerHTML.includes("<span>特性</span><strong>壁抜け</strong>"), "wall phasing was not disclosed in live monster details at research level two");
+
+const wallGuardianSave = clone(chestSave);
+wallGuardianSave.adventurer.floor = 10;
+wallGuardianSave.adventurer.level = 100;
+wallGuardianSave.adventurer.experience = 0;
+wallGuardianSave.adventurer.hp = 999;
+wallGuardianSave.adventurer.maxHp = 999;
+wallGuardianSave.dungeon.map[10][11] = "wall";
+wallGuardianSave.dungeon.stairs = [];
+const wallGuardianEnemy = clone(window.HD_DATA.monsters.find((monster) => monster.id === "spirit_1"));
+Object.assign(wallGuardianEnemy, {
+  x: 11, y: 10, hp: 1, maxHp: wallGuardianEnemy.hp, alive: true, asleep: false,
+  turns: 0, telegraphed: false, floorGuardian: true, canPhaseWalls: true,
+});
+wallGuardianSave.dungeon.enemies = [wallGuardianEnemy];
+let persistedWallGuardianSave = null;
+localStorage.getItem = function (key) {
+  return key === "hagitori-dungeon-save-v1" ? JSON.stringify(wallGuardianSave) : null;
+};
+localStorage.setItem = function (key, value) {
+  if (key === "hagitori-dungeon-save-v1") persistedWallGuardianSave = JSON.parse(value);
+};
+Math.random = function () { return 0; };
+eval(read("js/main.js"));
+document.listeners.keydown({ key: "ArrowRight", preventDefault() {} });
+Math.random = originalRandom;
+assert(persistedWallGuardianSave.dungeon.enemies[0].alive === false
+  && !persistedWallGuardianSave.log[0].includes("壁に阻まれた"),
+"a non-ghost player could not melee a phasing enemy standing inside a wall");
+assert(persistedWallGuardianSave.dungeon.stairs.length === 1
+  && persistedWallGuardianSave.dungeon.stairs[0].x === 11
+  && persistedWallGuardianSave.dungeon.stairs[0].y === 10
+  && persistedWallGuardianSave.dungeon.map[10][11] === "floor",
+"defeating a wall-phasing guardian left its only staircase buried in a wall");
+
+const acceleratedStatusSave = clone(chestSave);
+acceleratedStatusSave.adventurer.hp = 999;
+acceleratedStatusSave.adventurer.maxHp = 999;
+const acceleratedStatusEnemy = clone(window.HD_DATA.monsters.find((monster) => monster.id === "cave_rat"));
+Object.assign(acceleratedStatusEnemy, {
+  x: 11, y: 10, hp: 999, maxHp: 999, attack: 1, acceleration: 48, alive: true, asleep: false,
+  turns: 0, telegraphed: false, spellSlowedTurns: 0, spellBoundTurns: 2, spellStunnedTurns: 2,
+  spellCursedTurns: 2, spellArmorBreakTurns: 2, spellArmorBreak: 5,
+  spellDampenedTurns: 2, spellConfusedTurns: 2,
+});
+acceleratedStatusSave.dungeon.enemies = [acceleratedStatusEnemy];
+let persistedAcceleratedStatusSave = null;
+localStorage.getItem = function (key) {
+  return key === "hagitori-dungeon-save-v1" ? JSON.stringify(acceleratedStatusSave) : null;
+};
+localStorage.setItem = function (key, value) {
+  if (key === "hagitori-dungeon-save-v1") persistedAcceleratedStatusSave = JSON.parse(value);
+};
+Math.random = function () { return 0.99; };
+eval(read("js/main.js"));
+elements.get("#waitButton").listeners.click();
+Math.random = originalRandom;
+const statusAfterOneWorld = persistedAcceleratedStatusSave.dungeon.enemies[0];
+assert(statusAfterOneWorld.turns === 5
+  && ["spellBoundTurns", "spellStunnedTurns", "spellCursedTurns", "spellArmorBreakTurns", "spellDampenedTurns", "spellConfusedTurns"]
+    .every((key) => statusAfterOneWorld[key] === 1)
+  && statusAfterOneWorld.spellArmorBreak === 5,
+"accelerated enemy spell statuses did not advance exactly once per world turn");
+
+const flowerPassageSave = clone(chestSave);
+const flowerPassageEnemy = clone(window.HD_DATA.monsters.find((monster) => monster.id === "cave_rat"));
+Object.assign(flowerPassageEnemy, {
+  x: 11, y: 10, hp: flowerPassageEnemy.hp, maxHp: flowerPassageEnemy.hp, alive: true, asleep: false,
+  turns: 0, flowerPet: true, flowerPetTurns: 13,
+});
+flowerPassageSave.dungeon.enemies = [flowerPassageEnemy];
+let persistedFlowerPassageSave = null;
+localStorage.getItem = function (key) {
+  return key === "hagitori-dungeon-save-v1" ? JSON.stringify(flowerPassageSave) : null;
+};
+localStorage.setItem = function (key, value) {
+  if (key === "hagitori-dungeon-save-v1") persistedFlowerPassageSave = JSON.parse(value);
+};
+eval(read("js/main.js"));
+document.listeners.keydown({ key: "ArrowRight", preventDefault() {} });
+assert(persistedFlowerPassageSave.dungeon.player.x === 11
+  && persistedFlowerPassageSave.dungeon.player.y === 10
+  && persistedFlowerPassageSave.dungeon.enemies[0].x === 10
+  && persistedFlowerPassageSave.dungeon.enemies[0].y === 10,
+"a friendly flower pet still blocked a one-tile passage instead of swapping places");
+
+const anomalySummonSave = clone(chestSave);
+anomalySummonSave.adventurer.hp = 999;
+anomalySummonSave.adventurer.maxHp = 999;
+anomalySummonSave.dungeon.anomaly = { id: "titan", name: "巨獣祭" };
+anomalySummonSave.dungeon.chests = [];
+anomalySummonSave.dungeon.enemies = [];
+anomalySummonSave.dungeon.enemySpawnCap = 24;
+anomalySummonSave.dungeon.traps = [{
+  x: 11, y: 10, type: "summon", danger: 1, discovered: false, disarmed: false, triggerCount: 0, disarmFailures: 0,
+}];
+let persistedAnomalySummonSave = null;
+localStorage.getItem = function (key) {
+  return key === "hagitori-dungeon-save-v1" ? JSON.stringify(anomalySummonSave) : null;
+};
+localStorage.setItem = function (key, value) {
+  if (key === "hagitori-dungeon-save-v1") persistedAnomalySummonSave = JSON.parse(value);
+};
+Math.random = function () { return 0.99; };
+eval(read("js/main.js"));
+document.listeners.keydown({ key: "ArrowRight", preventDefault() {} });
+Math.random = originalRandom;
+assert(persistedAnomalySummonSave.dungeon.enemies.length > 0
+  && persistedAnomalySummonSave.dungeon.enemies.every((enemy) => {
+    const canonical = window.HD_DATA.monsters.find((monster) => monster.id === enemy.id);
+    return enemy.maxHp === Math.round(canonical.hp * 1.75)
+      && enemy.attack === Math.round(canonical.attack * 1.3);
+  }),
+"monsters summoned after floor creation did not inherit the active anomaly modifiers");
 
 const goldenChestSave = clone(chestSave);
 goldenChestSave.dungeon.anomaly = { id: "gold", name: "黄金墓" };

@@ -1,6 +1,6 @@
 # Hagitori Dungeon
 
-Current version: **正式版 1.0.0**
+Current version: **正式版 1.0.1**
 
 『剥ぎ取りダンジョン』は、地下100階に対応したスマートフォン向けターン制ローグライクRPGです。
 

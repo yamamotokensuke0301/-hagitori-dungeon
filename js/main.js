@@ -4,7 +4,7 @@
   const SAVE_KEY = "hagitori-dungeon-save-v1";
   const SAVE_REVISION_KEY = "hagitori-dungeon-save-revision-v1";
   const AUDIO_KEY = "hagitori-audio-enabled-v4";
-  const APP_VERSION = "正式版 1.0.0";
+  const APP_VERSION = "正式版 1.0.1";
   const DEVELOPER_MODE_ENABLED = /^(localhost|127\.0\.0\.1|\[?::1\]?)$/.test(String(window.location?.hostname || ""))
     && /(?:^|[?&])debug=1(?:&|$)/.test(String(window.location?.search || ""));
   const MAP_SIZE_RANGE = Object.freeze([36, 60]);
@@ -527,7 +527,9 @@
     } catch (error) {
       console.warn?.(error);
     }
-    return { state: defaultSave(), initialSetupPending: true };
+    const state = defaultSave();
+    state.meta.saveRevision = Math.max(0, Math.floor(finiteNumber(readStorage(SAVE_REVISION_KEY), 0)));
+    return { state, initialSetupPending: true };
   }
 
   function legacyCorpseHarvestCount(enemy) {
@@ -573,6 +575,33 @@
     return Number.isInteger(x) && Number.isInteger(y)
       && y >= 0 && y < map.length && x >= 0 && x < map.length
       && (map[y]?.[x] === "floor" || (allowWall && map[y]?.[x] === "wall"));
+  }
+
+  function placeDungeonStairsAt(dungeon, position) {
+    if (!isPlainRecord(dungeon) || !isValidDungeonMap(dungeon.map)) return false;
+    const desired = {
+      x: Math.floor(finiteNumber(position?.x, -1)),
+      y: Math.floor(finiteNumber(position?.y, -1)),
+    };
+    const inside = desired.x > 0 && desired.y > 0
+      && desired.x < dungeon.map.length - 1 && desired.y < dungeon.map.length - 1;
+    if (inside && dungeon.map[desired.y]?.[desired.x] === "wall") {
+      dungeon.map[desired.y][desired.x] = "floor";
+    }
+    let target = dungeon.map[desired.y]?.[desired.x] === "floor" ? desired : null;
+    if (!target) {
+      const candidates = [];
+      for (let y = 1; y < dungeon.map.length - 1; y += 1) {
+        for (let x = 1; x < dungeon.map.length - 1; x += 1) {
+          if (dungeon.map[y][x] === "floor") candidates.push({ x, y });
+        }
+      }
+      candidates.sort((left, right) => chebyshevDistance(left, desired) - chebyshevDistance(right, desired));
+      target = candidates[0] || null;
+    }
+    if (!target) return false;
+    dungeon.stairs = [{ x: target.x, y: target.y }];
+    return true;
   }
 
   function isValidDungeonState(dungeon, options = {}) {
@@ -772,6 +801,18 @@
         saved.arena.awaitingNext = Boolean(saved.arena.awaitingNext);
       }
     }
+    let removedGuardianPosition = null;
+    if (isPlainRecord(saved.dungeon) && Array.isArray(saved.dungeon.enemies)) {
+      saved.dungeon.enemies = saved.dungeon.enemies.filter((enemy) => {
+        if (!isPlainRecord(enemy) || typeof enemy.id !== "string" || !monsters[enemy.id]) {
+          if (isPlainRecord(enemy) && enemy.floorGuardian && enemy.alive !== false) {
+            removedGuardianPosition = { x: enemy.x, y: enemy.y };
+          }
+          return false;
+        }
+        return true;
+      });
+    }
     const savedEnemies = [
       ...(Array.isArray(saved.dungeon?.enemies) ? saved.dungeon.enemies : []),
       ...(saved.arena?.enemy ? [saved.arena.enemy] : []),
@@ -824,7 +865,6 @@
     }
     if (saved.dungeon?.enemies) {
       const activeUniqueIds = new Set();
-      let removedGuardianPosition = null;
       saved.dungeon.enemies = saved.dungeon.enemies.filter((enemy) => {
         const canonicalMonster = monsters[enemy.id];
         if (enemy.alive === false || !canonicalMonster?.unique || canonicalMonster.arenaOnly) return true;
@@ -844,7 +884,7 @@
           ? saved.dungeon.stairs
           : isPlainRecord(saved.dungeon.stairs) ? [saved.dungeon.stairs] : [];
         if (saved.adventurer.floor < MAX_FLOOR && !existingStairs.length) {
-          saved.dungeon.stairs = [removedGuardianPosition];
+          placeDungeonStairsAt(saved.dungeon, removedGuardianPosition);
         }
       }
     }
@@ -1628,11 +1668,17 @@
     });
     document.querySelector("#resetSaveButton").addEventListener("click", () => {
       askConfirm("セーブ初期化", "調査記録と死亡記録を含む全データを削除します。", () => {
+        const resetRevision = Math.max(
+          lastKnownSaveRevision,
+          Math.max(0, Math.floor(finiteNumber(readStorage(SAVE_REVISION_KEY), 0))),
+          Math.max(0, Math.floor(finiteNumber(state.meta.saveRevision, 0))),
+        ) + 1;
         removeStorage(SAVE_KEY);
-        removeStorage(SAVE_REVISION_KEY);
         state = defaultSave();
-        lastKnownSaveRevision = 0;
+        state.meta.saveRevision = resetRevision;
+        lastKnownSaveRevision = resetRevision;
         saveConflictDetected = false;
+        writeStorage(SAVE_REVISION_KEY, String(resetRevision));
         hidePersistenceWarning();
         initialSetupPending = true;
         pendingSetup = { raceId: state.adventurer.raceId || "human", jobId: state.adventurer.jobId || "swordsman", personalityId: "gentle", name: "たかし", preserveMeta: false };
@@ -2742,6 +2788,29 @@
     return gridLineOfSight(start, target, (x, y) => arena.obstacles.some((item) => item.x === x && item.y === y));
   }
 
+  function currentEnemyWorldStatuses(enemy) {
+    return {
+      slowed: Number(enemy?.spellSlowedTurns || 0) > 0,
+      bound: Number(enemy?.spellBoundTurns || 0) > 0,
+      stunned: Number(enemy?.spellStunnedTurns || 0) > 0,
+    };
+  }
+
+  function tickEnemyWorldStatuses(enemy) {
+    [
+      "spellSlowedTurns",
+      "spellBoundTurns",
+      "spellStunnedTurns",
+      "spellCursedTurns",
+      "spellArmorBreakTurns",
+      "spellDampenedTurns",
+      "spellConfusedTurns",
+    ].forEach((key) => {
+      if (Number(enemy?.[key] || 0) > 0) enemy[key] = Math.max(0, Number(enemy[key]) - 1);
+    });
+    if (Number(enemy?.spellArmorBreakTurns || 0) <= 0) enemy.spellArmorBreak = 0;
+  }
+
   function advanceArenaWorld() {
     const arena = state.arena;
     const enemy = arena?.enemy;
@@ -2756,11 +2825,14 @@
       arena.healCooldown = Math.max(0, Number(arena.healCooldown || 0) - 1);
       tickSpellCooldowns(arena);
       tickJobSkillCooldowns(arena);
-      const arenaSpellSlowed = Number(enemy.spellSlowedTurns || 0) > 0;
-      if (arenaSpellSlowed) enemy.spellSlowedTurns -= 1;
-      const enemyActions = 1 + Math.floor(Math.max(0, arenaSpellSlowed ? 0 : enemy.acceleration || 0) / 12);
-      for (let index = 0; index < enemyActions && state.arena && state.adventurer.hp > 0 && enemy.alive && enemy.hp > 0; index += 1) {
-        if (arenaEnemyAct(arena, enemy) === "telegraphed") break;
+      const worldStatuses = currentEnemyWorldStatuses(enemy);
+      const enemyActions = 1 + Math.floor(Math.max(0, worldStatuses.slowed ? 0 : enemy.acceleration || 0) / 12);
+      try {
+        for (let index = 0; index < enemyActions && state.arena && state.adventurer.hp > 0 && enemy.alive && enemy.hp > 0; index += 1) {
+          if (arenaEnemyAct(arena, enemy, worldStatuses, index === 0) === "telegraphed") break;
+        }
+      } finally {
+        tickEnemyWorldStatuses(enemy);
       }
       if (state.arena && state.adventurer.hp > 0) {
         applyEnemyRapidRegeneration([enemy]);
@@ -2775,18 +2847,19 @@
     render();
   }
 
-  function arenaEnemyAct(arena, enemy) {
+  function arenaEnemyAct(arena, enemy, worldStatuses = currentEnemyWorldStatuses(enemy), announceStun = true) {
     const distance = arenaDistance(arena.player, enemy);
-    const action = beginEnemyAction(enemy, { canUseCombatTechniques: distance <= 1 });
+    const action = beginEnemyAction(enemy, {
+      canUseCombatTechniques: distance <= 1,
+      stunned: worldStatuses.stunned,
+      announceStun,
+    });
     if (action.consumed) return action.result;
     if (distance <= 1) {
       performEnemyBasicAttack(enemy);
       return;
     }
-    if (Number(enemy.spellBoundTurns || 0) > 0) {
-      enemy.spellBoundTurns -= 1;
-      return;
-    }
+    if (worldStatuses.bound) return;
     if (enemy.specialAttack === "ranged" && distance <= 6 && arenaLineOfSight(arena, enemy, arena.player) && Math.random() < 0.4) {
       enemyAttack(enemy, "遠隔攻撃", chooseEnemyAttackAttribute(enemy, enemy.attackAttribute), enemy.attack, { trials: 2 });
       return;
@@ -3662,14 +3735,19 @@
     const destinations = unlockedDungeonStarts();
     const requestedFloor = clamp(Math.floor(Number(floorNumber || 1)), 1, MAX_FLOOR);
     const destination = debugOverride || destinations.includes(requestedFloor) ? requestedFloor : 1;
+    const nextDungeon = generateFloor(destination);
     spellTargetArmed = false;
     jobSkillTargetArmed = false;
     state.adventurer.inDungeon = true;
     state.adventurer.floor = destination;
     state.adventurer.deepestFloor = Math.max(state.adventurer.deepestFloor || 1, destination);
     refreshShopInventoryForDepth();
-    state.dungeon = generateFloor(destination);
+    state.dungeon = nextDungeon;
     log(`B${destination}Fへ足を踏み入れた。${state.dungeon.layout ? `構造は「${state.dungeon.layout.name}」。` : ""}`);
+    if (state.dungeon.guardianId) {
+      const guardian = state.dungeon.enemies.find((enemy) => enemy.id === state.dungeon.guardianId);
+      if (guardian) log(`B${destination}Fを守るフロア守護者「${guardian.name}」が選定された。`);
+    }
     if (hasDungeonRousingEquipment()) log("艶装備の気配が迷宮を走り、ダンジョン中のモンスターが一斉に目を覚ました！");
     if (state.dungeon.anomaly) {
       log(`迷宮異変「${state.dungeon.anomaly.name}」発生。${state.dungeon.anomaly.description}`);
@@ -3808,7 +3886,6 @@
     dungeon.guardianId = guardian.id;
     dungeon.guardianDefeated = false;
     dungeon.stairs = [];
-    log(`B${floorNumber}Fを守るフロア守護者「${guardian.name}」が選定された。`);
   }
 
   function rollFloorTrapCount(floorNumber) {
@@ -3849,6 +3926,30 @@
     return clamp(depthBase + (roll < 0.12 ? 1 : roll > 0.9 ? -1 : 0), 1, 5);
   }
 
+  function applyFloorAnomalyToEnemy(enemy, anomaly, floor, index = 0) {
+    if (!enemy || !anomaly) return enemy;
+    if (["overdrive", "pandemonium"].includes(anomaly.id)) {
+      enemy.acceleration = Number(enemy.acceleration || 0) + 20;
+    }
+    if (["titan", "pandemonium"].includes(anomaly.id)) {
+      enemy.maxHp = Math.round(enemy.maxHp * (anomaly.id === "pandemonium" ? 1.45 : 1.75));
+      enemy.hp = enemy.maxHp;
+      enemy.attack = Math.round(enemy.attack * (anomaly.id === "pandemonium" ? 1.22 : 1.3));
+      enemy.defense = Math.round(enemy.defense * 1.2);
+    }
+    if (["rainbow", "pandemonium"].includes(anomaly.id)) {
+      const floorNumber = Number(floor?.floor || state.adventurer.floor || 1);
+      enemy.attackAttribute = DATA.attributes[(floorNumber + index * 3) % DATA.attributes.length];
+      if (enemy.dangerous) enemy.dangerous.attribute = DATA.attributes[(floorNumber + index * 3 + 7) % DATA.attributes.length];
+    }
+    if (anomaly.id === "brittle") {
+      enemy.attack = Math.max(1, Math.round(enemy.attack * 1.12));
+      enemy.defense = Math.max(0, Math.floor(enemy.defense * 0.68));
+    }
+    if (anomaly.id === "tailwind") enemy.acceleration = Number(enemy.acceleration || 0) + 5;
+    return enemy;
+  }
+
   function applyFloorAnomaly(dungeon, floor) {
     if (dungeon.madnessRoom || dungeon.treasureVault || dungeon.thrillRoom) return;
     if (floor.floor === MAX_FLOOR) return;
@@ -3870,30 +3971,16 @@
       ? { id: "pandemonium", name: "迷宮大暴走", description: "巨獣・狂速・虹属性・大群・財宝が同時発生する。生還できれば大収穫。", chaotic: true }
       : chaosRoll < 0.18 ? pick(chaoticAnomalies) : pick(steadyAnomalies);
     dungeon.anomaly = anomaly;
-    if (["overdrive", "pandemonium"].includes(anomaly.id)) {
-      dungeon.enemies.forEach((enemy) => { enemy.acceleration = Number(enemy.acceleration || 0) + 20; });
-    }
-    if (["titan", "pandemonium"].includes(anomaly.id)) {
-      dungeon.enemies.forEach((enemy) => {
-        enemy.maxHp = Math.round(enemy.maxHp * (anomaly.id === "pandemonium" ? 1.45 : 1.75));
-        enemy.hp = enemy.maxHp;
-        enemy.attack = Math.round(enemy.attack * (anomaly.id === "pandemonium" ? 1.22 : 1.3));
-        enemy.defense = Math.round(enemy.defense * 1.2);
-      });
-    }
-    if (["rainbow", "pandemonium"].includes(anomaly.id)) {
-      dungeon.enemies.forEach((enemy, index) => {
-        enemy.attackAttribute = DATA.attributes[(floor.floor + index * 3) % DATA.attributes.length];
-        if (enemy.dangerous) enemy.dangerous.attribute = DATA.attributes[(floor.floor + index * 3 + 7) % DATA.attributes.length];
-      });
-    }
+    dungeon.enemies.forEach((enemy, index) => applyFloorAnomalyToEnemy(enemy, anomaly, floor, index));
     if (["swarm", "pandemonium", "rich_vein"].includes(anomaly.id)) {
       const ratio = anomaly.id === "swarm" ? 0.4 : anomaly.id === "pandemonium" ? 0.28 : 0.12;
       const extra = Math.floor(floor.enemyCount * ratio);
       for (let index = 0; index < extra; index += 1) {
         const pos = window.HD_DUNGEON.spawnPosition(dungeon, 7);
         if (!pos) break;
-        dungeon.enemies.push(createEnemy(pick(floor.monsterPool), pos, false));
+        const enemy = createEnemy(pick(floor.monsterPool), pos, false);
+        applyFloorAnomalyToEnemy(enemy, anomaly, floor, dungeon.enemies.length);
+        dungeon.enemies.push(enemy);
       }
     }
     if (["gold", "pandemonium", "rich_vein"].includes(anomaly.id)) {
@@ -3904,18 +3991,10 @@
         dungeon.chests.push({ ...pos, opened: false });
       }
     }
-    if (anomaly.id === "brittle") {
-      dungeon.enemies.forEach((enemy) => {
-        enemy.attack = Math.max(1, Math.round(enemy.attack * 1.12));
-        enemy.defense = Math.max(0, Math.floor(enemy.defense * 0.68));
-      });
-    }
-    if (anomaly.id === "tailwind") dungeon.enemies.forEach((enemy) => { enemy.acceleration = Number(enemy.acceleration || 0) + 5; });
   }
 
   function createEnemy(monsterId, pos, forceUnique) {
     const data = monsters[monsterId];
-    markResearch(monsterId, 0);
     const enemy = {
       ...JSON.parse(JSON.stringify(data)),
       x: pos.x,
@@ -4033,6 +4112,12 @@
     const insideMap = ny >= 0 && ny < mapSize && nx >= 0 && nx < mapSize;
     const wall = insideMap && state.dungeon.map[ny][nx] === "wall";
     const outerBoundary = nx <= 0 || ny <= 0 || nx >= mapSize - 1 || ny >= mapSize - 1;
+    const enemy = state.dungeon.enemies.find((item) => item.alive && item.x === nx && item.y === ny);
+    if (enemy && !enemy.flowerPet) {
+      if (enemy.specialRoom) discoverSpecialRoomsAt(enemy.x, enemy.y);
+      bumpAttack(enemy);
+      return;
+    }
     if (wall && !outerBoundary && state.adventurer.jobId === "handyman") {
       state.dungeon.map[ny][nx] = "floor";
       state.dungeon.excavatedTiles = Array.isArray(state.dungeon.excavatedTiles) ? state.dungeon.excavatedTiles : [];
@@ -4059,16 +4144,15 @@
       playSfx("illusion");
     }
 
-    const enemy = state.dungeon.enemies.find((item) => item.alive && item.x === nx && item.y === ny);
-    if (enemy) {
-      if (enemy.specialRoom) discoverSpecialRoomsAt(enemy.x, enemy.y);
-      bumpAttack(enemy);
-      return;
+    if (enemy?.flowerPet) {
+      enemy.x = state.dungeon.player.x;
+      enemy.y = state.dungeon.player.y;
     }
 
     const chest = state.dungeon.chests.find((item) => !item.opened && item.x === nx && item.y === ny);
     state.dungeon.player.x = nx;
     state.dungeon.player.y = ny;
+    if (enemy?.flowerPet) log(`${enemy.name}は花印に従って脇へ退き、道を譲った。`);
     discoverSpecialRoomsAt(nx, ny);
     triggerTrapAt(nx, ny);
     if (!state.dungeon || !state.adventurer.inDungeon) return;
@@ -4317,6 +4401,7 @@
     ));
     if (!destination) return false;
     const enemy = createEnemy(monsterId, destination, true);
+    applyFloorAnomalyToEnemy(enemy, state.dungeon.anomaly, floorByNumber[state.adventurer.floor], state.dungeon.enemies.length);
     enemy.asleep = false;
     enemy.chestAmbush = true;
     state.dungeon.enemies.push(enemy);
@@ -4465,7 +4550,9 @@
     positions.slice(0, targetCount).forEach((position, index) => {
       if (state.dungeon.enemies.some((enemy) => enemy.alive && enemy.x === position.x && enemy.y === position.y)) return;
       const poolIndex = (danger * 3 + index + state.adventurer.floor) % floor.monsterPool.length;
-      state.dungeon.enemies.push(createEnemy(floor.monsterPool[poolIndex], position, false));
+      const enemy = createEnemy(floor.monsterPool[poolIndex], position, false);
+      applyFloorAnomalyToEnemy(enemy, state.dungeon.anomaly, floor, state.dungeon.enemies.length);
+      state.dungeon.enemies.push(enemy);
       summoned += 1;
     });
     return summoned;
@@ -4528,8 +4615,10 @@
       log("これより先に階層はない。太古からの闇キキルクルスの討伐が最終目標だ。");
       return;
     }
-    state.adventurer.floor += 1;
-    state.adventurer.deepestFloor = Math.max(state.adventurer.deepestFloor || 1, state.adventurer.floor);
+    const nextFloor = state.adventurer.floor + 1;
+    const nextDungeon = generateFloor(nextFloor);
+    state.adventurer.floor = nextFloor;
+    state.adventurer.deepestFloor = Math.max(state.adventurer.deepestFloor || 1, nextFloor);
     refreshShopInventoryForDepth();
     const hpBeforeDescent = state.adventurer.hp;
     state.adventurer.hp = Math.min(getPlayerStats().maxHp, state.adventurer.hp + 4);
@@ -4537,8 +4626,12 @@
       0,
       Number(state.adventurer.attritionRecoveryDebt || 0) - Math.max(0, state.adventurer.hp - hpBeforeDescent),
     );
-    state.dungeon = generateFloor(state.adventurer.floor);
+    state.dungeon = nextDungeon;
     log(`B${state.adventurer.floor}Fへ降りた。${state.dungeon.layout ? `構造は「${state.dungeon.layout.name}」。${state.dungeon.layout.description}` : ""}`);
+    if (state.dungeon.guardianId) {
+      const guardian = state.dungeon.enemies.find((enemy) => enemy.id === state.dungeon.guardianId);
+      if (guardian) log(`B${state.adventurer.floor}Fを守るフロア守護者「${guardian.name}」が選定された。`);
+    }
     if (hasDungeonRousingEquipment()) log("艶装備の気配が迷宮を走り、ダンジョン中のモンスターが一斉に目を覚ました！");
     if (state.dungeon.anomaly) {
       log(`迷宮異変「${state.dungeon.anomaly.name}」発生。${state.dungeon.anomaly.description}`);
@@ -4895,6 +4988,7 @@
     const summonedNames = [];
     for (let index = 0; index < summonCount; index += 1) {
       const minion = createEnemy(pick(candidates).id, positions[index], uniqueMemorySummon);
+      applyFloorAnomalyToEnemy(minion, state.dungeon.anomaly, floor, state.dungeon.enemies.length);
       minion.asleep = false;
       minion.summoned = true;
       minion.summonedBy = enemy.summonToken;
@@ -4931,15 +5025,11 @@
         return { consumed: true };
       }
     }
-    if (Number(enemy.spellCursedTurns || 0) > 0) enemy.spellCursedTurns -= 1;
-    if (Number(enemy.spellArmorBreakTurns || 0) > 0) {
-      enemy.spellArmorBreakTurns -= 1;
-      if (enemy.spellArmorBreakTurns <= 0) enemy.spellArmorBreak = 0;
-    }
-    if (Number(enemy.spellStunnedTurns || 0) > 0) {
-      enemy.spellStunnedTurns -= 1;
-      log(`${enemy.name}は雷術の痺れで行動できない。`);
-      playSfx("debuff");
+    if (options.stunned) {
+      if (options.announceStun !== false) {
+        log(`${enemy.name}は雷術の痺れで行動できない。`);
+        playSfx("debuff");
+      }
       return { consumed: true };
     }
     const summonDue = advanceSummonProgress(enemy);
@@ -5155,13 +5245,9 @@
 
   function enemyAttack(enemy, name, attribute, power, options = {}) {
     const dampened = Number(enemy.spellDampenedTurns || 0) > 0;
-    if (dampened) {
-      power *= 0.78;
-      enemy.spellDampenedTurns -= 1;
-    }
+    if (dampened) power *= 0.78;
     if (Number(enemy.spellConfusedTurns || 0) > 0) {
       options = { ...options, hitBonus: Number(options.hitBonus || 0) - 0.18 };
-      enemy.spellConfusedTurns -= 1;
     }
     const profile = getEnemyBattleProfile(enemy, attribute, power, options);
     const stats = getPlayerStats();
@@ -5201,7 +5287,7 @@
         playSfx("shopRefresh");
       }
     }
-    if (state.adventurer.floor < MAX_FLOOR) state.dungeon.stairs = [{ x: enemy.x, y: enemy.y }];
+    if (state.adventurer.floor < MAX_FLOOR) placeDungeonStairsAt(state.dungeon, enemy);
     log(state.adventurer.floor < MAX_FLOOR ? `${enemy.name}が守っていた場所に下り階段が現れた。` : "最深層の守護者を打ち破った。");
   }
 
@@ -6706,75 +6792,79 @@
     if (hasDungeonRousingEquipment()) activeEnemies.forEach((enemy) => { enemy.asleep = false; });
     activeEnemies.filter((enemy) => enemy.flowerPet).forEach(flowerPetAct);
     for (const enemy of activeEnemies) {
-      if (!state.dungeon || !state.adventurer.inDungeon || state.adventurer.hp <= 0) return;
-      if (!enemy.alive || enemy.flowerPet) continue;
-      if (isConcealedSpecialResident(enemy)) continue;
-      if (Number(enemy.specialRoomGraceTurns || 0) > 0) {
-        enemy.specialRoomGraceTurns = Math.max(0, Number(enemy.specialRoomGraceTurns || 0) - 1);
-        continue;
-      }
-      if (enemy.asleep) {
-        const sleepDistance = chebyshevDistance(enemy, state.dungeon.player);
-        const wakeChance = sleepDistance <= 1 ? 0.28 : 0.01;
-        if (Math.random() >= wakeChance) continue;
-        enemy.asleep = false;
-        if (sleepDistance <= 6) log(`${enemy.name}が物音に気づいて目を覚ました。`);
-      }
-      const spellSlowed = Number(enemy.spellSlowedTurns || 0) > 0;
-      if (spellSlowed) enemy.spellSlowedTurns -= 1;
-      const effectiveAcceleration = spellSlowed ? 0 : Number(enemy.acceleration || 0);
-      const actions = 1 + Math.floor(Math.max(0, effectiveAcceleration) / 12);
-      for (let action = 0; action < actions; action += 1) {
-        if (!state.dungeon || !state.adventurer.inDungeon || !enemy.alive || state.adventurer.hp <= 0) break;
-        const dx = Math.abs(enemy.x - state.dungeon.player.x);
-        const dy = Math.abs(enemy.y - state.dungeon.player.y);
-        const dist = Math.max(dx, dy);
-        const actionState = beginEnemyAction(enemy, { canUseCombatTechniques: dist <= 1 });
-        if (actionState.consumed) {
-          if (actionState.result === "telegraphed") break;
+      const worldStatuses = currentEnemyWorldStatuses(enemy);
+      try {
+        if (!state.dungeon || !state.adventurer.inDungeon || state.adventurer.hp <= 0) return;
+        if (!enemy.alive || enemy.flowerPet) continue;
+        if (isConcealedSpecialResident(enemy)) continue;
+        if (Number(enemy.specialRoomGraceTurns || 0) > 0) {
+          enemy.specialRoomGraceTurns = Math.max(0, Number(enemy.specialRoomGraceTurns || 0) - 1);
           continue;
         }
-        if (dist <= 1) {
-          performEnemyBasicAttack(enemy);
-          continue;
+        if (enemy.asleep) {
+          const sleepDistance = chebyshevDistance(enemy, state.dungeon.player);
+          const wakeChance = sleepDistance <= 1 ? 0.28 : 0.01;
+          if (Math.random() >= wakeChance) continue;
+          enemy.asleep = false;
+          if (sleepDistance <= 6) log(`${enemy.name}が物音に気づいて目を覚ました。`);
         }
-        if (Number(enemy.spellBoundTurns || 0) > 0) {
-          enemy.spellBoundTurns -= 1;
-          continue;
-        }
-        if (enemy.specialAttack === "ranged" && dist <= 6
-          && hasLineOfSight(enemy.x, enemy.y, state.dungeon.player.x, state.dungeon.player.y)
-          && Math.random() < 0.35) {
-          enemyAttack(enemy, "遠隔攻撃", enemy.attackAttribute, enemy.attack, { trials: 2 });
-          continue;
-        }
-        const alerted = Number(enemy.alertedTurns || 0) > 0;
-        if (alerted) enemy.alertedTurns -= 1;
-        const fleeing = Number(enemy.fleeingTurns || 0) > 0;
-        if (fleeing) enemy.fleeingTurns -= 1;
-        const pursuitChance = fleeing ? 1 : alerted ? 0.98 : dist <= 10 ? 0.92 : 0.18;
-        if (Math.random() > pursuitChance) continue;
-        const options = [];
-        for (let stepY = -1; stepY <= 1; stepY += 1) {
-          for (let stepX = -1; stepX <= 1; stepX += 1) {
-            if (!stepX && !stepY) continue;
-            const pos = { x: enemy.x + stepX, y: enemy.y + stepY };
-            if (canEnemyMove(enemy, pos.x, pos.y)) options.push(pos);
+        const effectiveAcceleration = worldStatuses.slowed ? 0 : Number(enemy.acceleration || 0);
+        const actions = 1 + Math.floor(Math.max(0, effectiveAcceleration) / 12);
+        for (let action = 0; action < actions; action += 1) {
+          if (!state.dungeon || !state.adventurer.inDungeon || !enemy.alive || state.adventurer.hp <= 0) break;
+          const dx = Math.abs(enemy.x - state.dungeon.player.x);
+          const dy = Math.abs(enemy.y - state.dungeon.player.y);
+          const dist = Math.max(dx, dy);
+          const actionState = beginEnemyAction(enemy, {
+            canUseCombatTechniques: dist <= 1,
+            stunned: worldStatuses.stunned,
+            announceStun: action === 0,
+          });
+          if (actionState.consumed) {
+            if (actionState.result === "telegraphed") break;
+            continue;
+          }
+          if (dist <= 1) {
+            performEnemyBasicAttack(enemy);
+            continue;
+          }
+          if (worldStatuses.bound) continue;
+          if (enemy.specialAttack === "ranged" && dist <= 6
+            && hasLineOfSight(enemy.x, enemy.y, state.dungeon.player.x, state.dungeon.player.y)
+            && Math.random() < 0.35) {
+            enemyAttack(enemy, "遠隔攻撃", enemy.attackAttribute, enemy.attack, { trials: 2 });
+            continue;
+          }
+          const alerted = Number(enemy.alertedTurns || 0) > 0;
+          if (alerted) enemy.alertedTurns -= 1;
+          const fleeing = Number(enemy.fleeingTurns || 0) > 0;
+          if (fleeing) enemy.fleeingTurns -= 1;
+          const pursuitChance = fleeing ? 1 : alerted ? 0.98 : dist <= 10 ? 0.92 : 0.18;
+          if (Math.random() > pursuitChance) continue;
+          const options = [];
+          for (let stepY = -1; stepY <= 1; stepY += 1) {
+            for (let stepX = -1; stepX <= 1; stepX += 1) {
+              if (!stepX && !stepY) continue;
+              const pos = { x: enemy.x + stepX, y: enemy.y + stepY };
+              if (canEnemyMove(enemy, pos.x, pos.y)) options.push(pos);
+            }
+          }
+          options.sort((a, b) => {
+            const distanceA = chebyshevDistance(a, state.dungeon.player);
+            const distanceB = chebyshevDistance(b, state.dungeon.player);
+            return fleeing ? distanceB - distanceA : distanceA - distanceB;
+          });
+          if (options.length) {
+            const targetDistance = chebyshevDistance(options[0], state.dungeon.player);
+            const bestOptions = options.filter((pos) => chebyshevDistance(pos, state.dungeon.player) === targetDistance);
+            const next = pick(bestOptions);
+            enemy.x = next.x;
+            enemy.y = next.y;
+            if (alerted || enemy.dialogueState?.stages?.encounter) uniqueSpeak(enemy, "move", { chance: 0.46 });
           }
         }
-        options.sort((a, b) => {
-          const distanceA = chebyshevDistance(a, state.dungeon.player);
-          const distanceB = chebyshevDistance(b, state.dungeon.player);
-          return fleeing ? distanceB - distanceA : distanceA - distanceB;
-        });
-        if (options.length) {
-          const targetDistance = chebyshevDistance(options[0], state.dungeon.player);
-          const bestOptions = options.filter((pos) => chebyshevDistance(pos, state.dungeon.player) === targetDistance);
-          const next = pick(bestOptions);
-          enemy.x = next.x;
-          enemy.y = next.y;
-          if (alerted || enemy.dialogueState?.stages?.encounter) uniqueSpeak(enemy, "move", { chance: 0.46 });
-        }
+      } finally {
+        tickEnemyWorldStatuses(enemy);
       }
     }
     applyEnemyRapidRegeneration(activeEnemies);
@@ -6882,6 +6972,7 @@
       state.dungeon.uniqueSpawned = true;
     }
     const enemy = createEnemy(monsterId, pos, unique);
+    applyFloorAnomalyToEnemy(enemy, state.dungeon.anomaly, floor, state.dungeon.enemies.length);
     state.dungeon.enemies.push(enemy);
     log(unique ? `遠くで異様な気配が目覚めた。ユニークモンスターが出現した。` : "遠くの暗がりから新たな魔物の気配が現れた。");
   }

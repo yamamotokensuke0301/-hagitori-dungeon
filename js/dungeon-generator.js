@@ -217,11 +217,13 @@
     let summonerCount = 0;
     let timeStopCount = 0;
     while (pool.length && enemies.length < count) {
+      const position = positions[enemies.length];
+      if (!position) break;
       const id = pick(pool);
       for (let index = pool.length - 1; index >= 0; index -= 1) {
         if (pool[index] === id) pool.splice(index, 1);
       }
-      const enemy = createEnemy(id, positions[enemies.length], true);
+      const enemy = createEnemy(id, position, true);
       const summoner = Boolean(enemy.summon);
       const timeStopper = enemy.specialAttack === "time_stop";
       if ((summoner && summonerCount >= 1) || (timeStopper && timeStopCount >= 1)) continue;
@@ -240,7 +242,7 @@
     if (!rooms.length || new Set(availableTickets).size < minimum) return false;
     const room = pick(rooms);
     const positions = shuffled(roomEventTiles(dungeon, room));
-    const desiredCount = rand(minimum, maximum);
+    const desiredCount = Math.min(rand(minimum, maximum), positions.length);
     const enemies = weightedDistinctEnemies(availableTickets, desiredCount, createEnemy, positions);
     if (enemies.length < minimum) return false;
     enemies.forEach((enemy) => {
