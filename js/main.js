@@ -15,8 +15,8 @@
   const RESEARCH_SCHEMA_VERSION = 2;
   const ECONOMY_SCHEMA_VERSION = 2;
   const PROGRESSION_SCHEMA_VERSION = 2;
-  const MUSIC_VOLUME = 0.56;
-  const SFX_VOLUME = 1.05;
+  const MUSIC_VOLUME = 0.42;
+  const SFX_VOLUME = 1.30;
   const MAGIC_JOB_IDS = new Set(["mage", "spellblade"]);
   const PROTECTED_EQUIPMENT_IDS = new Set(["rusty_knife", "cloth"]);
   const RESEARCH_PAGE_SIZE = 30;
