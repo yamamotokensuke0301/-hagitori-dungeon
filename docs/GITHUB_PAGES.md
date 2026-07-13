@@ -1,6 +1,6 @@
 # GitHub Pages 公開手順
 
-このプロジェクトの公開入口はリポジトリ直下の `index.html` です。`src/` は旧プロトタイプ、`publish/` は過去の不完全な配布スナップショットなので使用しません。
+このプロジェクトの公開入口はリポジトリ直下の `index.html` です。`src/` は旧プロトタイプの保存用なので使用しません。
 
 ## 1. 公開前確認
 
@@ -50,7 +50,7 @@ https://<OWNER>.github.io/hagitori-dungeon/
 - 実行時に参照するBGM 10本
 - `assets/images/down-stairs.png`
 
-`main` ブランチへpushするたび、構文検査後に自動公開されます。`src/`、`publish/`、`docs/`、`tools/`、未使用の制作素材は公開サイトへ含めません。
+`main` ブランチへpushするたび、構文検査後に自動公開されます。`src/`、`docs/`、`tools/`、未使用の制作素材は公開サイトへ含めません。
 
 ## 公開後確認
 

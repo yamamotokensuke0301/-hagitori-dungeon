@@ -2437,14 +2437,6 @@ strong {
   text-shadow: 0 4px 0 #392612, 0 10px 28px #000;
 }
 
-.title-emblem {
-  color: #9b3328;
-  font-family: Georgia, serif;
-  font-size: 64px;
-  line-height: 0.8;
-  text-shadow: 0 0 20px rgba(190, 45, 30, 0.4);
-}
-
 .title-kicker,
 .title-version,
 .title-hint {

@@ -1,8 +1,8 @@
 # Hagitori Dungeon
 
-Current version: **Prototype 3.7.0**
+Current version: **正式版 1.0.0**
 
-『剥ぎ取りダンジョン』は、地下100階対応を前提にしたスマートフォン向けターン制ローグライクRPGのブラウザプロトタイプです。
+『剥ぎ取りダンジョン』は、地下100階に対応したスマートフォン向けターン制ローグライクRPGです。
 
 現在の実装は地下1階から100階まで対応しています。戦闘、回数制の剥ぎ取り、素材流通、宝箱探索、魔法習得、複合属性耐性、加速度、装備購入を組み合わせて攻略します。
 
@@ -26,7 +26,7 @@ http://127.0.0.1:5174/index.html
 
 `main` ブランチへのpushで、構文検査後に現行ルートだけをGitHub Pagesへ自動公開するワークフローを用意しています。GitHub側では `Settings` → `Pages` → `Source: GitHub Actions` を選択してください。
 
-初回公開の詳しい手順と公開後チェックは [docs/GITHUB_PAGES.md](docs/GITHUB_PAGES.md) を参照してください。`src/` と `publish/` は旧版なので公開元に使用しません。
+初回公開の詳しい手順と公開後チェックは [docs/GITHUB_PAGES.md](docs/GITHUB_PAGES.md) を参照してください。`src/` は旧プロトタイプの保存用で、公開元には使用しません。
 
 ## 操作
 
@@ -127,17 +127,22 @@ index.html
 css/
   style.css
 js/
+  artifact-generator.js
   audio-effects.js
   bounty-system.js
   character-system.js
   dungeon-generator.js
   economy.js
+  inn-content.js
+  surreal-text.js
   threat-system.js
   unique-dialogue.js
   utils.js
   main.js
 data/
   jobs.js
+  races.js
+  personalities.js
   monsters.js
   materials.js
   equipment.js
@@ -148,11 +153,17 @@ docs/
   GAME_DESIGN.md
   DATA_SCHEMA.md
   TODO.md
+  ほか監査・引き継ぎ記録
 tools/
   generate_bgm.py
   smoke_test.js
+  combat_balance_sim.js
+  equipment_audit.js
+  bgm_lab.html
+  sfx_lab.html
+  start_server.command
 src/
-  旧小型プロトタイプ
+  旧小型プロトタイプ（保存用・公開対象外）
 assets/
   画像、音声などの素材置き場
 ```
@@ -172,4 +183,6 @@ assets/
 
 ## ライセンス
 
-現在、ソースコードとアセットの再利用ライセンスは未設定です。第三者による改変・再配布を許可する場合は、公開方針を決めてから `LICENSE` を追加してください。
+© 2026 yamamotokensuke0301. All rights reserved.
+
+ソースコード・データ・音楽・画像を含む本リポジトリの内容は、閲覧とプレイを目的として公開しています。作者の許諾なく改変物の再配布・素材の転用を行うことはできません（詳細は [LICENSE](LICENSE) を参照）。オープンソースライセンスの付与は今後の検討事項です。

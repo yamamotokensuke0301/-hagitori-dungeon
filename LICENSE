@@ -1,0 +1,26 @@
+剥ぎ取りダンジョン (Hagitori Dungeon)
+Copyright (c) 2026 yamamotokensuke0301. All rights reserved.
+
+本リポジトリに含まれるソースコード、ゲームデータ、音楽、効果音、画像、
+文章その他一切のコンテンツの著作権は作者に帰属します。
+
+許可される行為:
+- 本リポジトリの閲覧、およびGitHub Pages等で公開されるゲームのプレイ
+- 学習目的でのソースコードの参照
+
+禁止される行為（作者の事前の許諾がない限り）:
+- 改変の有無を問わない再配布・再公開
+- ソースコード・データ・音源・画像等の他プロジェクトへの転用
+- 商用利用
+
+オープンソースライセンスの適用は今後検討します。利用許諾の相談は
+リポジトリのIssueにてお願いします。
+
+---
+
+All content in this repository (source code, game data, music, sound
+effects, images, and text) is copyrighted by the author. Viewing the
+repository and playing the published game are permitted. Redistribution,
+reuse of assets in other projects, and commercial use are prohibited
+without prior permission. An open-source license may be considered in
+the future.

@@ -4,7 +4,7 @@
   const SAVE_KEY = "hagitori-dungeon-save-v1";
   const SAVE_REVISION_KEY = "hagitori-dungeon-save-revision-v1";
   const AUDIO_KEY = "hagitori-audio-enabled-v4";
-  const APP_VERSION = "Prototype 3.7.0";
+  const APP_VERSION = "正式版 1.0.0";
   const DEVELOPER_MODE_ENABLED = /^(localhost|127\.0\.0\.1|\[?::1\]?)$/.test(String(window.location?.hostname || ""))
     && /(?:^|[?&])debug=1(?:&|$)/.test(String(window.location?.search || ""));
   const MAP_SIZE_RANGE = Object.freeze([36, 60]);

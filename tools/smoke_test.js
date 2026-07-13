@@ -50,7 +50,7 @@ const indexSource = read("index.html");
 const combatSimSource = read("tools/combat_balance_sim.js");
 const bgmTrackBlock = mainSource.match(/const BGM_TRACKS = \{([\s\S]*?)\n  \};/)?.[1] || "";
 const publicBgmPaths = [...bgmTrackBlock.matchAll(/"\.\/(assets\/audio\/[^"?]+\.m4a)\?/g)].map((match) => match[1]);
-assert(mainSource.includes('const APP_VERSION = "Prototype 3.7.0"'), "public version was not updated to Prototype 3.7.0");
+assert(mainSource.includes('const APP_VERSION = "正式版 1.0.0"'), "public version was not updated to 正式版 1.0.0");
 assert(publicBgmPaths.length === 10 && !bgmTrackBlock.includes(".wav")
   && publicBgmPaths.every((path) => $.NSFileManager.defaultManager.fileExistsAtPath(path)),
 "public BGM paths are not ten existing compressed M4A files");
@@ -198,7 +198,7 @@ assert(mainSource.includes("const MUSIC_VOLUME = 0.252") && mainSource.includes(
 assert(mainSource.includes("BGM_SCENE_VOLUME_MULTIPLIERS = Object.freeze({ town: 0.55 })")
   && mainSource.includes("track.targetVolume = MUSIC_VOLUME * (BGM_SCENE_VOLUME_MULTIPLIERS[scene] ?? 1)"),
 "town-only BGM volume reduction is missing");
-assert(indexSource.includes("./js/main.js?v=20260713-audiomix4"), "audio-mix release did not refresh the main script cache key");
+assert(indexSource.includes("./js/main.js?v=20260713-release100"), "1.0.0 release did not refresh the main script cache key");
 assert(styleSource.includes("min(32px, calc((100vw - 42px) / 13)") && styleSource.includes("min(29px, calc((100vw - 42px) / 13)"), "dungeon map tiles do not use the reclaimed phone viewport space");
 assert(mainSource.includes("const overlayOpen") && mainSource.includes("const dungeonMovement"), "global movement keys are not gated to active combat");
 assert(mainSource.includes("function trapModalFocus") && mainSource.includes("focusEscapesForward"), "modal keyboard focus can escape into the background");
