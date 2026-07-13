@@ -16,6 +16,7 @@
   const ECONOMY_SCHEMA_VERSION = 2;
   const PROGRESSION_SCHEMA_VERSION = 2;
   const MUSIC_VOLUME = 0.252;
+  const BGM_SCENE_VOLUME_MULTIPLIERS = Object.freeze({ town: 0.55 });
   const SFX_VOLUME = 1.69;
   const MAGIC_JOB_IDS = new Set(["mage", "spellblade"]);
   const PROTECTED_EQUIPMENT_IDS = new Set(["rusty_knife", "cloth"]);
@@ -6930,7 +6931,8 @@
     Object.entries(tracks).forEach(([scene, track]) => {
       track.loop = true;
       track.preload = scene === "town" ? "auto" : "metadata";
-      track.volume = MUSIC_VOLUME;
+      track.targetVolume = MUSIC_VOLUME * (BGM_SCENE_VOLUME_MULTIPLIERS[scene] ?? 1);
+      track.volume = track.targetVolume;
     });
     audio = {
       context: null,
@@ -7048,10 +7050,12 @@
     if (!track || (audio.currentTrack === track && !track.paused)) return;
     if (audio.musicFadeTimer) window.clearInterval(audio.musicFadeTimer);
     const previous = audio.currentTrack;
+    const targetVolume = Number(track.targetVolume ?? MUSIC_VOLUME);
+    const previousVolume = Number(previous?.targetVolume ?? MUSIC_VOLUME);
     audio.scene = scene;
     audio.currentTrack = track;
     track.currentTime = 0;
-    track.volume = previous ? 0.001 : MUSIC_VOLUME;
+    track.volume = previous && previous !== track ? 0.001 : targetVolume;
     const playback = track.play();
     if (playback && typeof playback.catch === "function") {
       playback.catch(() => {
@@ -7065,14 +7069,14 @@
     audio.musicFadeTimer = window.setInterval(() => {
       step += 1;
       const ratio = Math.min(1, step / steps);
-      track.volume = 0.001 + (MUSIC_VOLUME - 0.001) * ratio;
-      previous.volume = Math.max(0.001, MUSIC_VOLUME * (1 - ratio));
+      track.volume = 0.001 + (targetVolume - 0.001) * ratio;
+      previous.volume = Math.max(0.001, previousVolume * (1 - ratio));
       if (ratio < 1) return;
       window.clearInterval(audio.musicFadeTimer);
       audio.musicFadeTimer = null;
       previous.pause();
       previous.currentTime = 0;
-      previous.volume = MUSIC_VOLUME;
+      previous.volume = previousVolume;
     }, 45);
   }
 
@@ -7083,7 +7087,7 @@
       Object.values(audio.tracks || {}).forEach((track) => {
         track.pause();
         track.currentTime = 0;
-        track.volume = MUSIC_VOLUME;
+        track.volume = Number(track.targetVolume ?? MUSIC_VOLUME);
       });
       audio.currentTrack = null;
       audio.scene = "silent";

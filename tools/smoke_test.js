@@ -195,7 +195,10 @@ assert(/\.app-shell\.dungeon-mode \.status-bar\s*\{[^}]*display:\s*none/.test(st
 assert(mainSource.includes('writeStorage(AUDIO_KEY, "0")') && mainSource.includes('currentView === "arena"') && styleSource.includes('.app-shell:not(.town-mode) .audio-button') && indexSource.includes("街で音楽を切り替える"), "music switching is not restricted to town screens");
 assert(mainSource.includes("const MUSIC_VOLUME = 0.252") && mainSource.includes("const SFX_VOLUME = 1.69")
   && mainSource.includes("audio.sfx.gain.value = SFX_VOLUME"), "global BGM/SFX mix adjustment is missing");
-assert(indexSource.includes("./js/main.js?v=20260713-audiomix3"), "audio-mix release did not refresh the main script cache key");
+assert(mainSource.includes("BGM_SCENE_VOLUME_MULTIPLIERS = Object.freeze({ town: 0.55 })")
+  && mainSource.includes("track.targetVolume = MUSIC_VOLUME * (BGM_SCENE_VOLUME_MULTIPLIERS[scene] ?? 1)"),
+"town-only BGM volume reduction is missing");
+assert(indexSource.includes("./js/main.js?v=20260713-audiomix4"), "audio-mix release did not refresh the main script cache key");
 assert(styleSource.includes("min(32px, calc((100vw - 42px) / 13)") && styleSource.includes("min(29px, calc((100vw - 42px) / 13)"), "dungeon map tiles do not use the reclaimed phone viewport space");
 assert(mainSource.includes("const overlayOpen") && mainSource.includes("const dungeonMovement"), "global movement keys are not gated to active combat");
 assert(mainSource.includes("function trapModalFocus") && mainSource.includes("focusEscapesForward"), "modal keyboard focus can escape into the background");
