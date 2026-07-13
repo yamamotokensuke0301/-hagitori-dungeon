@@ -194,6 +194,7 @@ assert(styleSource.includes("clamp(105px, 15svh, 132px)") && styleSource.include
 assert(/\.app-shell\.dungeon-mode \.status-bar\s*\{[^}]*display:\s*none/.test(styleSource), "dungeon still shows the top place/job/race status bar");
 assert(mainSource.includes('writeStorage(AUDIO_KEY, "0")') && mainSource.includes('currentView === "arena"') && styleSource.includes('.app-shell:not(.town-mode) .audio-button') && indexSource.includes("街で音楽を切り替える"), "music switching is not restricted to town screens");
 assert(mainSource.includes("const SFX_VOLUME = 1.05") && mainSource.includes("audio.sfx.gain.value = SFX_VOLUME"), "global sound-effect volume boost is missing");
+assert(indexSource.includes("./js/main.js?v=20260713-sfxvolume1"), "sound-effect volume release did not refresh the main script cache key");
 assert(styleSource.includes("min(32px, calc((100vw - 42px) / 13)") && styleSource.includes("min(29px, calc((100vw - 42px) / 13)"), "dungeon map tiles do not use the reclaimed phone viewport space");
 assert(mainSource.includes("const overlayOpen") && mainSource.includes("const dungeonMovement"), "global movement keys are not gated to active combat");
 assert(mainSource.includes("function trapModalFocus") && mainSource.includes("focusEscapesForward"), "modal keyboard focus can escape into the background");
