@@ -229,7 +229,14 @@ assert(indexSource.indexOf('id="magicMoveControls"') < indexSource.indexOf('clas
 assert(/\.controls\s*\{[^}]*border:\s*0;[^}]*background:[^}]*rgba\([^)]*,\s*0\.(?:42|5)\)[^}]*box-shadow:\s*none;/.test(styleSource), "keypad outer frame is not transparently blended into the map");
 assert(styleSource.includes("grid-template-columns: repeat(3, 54px)") && styleSource.includes("grid-template-rows: repeat(3, 50px)"), "keypad did not receive the requested six-pixel size increase");
 assert(styleSource.includes("@media (min-width: 980px)") && styleSource.includes("width: min(100vw, 1180px)") && styleSource.includes("grid-template-columns: repeat(10, minmax(0, 1fr))"), "desktop-wide town layout is missing");
-assert(styleSource.includes("grid-template-columns: minmax(600px, 1fr) minmax(310px, 360px)") && styleSource.includes("min(42px, calc((100svh - 360px) / 13))"), "desktop dungeon map and side-log layout is missing");
+assert(
+  styleSource.includes("min(36px, calc((100svh - 480px) / 13))")
+  && styleSource.includes("grid-template-rows: clamp(105px, 15svh, 150px) minmax(0, 1fr)")
+  && /\.app-shell\.dungeon-mode #dungeonView\s*\{[^}]*grid-row:\s*2/.test(styleSource)
+  && /\.app-shell\.dungeon-mode \.log-panel\s*\{[^}]*grid-row:\s*1/.test(styleSource)
+  && !styleSource.includes("grid-template-columns: minmax(600px, 1fr) minmax(310px, 360px)"),
+  "dungeon log is not fixed above the dungeon view across viewport sizes",
+);
 assert(/\.controls\s*\{[^}]*transform:\s*translateY\(-3px\)/.test(styleSource), "keypad does not include the additional one-pixel upward offset");
 assert(/\.magic-move-controls\s*\{[^}]*transform:\s*translateY\(-4px\) scale\(0\.9\)[^}]*transform-origin:\s*right center/.test(styleSource), "purple ability box size or four-pixel upward offset is missing");
 assert(styleSource.includes("clamp(105px, 15svh, 132px)") && styleSource.includes("calc((100svh - 390px) / 13)"), "removed dungeon status space was not assigned to the log");

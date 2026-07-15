@@ -72,11 +72,11 @@ button:active:not(:disabled) {
 }
 
 .app-shell.dungeon-mode {
-  /* 高さ予算: ヘッダー約90px + 操作パッド156px + ログ105px + 余白約40px。
+  /* 高さ予算: 上部ログ105px + ヘッダー約90px + 操作パッド156px + 余白約40px。
      328px では中背丈端末(667px級)でパッド下段がログに重なった。 */
   --tile: clamp(15px, min(32px, calc((100vw - 42px) / 13), calc((100svh - 390px) / 13)), 32px);
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: minmax(0, 1fr) clamp(105px, 15svh, 132px);
+  grid-template-rows: clamp(105px, 15svh, 132px) minmax(0, 1fr);
   background:
     radial-gradient(circle at 50% 26%, rgba(74, 101, 84, 0.2), transparent 48%),
     linear-gradient(180deg, rgba(15, 22, 18, 0.94), rgba(8, 12, 10, 0.98));
@@ -96,7 +96,7 @@ button:active:not(:disabled) {
 
 .app-shell.dungeon-mode #dungeonView {
   grid-column: 1;
-  grid-row: 1;
+  grid-row: 2;
   padding-bottom: 7px;
   scroll-padding-bottom: 7px;
   overflow: hidden;
@@ -104,7 +104,7 @@ button:active:not(:disabled) {
 
 .app-shell.dungeon-mode .log-panel {
   grid-column: 1 / -1;
-  grid-row: 2;
+  grid-row: 1;
 }
 
 .app-shell.dungeon-mode .equipment-strip {
@@ -2769,6 +2769,7 @@ strong {
   min-height: 105px;
   padding: 6px 8px;
   gap: 3px;
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.025), 0 8px 28px rgba(0, 0, 0, 0.18);
 }
 
 .app-shell.dungeon-mode .log-panel-toolbar > span {
@@ -3106,20 +3107,20 @@ textarea:focus-visible,
   }
 
   .app-shell.dungeon-mode {
-    --tile: clamp(28px, min(42px, calc((100svh - 360px) / 13)), 42px);
-    grid-template-columns: minmax(600px, 1fr) minmax(310px, 360px);
-    grid-template-rows: minmax(0, 1fr);
+    --tile: clamp(18px, min(36px, calc((100svh - 480px) / 13)), 36px);
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: clamp(105px, 15svh, 150px) minmax(0, 1fr);
     gap: 12px;
   }
 
   .app-shell.dungeon-mode #dungeonView {
     grid-column: 1;
-    grid-row: 1;
+    grid-row: 2;
     padding: 10px;
   }
 
   .app-shell.dungeon-mode .log-panel {
-    grid-column: 2;
+    grid-column: 1;
     grid-row: 1;
     min-height: 0;
     max-height: none;
