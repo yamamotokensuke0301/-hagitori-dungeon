@@ -50,7 +50,7 @@
     { id: "cool_fire_gland", name: "冷却された火腺", description: "水属性で冷やしてから得た火器官。" },
     { id: "fire_lizard_marrow", name: "火蜥蜴の骨髄", description: "打属性で骨を割って得る素材。" },
     { id: "burned_corpse", name: "焼損した遺体", description: "火で焼けて価値が落ちた素材。" },
-    { id: "garm_red_pelt", name: "ガルムの赤毛皮", description: "赤熱のガルムから得た赤い毛皮。" },
+    { id: "garm_red_pelt", name: "ガルムの赤毛皮", description: "胸火のガルムから得た赤い毛皮。" },
     { id: "garm_fire_core", name: "ガルムの火核", description: "火でとどめを刺さずに討伐した証。" },
     { id: "slime_gel", name: "粘体の原液", description: "粘体族の身体を形作る粘性素材。" },
     { id: "slime_crystal", name: "粘体晶核", description: "弱点を突いて凝固させた粘体族の中枢核。" },

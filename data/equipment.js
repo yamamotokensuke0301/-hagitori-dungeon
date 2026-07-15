@@ -115,7 +115,7 @@
       resistances: { fire: 2 },
       jobs: allJobs,
       recipe: { fire_lizard_scale: 2, cool_fire_gland: 1 },
-      description: "火耐性を大きく上げる。赤熱のガルム攻略の要。",
+      description: "火耐性を大きく上げる。胸火のガルム攻略の要。",
     },
     {
       id: "thunder_charm",

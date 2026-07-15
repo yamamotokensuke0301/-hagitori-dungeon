@@ -835,6 +835,7 @@
       if (canonicalMonster) {
         enemy.name = canonicalMonster.name;
         enemy.baseName = canonicalMonster.baseName || canonicalMonster.name;
+        enemy.mapMarker = canonicalMonster.mapMarker || canonicalMonster.glyph;
         enemy.epithet = canonicalMonster.epithet || null;
         enemy.uniqueTemperament = canonicalMonster.uniqueTemperament || null;
         enemy.uniqueStyle = canonicalMonster.uniqueStyle || null;

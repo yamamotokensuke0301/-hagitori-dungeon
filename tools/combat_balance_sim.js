@@ -7,7 +7,7 @@ function read(path) {
 var window = { HD_DATA: {} };
 [
   "data/materials.js", "data/races.js", "data/jobs.js", "data/personalities.js",
-  "data/equipment.js", "data/treasures.js", "data/monsters.js", "data/floors.js",
+  "data/equipment.js", "data/treasures.js", "data/monsters.js", "data/monster-name-atlas.js", "data/floors.js",
   "js/character-system.js",
 ].forEach((path) => eval(read(path)));
 

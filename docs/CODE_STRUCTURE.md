@@ -8,7 +8,7 @@
 
 1. `data/materials.js`
 2. `data/races.js`、`data/jobs.js`、`data/personalities.js`
-3. `data/equipment.js`、`data/treasures.js`、`data/monsters.js`、`data/floors.js`
+3. `data/equipment.js`、`data/treasures.js`、`data/monsters.js`、`data/monster-name-atlas.js`、`data/floors.js`
 4. `js/unique-dialogue.js`
 5. `js/utils.js`、`js/threat-system.js`
 6. `js/dungeon-generator.js`、`js/artifact-generator.js`、`js/economy.js`、`js/character-system.js`、`js/bounty-system.js`
@@ -21,6 +21,7 @@
 
 - `data/`: 職業、種族、装備、宝箱アイテム、魔法、モンスター、階層などの定義と生成規則
 - `data/treasures.js`: 5ランクの魔法書、習得魔法、売却用ガラクタの定義
+- `data/monster-name-atlas.js`: 能力・ID・配列順を変えず、最終表示名、深層生態域、マップ記号、名称を含む予告・調査文を同期する命名台帳
 - `js/utils.js`: 状態を持たない共通関数。ID索引、数値制限、乱数、HTMLエスケープ、グリッド距離・射線判定
 - `js/dungeon-generator.js`: マップ生成
 - `js/artifact-generator.js`: 激レアなランダムアーティファクトの深度別品質・能力・複数属性・呪い生成と保存スキーマ検証
@@ -40,7 +41,7 @@
 ## 変更時の注意
 
 - `materials.js` の属性定義順は装備・モンスター生成に使うため、単なる整列目的で変更しない。
-- `monsters.js` の表示名はモンスターIDに結び付け、セーブ上の敵名もロード時に現行データへ同期する。配列順は固有異能・戦型・個体モチーフの割当へ影響するため、単なる整列目的では変更しない。
+- `monsters.js` の能力・出現・割当データと `monster-name-atlas.js` の最終表示名はモンスターIDで結び付ける。セーブ上の敵名もロード時に現行データへ同期する。配列順は固有異能・戦型・個体モチーフの割当へ影響するため、単なる整列目的では変更しない。
 - 台詞本体は敵インスタンスへ複製せず、`unique-dialogue.js` の静的表をID参照する。セーブには直近履歴とクールダウンだけを持たせる。
 - 装備データは `jobs.js` 読み込み後に生成する。
 - `treasures.js` は装備の後、モンスターと階層の前に読み込む。魔法書ランクは希少度と解禁階層を兼ねるため、IDや順序を変える場合は旧セーブの `items` と `learnedSpells` も確認する。

@@ -376,9 +376,9 @@
       window.HD_DATA.monsters.push({
         ...JSON.parse(JSON.stringify(source)),
         id: `abyss_f${floor}_v${variant + 1}`,
-        name: `第${floor}層${source.name}${["アルファ", "ベータ", "ガンマ"][variant]}`,
+        name: `第${floor}層・${source.name}〈${["甲", "乙", "丙"][variant]}〉`,
         abyssSourceId: source.id,
-        mapMarker: ["ア", "ベ", "ガ"][variant],
+        mapMarker: ["甲", "乙", "丙"][variant],
         floors: [floor],
         hp: 45 + floor * 7 + variant * 13,
         attack: 7 + Math.floor(floor * 0.72) + variant,
@@ -389,7 +389,7 @@
         resistances: { [primary]: Math.min(5, 2 + Math.floor(floor / 25)), [secondary]: Math.min(4, 1 + Math.floor(floor / 35)) },
         dangerous: {
           every: floor >= 60 ? 2 : 3,
-          telegraph: `第${floor}層${source.name}が${window.HD_DATA.attributeLabels[secondary]}の力を圧縮した。`,
+          telegraph: `第${floor}層・${source.name}が${window.HD_DATA.attributeLabels[secondary]}の力を圧縮した。`,
           name: `${window.HD_DATA.attributeLabels[secondary]}深層撃`,
           attribute: secondary,
           power: 24 + Math.floor(floor * 1.08) + variant * 3,
@@ -1560,6 +1560,156 @@
   ].forEach(([id, name]) => individuallyAuthoredUniqueNames.set(id, name));
   window.HD_DATA.individuallyAuthoredUniqueNames = individuallyAuthoredUniqueNames;
 
+  // 字面の重さと読みやすさを両立させる。動物名はカタカナ、難読異名や動詞は
+  // 音だけを写さず平易な日本語へ言い換え、意図的なゲーム語は漢字の迫力を残す。
+  const MONSTER_NAME_STYLE_REPLACEMENTS = Object.freeze([
+    // 基礎種・派生種
+    ["火喰い蜥蜴", "火食いトカゲ"],
+    ["溺死騎士オルド", "水没騎士オルド"],
+    ["苔鱗蜥蜴", "苔肌トカゲ"],
+    ["氷牙蜥蜴", "氷牙トカゲ"],
+    ["毒牙蝙蝠", "毒牙コウモリ"],
+    ["洞羽蝙蝠", "洞羽コウモリ"],
+    ["雷角兎", "雷角ウサギ"],
+    ["灰牙鼠", "灰牙ネズミ"],
+    ["穴掘り鼬", "穴掘りイタチ"],
+    ["血眼狐", "血眼キツネ"],
+    ["洞窟狼", "洞窟オオカミ"],
+    ["鉄甲蟹", "鉄甲ガニ"],
+    ["鎧百足", "鎧ムカデ"],
+    ["岩背亀", "岩背ガメ"],
+    ["鋼殻蠍", "鋼殻サソリ"],
+    ["城塞蟲", "城塞ムシ"],
+    ["毒粉蛾", "毒粉ガ"],
+    ["刃羽烏", "刃羽カラス"],
+    ["雷鳴梟", "雷鳴フクロウ"],
+    ["泥雫", "泥シズク"],
+    ["雫精", "シズク精"],
+    ["砂塵精", "砂嵐精"],
+    ["囁く影", "ささやく影"],
+    ["毒尾蛇", "毒尾ヘビ"],
+    ["灼熱蛇", "灼熱ヘビ"],
+    ["岩顎竜", "岩アゴ竜"],
+    ["壁這い", "壁走り"],
+    ["月喰らいルナ", "月食らい・ルナ"],
+    ["夢喰らい", "夢食らい"],
+    ["昨日喰らい", "昨日を食らう者"],
+    ["火喰い酸雨", "火を食らう酸雨"],
+
+    // 固有種・深淵ユニーク
+    ["灰燼竜ヴォルダ", "灰竜ヴォルダ"],
+    ["骸王ガズラ", "骨王ガズラ"],
+    ["氷獄妃フレイア", "氷宮の女王フレイア"],
+    ["双貌のアギト", "双面のアギト"],
+    ["飢界のオルム", "飢えの王オルム"],
+    ["逆鱗のゼノ", "竜の怒り・ゼノ"],
+    ["無明のミラ", "光なきミラ"],
+    ["星喰のアギト", "星を食らうアギト"],
+    ["天蓋のオルム", "天を覆うオルム"],
+    ["終鐘のゼノ", "終わりの鐘・ゼノ"],
+    ["虚王のミラ", "虚ろの王ミラ"],
+    ["時喰のオルム", "時を食らうオルム"],
+    ["夢獄のゼノ", "悪夢の王ゼノ"],
+    ["冥府のミラ", "死者の国のミラ"],
+    ["神骸のアギト", "亡き神のアギト"],
+    ["麒麟児印", "天才印"],
+
+    // 闘技場・固有異能
+    ["鋼を啜るセレス", "鋼をすするセレス"],
+    ["白刃を呑む不落門ネフィラ", "白刃を飲み込む不落門ネフィラ"],
+    ["氷塵を置き去りにするドグマ", "氷雪を置き去りにするドグマ"],
+    ["風闇に錆びぬヘリオ城", "風闇にもさびないヘリオ城"],
+    ["光刃五芒城キリエ", "光刃五曜城キリエ"],
+    ["五重郭", "五重城"],
+    ["五郭", "五重城"],
+    ["白蝕レオン", "白き侵食者レオン"],
+    ["風蝕ヘリオ", "風削りヘリオ"],
+    ["腐蝕", "腐食"],
+    ["錆びない血", "さびない血"],
+    ["眠れない棺", "眠れないヒツギ"],
+
+    // 物語型ユニークとネタ名
+    ["未解の頁", "未解のページ"],
+    ["沈鐘", "沈んだ鐘"],
+    ["溺者の足跡を岸へ返すドーマ", "溺れた者の足跡を岸へ返すドーマ"],
+    ["花后", "花の女王"],
+    ["逆手で暦を閉じるイリス", "逆手で時の書を閉じるイリス"],
+    ["弔鐘", "別れの鐘"],
+    ["二度落雷死した天狐グレイヴ", "二度落雷死した天のキツネ・グレイヴ"],
+    ["天狐", "天のキツネ"],
+    ["狐火", "キツネ火"],
+    ["勝者へ孵らぬ種を贈るジュノ", "勝者へ芽吹かぬ種を贈るジュノ"],
+    ["錆びた轍を都へ返すドーマ", "赤さびの道を都へ返すドーマ"],
+    ["螺子", "ネジ"],
+    ["夜明けに偽陽を見逃すシエラ", "夜明けに偽りの太陽を見逃すシエラ"],
+    ["鞘", "サヤ"],
+    ["勝者へ味のない晩餐を贈るジュノ", "勝者へ味のない祝宴を贈るジュノ"],
+    ["北冥支局", "あの世北支局"],
+    ["冥府書記", "あの世の書記"],
+    ["逆手で白骨を剪定するイリス", "逆手で白骨を刈り込むイリス"],
+    ["おかわり自由の飢餓", "おかわり自由の飢え"],
+    ["冥王（ちょっとそこまで）", "あの世の王（ちょっとそこまで）"],
+    ["とりあえず生の冥界魚", "とりあえず生の魔界魚"],
+    ["来週から本気を出す龍", "来週から本気を出すドラゴン"],
+
+    // 最深層の希少種・上位種
+    ["冥府の徴税霊", "あの世の徴税霊"],
+    ["金庫穿ちモグラ", "金庫破りモグラ"],
+    ["金影の妖狐", "金影の化けギツネ"],
+    ["奈落の掏摸", "奈落のスリ"],
+    ["世界金庫喰らい", "世界金庫イーター"],
+    ["木陰の斥候", "木陰のスカウト"],
+    ["翠環のドルイド", "緑輪のドルイド"],
+    ["紫苑の森導師", "紫花の森導師"],
+    ["白鱗の幼竜", "白いウロコの幼竜"],
+    ["紫冥", "紫闇"],
+    ["翠毒の魔侯", "翠毒の魔将"],
+    ["黄金瞳の契約卿", "黄金瞳の契約王"],
+    ["紅獄の処刑魔", "紅蓮の処刑魔"],
+    ["蒼穹の奏使", "蒼空の奏使"],
+    ["紫星の熾天使", "紫星のセラフ"],
+  ]);
+  const OBSCURE_MONSTER_NAME_KANJI = "鼠兎蝙蝠蜥蜴鼬蟹蠍蟲烏梟蛾亀狐蛇狼鱗龍雫囁這顎燼骸喰啜麒麟剪掏穿熾穹芒螺轍鞘呑孵貌蓋冥蝕棺頁暦弔餓餐斥苑侯卿錆";
+  const polishMonsterName = (value) => MONSTER_NAME_STYLE_REPLACEMENTS.reduce(
+    (text, [before, after]) => text.split(before).join(after),
+    String(value || ""),
+  );
+  const normalizeMonsterNameMap = (nameMap) => {
+    [...nameMap.entries()].forEach(([id, name]) => nameMap.set(id, polishMonsterName(name)));
+  };
+  normalizeMonsterNameMap(individuallyAuthoredUniqueNames);
+  normalizeMonsterNameMap(exceptionalUniqueNames);
+  additionalComedyUniqueNames.splice(0, additionalComedyUniqueNames.length, ...additionalComedyUniqueNames.map(polishMonsterName));
+  window.HD_DATA.monsterNameStyleReplacements = MONSTER_NAME_STYLE_REPLACEMENTS;
+  window.HD_DATA.obscureMonsterNameKanji = OBSCURE_MONSTER_NAME_KANJI;
+
+  window.HD_DATA.monsters.forEach((monster) => {
+    const previousName = monster.name;
+    monster.name = polishMonsterName(monster.name);
+    const previousTraitName = monster.singularTrait?.name;
+    if (previousTraitName) {
+      monster.singularTrait.name = polishMonsterName(previousTraitName);
+      if (previousTraitName !== monster.singularTrait.name) {
+        const replaceTraitName = (value) => String(value || "").split(previousTraitName).join(monster.singularTrait.name);
+        if (monster.dangerous?.name) monster.dangerous.name = replaceTraitName(monster.dangerous.name);
+        if (monster.dangerous?.telegraph) monster.dangerous.telegraph = replaceTraitName(monster.dangerous.telegraph);
+        if (monster.divineInvulnerability?.name) monster.divineInvulnerability.name = replaceTraitName(monster.divineInvulnerability.name);
+        Object.keys(monster.research || {}).forEach((key) => {
+          monster.research[key] = replaceTraitName(monster.research[key]);
+        });
+      }
+    }
+    if (previousName === monster.name) return;
+    const replacePreviousName = (value) => String(value || "").split(previousName).join(monster.name);
+    if (monster.dangerous?.telegraph) monster.dangerous.telegraph = replacePreviousName(monster.dangerous.telegraph);
+    ["dialogueDesire", "dialogueKeepsake", "dialogueSecret"].forEach((key) => {
+      if (monster[key]) monster[key] = replacePreviousName(monster[key]);
+    });
+    Object.keys(monster.research || {}).forEach((key) => {
+      monster.research[key] = replacePreviousName(monster.research[key]);
+    });
+  });
+
   const arenaRolesByAttribute = {
     fire: "火渡り", water: "潮騎士", thunder: "雷走り", poison: "毒杯師", ice: "霜刃",
     curse: "呪印師", acid: "腐蝕工", dark: "影役者", light: "灯守", earth: "岩砕き",
@@ -1633,6 +1783,28 @@
   });
 
   window.HD_DATA.monsters.filter((monster) => monster.unique).forEach(addUniqueEpithet);
+
+  // 固有異名を確定した後にも同じ字面調整を通し、名称を埋め込んだ文章も同期する。
+  window.HD_DATA.monsters.forEach((monster) => {
+    const previousName = monster.name;
+    const previousBaseName = monster.baseName;
+    monster.name = polishMonsterName(monster.name);
+    if (monster.baseName) monster.baseName = polishMonsterName(monster.baseName);
+    if (monster.singularTrait?.name) monster.singularTrait.name = polishMonsterName(monster.singularTrait.name);
+    const namePairs = [[previousName, monster.name], [previousBaseName, monster.baseName]]
+      .filter(([before, after]) => before && after && before !== after);
+    const replaceNameReferences = (value) => namePairs.reduce(
+      (text, [before, after]) => text.split(before).join(after),
+      String(value || ""),
+    );
+    if (monster.dangerous?.telegraph) monster.dangerous.telegraph = polishMonsterName(replaceNameReferences(monster.dangerous.telegraph));
+    ["dialogueDesire", "dialogueKeepsake", "dialogueSecret"].forEach((key) => {
+      if (monster[key]) monster[key] = polishMonsterName(replaceNameReferences(monster[key]));
+    });
+    Object.keys(monster.research || {}).forEach((key) => {
+      monster.research[key] = polishMonsterName(replaceNameReferences(monster.research[key]));
+    });
+  });
 
   // ごく一部のダンジョンユニークだけが眷属を呼ぶ。既存の特殊行動割当は変えない。
   const forcedSummoners = new Set([

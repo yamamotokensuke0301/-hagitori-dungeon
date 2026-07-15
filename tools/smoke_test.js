@@ -24,6 +24,7 @@ const scriptFiles = [
   "data/equipment.js",
   "data/treasures.js",
   "data/monsters.js",
+  "data/monster-name-atlas.js",
   "data/floors.js",
   "js/unique-dialogue.js",
   "js/utils.js",
@@ -248,8 +249,10 @@ assert(mainSource.includes("const MUSIC_VOLUME = 0.252") && mainSource.includes(
 assert(mainSource.includes("BGM_SCENE_VOLUME_MULTIPLIERS = Object.freeze({ town: 0.55 })")
   && mainSource.includes("track.targetVolume = MUSIC_VOLUME * (BGM_SCENE_VOLUME_MULTIPLIERS[scene] ?? 1)"),
 "town-only BGM volume reduction is missing");
-assert(indexSource.includes("./js/main.js?v=20260716-critical-flee1")
+assert(indexSource.includes("./js/main.js?v=20260716-critical-flee-name-atlas1")
   && indexSource.includes("./css/style.css?v=20260716-critical-flee1"), "critical-flee assets did not refresh their cache keys");
+assert(indexSource.includes("./data/monsters.js?v=20260716-name-atlas1")
+  && indexSource.includes("./data/monster-name-atlas.js?v=20260716-name-atlas1"), "monster-name atlas did not refresh its cache keys");
 assert(mainSource.includes("const CRITICAL_HP_PERCENT = 25")
   && mainSource.includes("function enterEnemyCriticalFleeState")
   && mainSource.includes("function performCriticalFleeAction")
@@ -293,6 +296,7 @@ var window = {};
   "data/equipment.js",
   "data/treasures.js",
   "data/monsters.js",
+  "data/monster-name-atlas.js",
   "data/floors.js",
   "js/unique-dialogue.js",
   "js/utils.js",
@@ -510,61 +514,99 @@ assert(window.HD_DATA.junkItems.filter((item) => item.junkTier === "ultra_luxury
 assert(window.HD_DATA.junkItems.filter((item) => item.junkTier === "legend").length === 5, "legend junk tier is missing");
 assert(new Set(window.HD_DATA.junkItems.map((item) => item.name)).size === window.HD_DATA.junkItems.length, "junk names are duplicated");
 assert(new Set(window.HD_DATA.monsters.map((monster) => monster.id)).size === window.HD_DATA.monsters.length, "monster id collision");
+assert(new Set(window.HD_DATA.monsters.map((monster) => monster.name)).size === window.HD_DATA.monsters.length, "monster name collision");
+const monsterNameAtlas = window.HD_DATA.monsterNameAtlas;
+assert(monsterNameAtlas?.edition === "2026-07-16 high-quality rewrite"
+  && monsterNameAtlas.renamedIds instanceof Set
+  && monsterNameAtlas.renamedIds.size === 726,
+"high-quality monster-name atlas is missing or incomplete");
+const allMonsterNameFields = window.HD_DATA.monsters.flatMap((monster) => (
+  [monster.name, monster.baseName, monster.singularTrait && monster.singularTrait.name].filter(Boolean)
+));
+const monsterNameRelatedTexts = window.HD_DATA.monsters.flatMap((monster) => [
+  monster.dangerous && monster.dangerous.telegraph,
+  monster.dialogueDesire,
+  monster.dialogueKeepsake,
+  monster.dialogueSecret,
+  ...Object.values(monster.research || {}),
+].filter(Boolean));
+const obsoleteMonsterNameSpellings = window.HD_DATA.monsterNameStyleReplacements.map(([before]) => before);
+assert([...allMonsterNameFields, ...monsterNameRelatedTexts].every((text) => (
+  obsoleteMonsterNameSpellings.every((spelling) => !text.includes(spelling))
+)), "an obsolete monster-name spelling remains in related text");
+const difficultCreatureKanji = /[鼠兎蝙蝠蜥蜴鼬蟹蠍蟲烏梟蛾亀狐蛇狼鱗]/;
+assert(allMonsterNameFields.every((name) => !difficultCreatureKanji.test(name)),
+"a difficult creature name was not converted to readable Japanese");
+assert(window.HD_DATA.monsters.every((monster) => monster.id === "dungeon_lord_nox" || Array.from(monster.name).length <= 21),
+"a non-final monster name is too long for the catalog layout");
+const awkwardMonsterNameFragments = [
+  "サビび", "ゴボウ城", "ツキクライ", "シンガイ", "ムゴク", "フショク", "メイフ", "ヨウコ",
+  "ケイヤクキョウ", "シテンシ", "ソウキュウ", "キリンジ", "百足", "五郭", "五重郭", "沈鐘", "花后",
+];
+assert(allMonsterNameFields.every((name) => awkwardMonsterNameFragments.every((fragment) => !name.includes(fragment))),
+"an awkward mechanical reading remains in a monster name");
+const layeredMonsterNames = window.HD_DATA.monsters.filter((monster) => /^abyss_f\d+_v\d+$/.test(monster.id));
+assert(layeredMonsterNames.length === 170
+  && layeredMonsterNames.every((monster) => monster.ecologicalRegion
+    && !/^第\d+層/.test(monster.name)
+    && !/[〈〉甲乙丙]/.test(monster.name)
+    && !["甲", "乙", "丙"].includes(monster.mapMarker)
+    && ["甲", "乙", "丙"].includes(monster.catalogVariant)
+    && monster.dangerous.telegraph.includes(monster.name)),
+"deep general monsters did not receive ecological names and visible markers");
+assert(monsterNameAtlas.abyssRegionNames.length === 9
+  && monsterNameAtlas.abyssRegionNames.reduce((sum, region) => sum + region.names.length, 0) === 170,
+"deep ecological regions do not cover all 170 general monsters");
+assert(window.HD_DATA.monsters.find((monster) => monster.id === "poison_bat").name === "毒牙コウモリ"
+  && window.HD_DATA.monsters.find((monster) => monster.id === "fire_lizard").name === "火食いトカゲ"
+  && window.HD_DATA.monsters.find((monster) => monster.id === "ash_dragon_volda").name === "灰竜ヴォルダ"
+  && window.HD_DATA.monsters.find((monster) => monster.id === "deep_cave_rat_6").name === "墓穴ネズミ"
+  && window.HD_DATA.monsters.find((monster) => monster.id === "abyss_f11_v1").name === "白殻の空鎧"
+  && window.HD_DATA.monsters.find((monster) => monster.id === "abyss_unique_55").name === "赤さびの脱獄王ギデオン"
+  && window.HD_DATA.monsters.find((monster) => monster.id === "dungeon_unique_rust_rain_doma").name === "溶け都のガラン"
+  && window.HD_DATA.monsters.find((monster) => monster.id === "world_coffer_eater").name === "世界の財布を食うもの"
+  && window.HD_DATA.monsters.find((monster) => monster.id === "apex_angel_6").name === "星を焼くセラフ",
+"representative high-quality names do not cover every roster school");
 assert(new Set(window.HD_DATA.monsters.filter((monster) => monster.unique).map((monster) => monster.name)).size === 488, "unique monster name collision");
 const uniqueNameStyles = window.HD_DATA.monsters.filter((monster) => monster.unique).map((monster) => monster.name);
-assert(!uniqueNameStyles.some((name) => name.includes("迷宮異名録")), "unique monster registry-style names remain overused");
-assert(uniqueNameStyles.filter((name) => ["％＝", "≠？"].includes(name)).length === 2,
-"symbol-only unique names must remain exceptional");
-assert(uniqueNameStyles.filter((name) => ["さわやかなミルクオレ", "午後三時のクリームパン"].includes(name)).length === 2,
-"mundane outlier unique names must remain exceptional");
-assert(uniqueNameStyles.includes("機械仕掛けの脱獄王"), "story-like outlier unique name is missing");
-assert(uniqueNameStyles.includes("川の流れのようにアサハカ"), "absurd outlier unique name is missing");
-assert(uniqueNameStyles.includes("麒麟児印のニュースター・メテオ"), "showman-like outlier unique name is missing");
-const curatedOutlierNames = [
-  "だいたい無敵の田中", "倒すと縁起が悪い鳥", "うすしお味の破壊神", "たぶん佐々木",
-  "無事故無違反の暴走王", "返品不可の救世主", "株式会社あの世・迷宮支店長", "説明書をなくした神様",
-  "有給休暇中の死神", "ご家庭用ブラックホール", "第二形態から来た新人", "※画像はイメージです",
-];
-assert(curatedOutlierNames.every((name) => uniqueNameStyles.includes(name)), "curated outlier unique names are missing");
-const expandedOutlierNames = [
-  "湯上がり決戦兵器ポカポカ", "お会計は世界の終わりに", "実家が太いデスワーム", "昨日届いた最後通告",
-  "午前二時だけ正義の味方", "おばあちゃんの最終定理", "こちら側のどなたか", "三割引のラストエンペラー",
-  "まだ温かい石田", "先着一名様の永遠", "うしろめたい太陽", "月刊ムーンサルト八月号",
-  "おかわり自由の飢餓", "全自動ぬか喜び製造機", "電池別売りの超新星", "低気圧由来のカリスマ",
-  "既読をつけない預言者", "迷子センターのラスボス", "生まれたての古代兵器", "予約の取れない亡霊",
-  "だれより普通の異常者", "世界で二番目に鋭い豆腐", "概念としての鈴木", "夕方には帰る魔王",
-  "よく振ってから絶望", "ただいま混み合っております", "賞味期限は昨日まで", "安全第一デストロイヤー",
-  "お近くの終末", "来週から本気を出す龍",
-];
-assert(expandedOutlierNames.every((name) => uniqueNameStyles.includes(name)), "expanded outlier unique names are missing");
-const outlierNameCount = curatedOutlierNames.length + expandedOutlierNames.length + 7;
-const additionalComedyUniqueNames = window.HD_DATA.additionalComedyUniqueNames || [];
-assert(additionalComedyUniqueNames.length === 98 && new Set(additionalComedyUniqueNames).size === 98
-  && additionalComedyUniqueNames.every((name) => uniqueNameStyles.includes(name)),
-"additional comedy unique names are missing or duplicated");
-assert(additionalComedyUniqueNames.filter((name) => /[【】［］《》★→←＠※／＋≒…㊙￥]/.test(name)).length >= 25,
-"symbol styling is not varied across comedy unique names");
-const tripledOutlierNameCount = outlierNameCount + additionalComedyUniqueNames.length;
-assert(tripledOutlierNameCount === 147 && tripledOutlierNameCount / uniqueNameStyles.length >= 0.29 && tripledOutlierNameCount / uniqueNameStyles.length <= 0.31,
-"comedy unique-name ratio is outside the intended thirty-percent band");
-assert(window.HD_DATA.monsters.filter((monster) => monster.unique && monster.name === monster.baseName).length >= 340,
-"generic epithet templates still overwrite authored unique names");
-assert(window.HD_DATA.monsters.filter((monster) => monster.migratedFromArenaRank && monster.singularTrait).every((monster) => monster.baseName === monster.singularTrait.name),
-"singular migrated uniques do not use their individual trait as their authored name");
-const individuallyAuthoredUniqueNames = window.HD_DATA.individuallyAuthoredUniqueNames;
-assert(individuallyAuthoredUniqueNames instanceof Map && individuallyAuthoredUniqueNames.size === 270
-  && new Set(individuallyAuthoredUniqueNames.values()).size === 270,
-"individually authored unique-name map is incomplete or duplicated");
-assert(window.HD_DATA.monsters.filter((monster) => monster.dungeonExpansion && individuallyAuthoredUniqueNames.has(monster.id)).length === 118
-  && window.HD_DATA.monsters.filter((monster) => monster.migratedFromArenaRank && individuallyAuthoredUniqueNames.has(monster.id)).length === 80
-  && window.HD_DATA.monsters.filter((monster) => monster.arenaOnly && individuallyAuthoredUniqueNames.has(monster.id)).length === 72,
-"individually authored unique names do not cover every remaining generated-name offender");
+const legacyArenaNames = ["レオン", "ミドラ", "ガルド", "ネフィラ", "オズマ", "ラグナ", "セレス", "バロウ", "キリエ", "ドグマ", "ヴェイン", "アルマ", "ザクロ", "ノイン", "ヘリオ", "クオン", "メビウス", "イグナ", "ゼロス"];
+const legacyNarrativeNames = ["アデル", "ビスク", "シエラ", "ドーマ", "エニグマ", "フィオ", "グレイヴ", "ハクア", "イリス", "ジュノ"];
+assert(window.HD_DATA.monsters.filter((monster) => monster.arenaOnly || monster.migratedFromArenaRank)
+  .every((monster) => legacyArenaNames.every((name) => !monster.name.includes(name))),
+"recycled arena proper names remain visible");
+assert(window.HD_DATA.monsters.filter((monster) => monster.dungeonExpansion)
+  .every((monster) => legacyNarrativeNames.every((name) => !monster.name.includes(name))),
+"recycled narrative proper names remain visible");
+const legacyComedyNames = window.HD_DATA.additionalComedyUniqueNames || [];
+const rejectedRandomOutliers = ["％＝", "≠？", "さわやかなミルクオレ", "午後三時のクリームパン", "だいたい無敵の田中", "※画像はイメージです"];
+assert([...legacyComedyNames, ...rejectedRandomOutliers].every((name) => !uniqueNameStyles.includes(name)),
+"unrelated random-comedy names remain in the visible roster");
+assert(window.HD_DATA.monsters.filter((monster) => monster.unique).every((monster) => monster.name === monster.baseName),
+"a legacy generated epithet still overrides an authored display name");
+assert(window.HD_DATA.monsters.filter((monster) => monster.arenaOnly).every((monster) => monster.namingSchool.startsWith("闘技場リングネーム"))
+  && window.HD_DATA.monsters.filter((monster) => monster.peakyProfile).length === 100
+  && window.HD_DATA.monsters.filter((monster) => monster.singularTrait).length === 50
+  && window.HD_DATA.monsters.filter((monster) => monster.dungeonExpansion).every((monster) => monster.namingSchool.startsWith("個体史")),
+"one of the authored naming schools is incomplete");
+const narrativeNames = window.HD_DATA.monsters.filter((monster) => monster.dungeonExpansion).map((monster) => monster.name);
+const rejectedGridMotifs = ["北", "遺言", "夜明け", "足跡", "問う", "名付け親", "二度", "宛名", "左手", "勝者へ"];
+assert(rejectedGridMotifs.every((motif) => narrativeNames.filter((name) => name.includes(motif)).length <= 5),
+"the 200 narrative names reveal a repeated ten-slot template");
+assert(uniqueNameStyles.filter((name) => name.includes("王")).length <= 24
+  && uniqueNameStyles.filter((name) => name.includes("城")).length <= 15
+  && uniqueNameStyles.filter((name) => name.includes("砲")).length <= 8,
+"generic power nouns are overused across unique names");
+assert(uniqueNameStyles.includes("弱火の悲鳴ボンゴ")
+  && uniqueNameStyles.includes("死亡届返送係ハン")
+  && uniqueNameStyles.includes("一秒を食べ残すクロノ"),
+"world-linked dark humor and surreal names were lost with the random-comedy cleanup");
 const renamedGeneratedUniques = window.HD_DATA.monsters.filter((monster) => monster.unique
   && (monster.dungeonExpansion || monster.migratedFromArenaRank || monster.arenaOnly));
 assert(renamedGeneratedUniques.every((monster) => !monster.dangerous?.telegraph || monster.dangerous.telegraph.includes(monster.name)),
 "a renamed unique still uses an obsolete name in its danger telegraph");
 assert(mainSource.includes("enemy.name = canonicalMonster.name")
   && mainSource.includes("enemy.baseName = canonicalMonster.baseName || canonicalMonster.name")
+  && mainSource.includes("enemy.mapMarker = canonicalMonster.mapMarker || canonicalMonster.glyph")
   && mainSource.includes("enemy.dangerous.telegraph = canonicalMonster.dangerous.telegraph")
   && mainSource.includes("enemy.uniqueTemperament = canonicalMonster.uniqueTemperament")
   && mainSource.includes("enemy.dialogueNameMatched = Boolean(canonicalMonster.dialogueNameMatched)"),
@@ -698,24 +740,12 @@ assert(dungeonUniques.every((monster) => monster.floors?.length && monster.floor
 assert(window.HD_DATA.floors.every((floor) => floor.uniques.every((id) => dungeonUniques.some((monster) => monster.id === id))), "floor contains a non-dungeon unique");
 assert(Math.max(...window.HD_DATA.floors.map((floor) => floor.uniques.length)) < 120, "weighted unique pool grew unexpectedly large");
 assert(window.HD_UNIQUE_DIALOGUE.count === uniqueMonsters.length, "unique dialogue count mismatch");
-const displayRenamedUniques = uniqueMonsters.filter((monster) => (
-  monster.id !== "dungeon_lord_nox" && monster.name !== monster.baseName
-));
-assert(displayRenamedUniques.length === 147 && displayRenamedUniques.every((monster) => (
-  monster.dialogueNameMatched
-  && [monster.dialogueDesire, monster.dialogueKeepsake, monster.dialogueSecret].every((text) => text?.includes(monster.name))
-)), "comedy-name uniques did not receive name-matched identities and research notes");
+const atlasRenamedUniques = uniqueMonsters.filter((monster) => monsterNameAtlas.renamedIds.has(monster.id));
+assert(atlasRenamedUniques.length === 488 && atlasRenamedUniques.every((monster) => monster.name === monster.baseName),
+"the authored atlas does not own every unique monster display name");
 assert(uniqueMonsters.every((monster) => window.HD_UNIQUE_DIALOGUE.variants(monster.id, "encounter")
   .some((line) => line.includes(monster.name))),
 "a unique monster never states its current display name on encounter");
-displayRenamedUniques.forEach((monster) => {
-  const contextLines = window.HD_UNIQUE_DIALOGUE.contexts.map((context) => window.HD_UNIQUE_DIALOGUE.variants(monster.id, context));
-  assert(contextLines.every((lines) => lines.some((line) => line.includes(monster.name))), `${monster.name} has a dialogue context detached from its display name`);
-  const lines = contextLines.flat();
-  const staleNames = [monster.baseName, monster.coreName]
-    .filter((name) => name && !monster.name.includes(name));
-  assert(staleNames.every((name) => lines.every((line) => !line.includes(name))), `${monster.name} still speaks under an obsolete name`);
-});
 const dialogueLines = new Set();
 uniqueMonsters.forEach((monster) => {
   window.HD_UNIQUE_DIALOGUE.contexts.forEach((context) => {

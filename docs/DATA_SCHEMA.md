@@ -54,7 +54,7 @@
 
 ## モンスター
 
-`data/monsters.js` の `monsters` に配列で定義する。
+`data/monsters.js` の `monsters` に能力・出現・素材を配列で定義し、`data/monster-name-atlas.js` がID単位で最終表示名と名称由来の表示文を確定する。
 
 ```js
 {
