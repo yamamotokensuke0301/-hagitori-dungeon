@@ -12,7 +12,7 @@
       water: [0.78, 1.0], thunder: [0.62, 0.52], poison: [0.76, 0.82], ice: [0.74, 1.12],
       curse: [0.68, 1.0], acid: [0.72, 0.55], dark: [0.66, 1.12], light: [0.7, 1.32],
       earth: [0.7, 0.42], wind: [0.76, 0.82], steel: [0.72, 0.92], illusion: [0.72, 1.3],
-      observe: [0.78, 0.84], guard: [0.84, 0.5], warning: [0.76, 0.38], hit: [0.82, 0.22],
+      observe: [0.78, 0.84], guard: [0.84, 0.5], warning: [0.76, 0.38], hit: [0.82, 0.22], playerHurt: [0.74, 0.3],
       fireHit: [0.68, 0.52], loot: [0.8, 0.96], chest: [0.7, 1.0], coinSell: [0.78, 1.12],
       purchase: [0.78, 0.88], researchUp: [0.7, 1.18], critical: [0.66, 0.52], trapDamage: [0.66, 0.32],
       trapDrain: [0.68, 0.84], trapSlow: [0.68, 1.0], teleportShort: [0.7, 1.12], teleportLong: [0.6, 1.22],
@@ -35,14 +35,14 @@
     let reverbInput = null;
     const mixOutput = context && output ? createOutputStage(output) : output;
 
-    function play(type) {
+    function play(type, delaySeconds = 0) {
       if (!context || !output) return;
       const profile = EVENT_PROFILES[type];
       if (!profile) return;
       activeLevel = profile[0];
       activeSpace = profile[1];
       // A few milliseconds of look-ahead avoids clipped attacks on busy frames.
-      const now = context.currentTime + 0.005;
+      const now = context.currentTime + 0.005 + Math.max(0, Number(delaySeconds) || 0);
       const out = mixOutput;
       if (type === "startup") {
         playTone(261.63, now, 0.52, 0.055, "sine", out, { attack: 0.018, sustain: 0.72, pan: 0, reverb: 0.2 });
@@ -164,6 +164,12 @@
       if (type === "hit") {
         playImpact(118, now, 0.085, 0.092, out, { click: 980, pan: 0 });
         playNoise(now, 0.072, 0.07, out, 820, { attack: 0.001, pan: nextPan(0.12), reverb: 0.018 });
+      }
+      if (type === "playerHurt") {
+        // 攻撃側の属性音と聞き分けられる、低く近い被弾専用の衝撃。
+        playImpact(64, now, 0.18, 0.12, out, { click: 520, pan: 0 });
+        playNoiseBand(now + 0.012, 0.13, 0.085, out, 760, 0.64, 0, { attack: 0.001, reverb: 0.025 });
+        playTone(116, now + 0.045, 0.2, 0.052, "triangle", out, { sustain: 0.28, pan: 0, reverb: 0.04 });
       }
       if (type === "fireHit") {
         playImpact(96, now, 0.12, 0.074, out, { click: 640, pan: 0 });

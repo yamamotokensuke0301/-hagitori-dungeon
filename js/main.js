@@ -56,6 +56,14 @@
   });
   const MONSTER_SLEEP_CHANCE = 0.14;
   const UNIQUE_SLEEP_CHANCE = 0.05;
+  const CRITICAL_HP_PERCENT = 25;
+  const COMBAT_SFX_GAP_SECONDS = 0.06;
+  const COMBAT_SFX_DURATIONS = Object.freeze({
+    slash: 0.16, blunt: 0.22, fire: 0.24, water: 0.3, thunder: 0.26,
+    poison: 0.36, ice: 0.24, curse: 0.52, acid: 0.38, dark: 0.58,
+    light: 0.4, earth: 0.3, wind: 0.34, steel: 0.38, illusion: 0.42,
+    playerHurt: 0.28, warning: 0.28, critical: 0.24, deathCrySharp: 1.22,
+  });
   const THIEF_SLEEP_AMBUSH_MULTIPLIER = 3;
   const FLOWER_TAMER_CONFIG = Object.freeze({
     baseCharmChance: 0.055, skillBonus: 0.32, luckFactor: 0.0035, dexterityFactor: 0.002,
@@ -333,6 +341,7 @@
   let initialSetupPending = loaded.initialSetupPending;
   let audio = null;
   let sfxPlayer = null;
+  let combatSfxAvailableAt = 0;
   let levelUpEffectTimer = null;
   let levelUpStatTimers = [];
   let spellTargetArmed = false;
@@ -973,6 +982,14 @@
       saved.dungeon.stairs = saved.dungeon.stairs ? [saved.dungeon.stairs] : [];
     }
     if (saved.dungeon) {
+      saved.dungeon.enemies.forEach((enemy) => {
+        if (!isPlainRecord(enemy)) return;
+        enemy.criticalFleeing = Boolean(enemy.criticalFleeing && !enemy.flowerPet && enemy.alive && enemy.hp > 0);
+        enemy.criticalRetaliationPending = Boolean(enemy.criticalFleeing && enemy.criticalRetaliationPending);
+        enemy.criticalScreamTurns = enemy.criticalFleeing
+          ? clamp(Math.floor(Number(enemy.criticalScreamTurns || 0)), 0, 2)
+          : 0;
+      });
       const excavatedKeys = new Set();
       saved.dungeon.excavatedTiles = (Array.isArray(saved.dungeon.excavatedTiles) ? saved.dungeon.excavatedTiles : [])
         .map((tile) => ({ x: Math.trunc(Number(tile?.x)), y: Math.trunc(Number(tile?.y)) }))
@@ -3331,6 +3348,9 @@
         } else if (enemy) {
           const rec = getResearch(enemy.id);
           cell.classList.add(enemy.flowerPet ? "tile-flower-pet" : enemy.unique ? "tile-unique" : "tile-enemy");
+          if (enemy.criticalFleeing) cell.classList.add("tile-critical-fleeing");
+          const showCriticalScream = Number(enemy.criticalScreamTurns || 0) > 0;
+          if (showCriticalScream) cell.classList.add("has-monster-scream");
           if (enemy.asleep) cell.classList.add("tile-sleeping");
           if (enemy.uniqueStyle) cell.classList.add(`unique-${enemy.uniqueStyle}`);
           if (enemy.invisible) cell.classList.add("tile-invisible-seen");
@@ -3341,8 +3361,9 @@
           const hpBar = rec.level >= 1
             ? `<span class="mini-hp-bar"><i class="${hpColorClass(hpRate)}" style="width:${hpRate}%"></i></span>`
             : "";
-          cell.innerHTML = `<span class="monster-marker">${monsterMarker(enemy)}</span>${enemy.asleep ? '<span class="sleep-indicator" aria-hidden="true">Z</span>' : ""}${hpBar}`;
-          cell.setAttribute("aria-label", `${rec.seen ? enemy.name : "未確認の魔物"}${enemy.flowerPet ? "（使役中の花ペット）" : enemy.asleep ? "（睡眠中）" : ""}`);
+          const screamEffect = showCriticalScream ? '<span class="monster-scream" aria-hidden="true">ギャアッ！</span>' : "";
+          cell.innerHTML = `<span class="monster-marker">${monsterMarker(enemy)}</span>${enemy.asleep ? '<span class="sleep-indicator" aria-hidden="true">Z</span>' : ""}${hpBar}${screamEffect}`;
+          cell.setAttribute("aria-label", `${rec.seen ? enemy.name : "未確認の魔物"}${enemy.flowerPet ? "（使役中の花ペット）" : enemy.criticalFleeing ? "（瀕死・逃走中）" : enemy.asleep ? "（睡眠中）" : ""}`);
           cell.setAttribute("role", "button");
           cell.setAttribute("tabindex", "0");
           cell.dataset.enemyX = String(enemy.x);
@@ -4033,6 +4054,9 @@
       summonToken: data.summon ? `${data.id}@${pos.x},${pos.y}` : null,
       summonsUsed: 0,
       summonProgress: 0,
+      criticalFleeing: false,
+      criticalRetaliationPending: false,
+      criticalScreamTurns: 0,
       asleep: !hasDungeonRousingEquipment() && Math.random() < (data.unique || forceUnique ? UNIQUE_SLEEP_CHANCE : MONSTER_SLEEP_CHANCE),
     };
     enemy.canPhaseWalls = monsterCanPhaseWalls(data);
@@ -4691,6 +4715,7 @@
 
   function finishDungeonAttack(enemy, result = null) {
     if (result?.skipWorldAdvance) return;
+    enterEnemyCriticalFleeState(enemy, result);
     if (enemy.hp <= 0 && enemy.alive) defeatEnemy(enemy);
     if (!state.dungeon || !state.adventurer.inDungeon) return;
     advanceWorldIfDue();
@@ -4705,6 +4730,8 @@
       observeEnemy(enemy, Number(job.skill.researchAmount || 2));
       return;
     }
+    const playerAdjacentAtAttack = Boolean(state.dungeon && state.adventurer.inDungeon
+      && chebyshevDistance(enemy, state.dungeon.player) <= 1);
     const wasAsleep = Boolean(enemy.asleep);
     const thiefSleepAmbush = wasAsleep && state.adventurer.jobId === "hunter";
     if (wasAsleep) {
@@ -4720,7 +4747,7 @@
       enemy.hp = 0;
       markResearch(enemy.id, 4);
       log(`裏技発動。サイタマのワンパンチが${enemy.name}を一撃で沈めた！`);
-      playSfx("critical");
+      queueCombatSfx("critical");
       return;
     }
     if (secretName === "リムル" && state.adventurer.raceId === "slime" && state.dungeon && Math.random() < RIMURU_FLOOR_WIPE_CHANCE) {
@@ -4741,6 +4768,7 @@
       enemy.hp -= damage;
       return damage;
     }, () => enemy.hp <= 0);
+    outcome.playerAdjacentAtAttack = playerAdjacentAtAttack;
     state.adventurer.lastAttack = {
       attribute: profile.attribute,
       attributes: profile.attributes.slice(),
@@ -4769,9 +4797,10 @@
     }
     if (outcome.hitCount) {
       playCombatSfx(profile.attribute, false);
-      if (outcome.critCount) playSfx("critical");
-    } else playSfx("warning");
+      if (outcome.critCount) queueCombatSfx("critical");
+    } else queueCombatSfx("warning");
     markResearch(enemy.id, 2);
+    enterEnemyCriticalFleeState(enemy, outcome);
     if (outcome.total > 0 && enemy.hp > 0 && tryFlowerCharm(enemy, mode)) return outcome;
     const milestoneSpoken = speakByHp(enemy);
     if (!milestoneSpoken && enemy.hp > 0) {
@@ -4823,6 +4852,9 @@
     enemy.telegraphedAttribute = null;
     enemy.alertedTurns = 0;
     enemy.fleeingTurns = 0;
+    enemy.criticalFleeing = false;
+    enemy.criticalRetaliationPending = false;
+    enemy.criticalScreamTurns = 0;
     log(`${enemy.name}の意識へ花が咲いた！ 使い捨て花ペットとして${enemy.flowerPetTurns}ターン使役する（${activeFlowerPets().length}/${flowerPetLimit()}体）。`);
     playSfx("levelUp");
     return true;
@@ -4866,6 +4898,7 @@
       target.hp -= damage;
       log(`花ペット${pet.name}が${target.name}へ${attr(attribute)}属性で${damage}ダメージ。`);
       playCombatSfx(attribute, false);
+      enterEnemyCriticalFleeState(target);
       if (target.hp <= 0 && target.alive) defeatEnemy(target);
       return;
     }
@@ -4940,6 +4973,31 @@
     if (!stage || dialogue.stages[stage]) return false;
     dialogue.stages[stage] = true;
     return uniqueSpeak(enemy, stage, { force: true });
+  }
+
+  function enemyHpPercent(enemy) {
+    return Math.max(0, Math.min(100, Math.round((Number(enemy?.hp || 0) / Math.max(1, Number(enemy?.maxHp || 1))) * 100)));
+  }
+
+  function enterEnemyCriticalFleeState(enemy, attackOutcome = null) {
+    if (!state.dungeon || !state.adventurer.inDungeon || !enemy?.alive || enemy.hp <= 0 || enemy.flowerPet) return false;
+    const alreadyFleeing = Boolean(enemy.criticalFleeing);
+    if (!alreadyFleeing && enemyHpPercent(enemy) > CRITICAL_HP_PERCENT) return false;
+    if (!alreadyFleeing) {
+      enemy.criticalFleeing = true;
+      enemy.criticalScreamTurns = 2;
+      enemy.asleep = false;
+      enemy.telegraphed = false;
+      enemy.telegraphedAttribute = null;
+      enemy.alertedTurns = 0;
+      enemy.fleeingTurns = 0;
+      log(`「ギャアアッ！」${enemy.name}が悲鳴を上げ、瀕死のまま冒険者から逃げ始めた！`);
+      queueCombatSfx("deathCrySharp");
+    }
+    if (Number(attackOutcome?.hitCount || 0) > 0 && attackOutcome?.playerAdjacentAtAttack) {
+      enemy.criticalRetaliationPending = true;
+    }
+    return !alreadyFleeing;
   }
 
   function observeEnemy(enemy, amount) {
@@ -5295,7 +5353,7 @@
     log(`${enemy.name}の${name}（${attr(attribute)}）。${profile.attackTrials}回試行、${outcome.hitCount}ヒット、合計${outcome.total}ダメージ。${enemy.lastAttackReadWeakness ? " 耐性の隙を読まれた。" : ""}`);
     markResearch(enemy.id, 3);
     if (outcome.hitCount) playCombatSfx(attribute, true);
-    else playSfx("warning");
+    else queueCombatSfx("warning");
     if (state.adventurer.hp <= 0) die(`${enemy.name}の${name}`);
     return outcome;
   }
@@ -6573,7 +6631,7 @@
   }
 
   function hpColorClass(rate) {
-    return rate <= 25 ? "hp-critical" : rate <= 55 ? "hp-warning" : "hp-healthy";
+    return rate <= CRITICAL_HP_PERCENT ? "hp-critical" : rate <= 55 ? "hp-warning" : "hp-healthy";
   }
 
   function updateHpFill(element, value, max) {
@@ -6845,6 +6903,54 @@
     return found ? found.skill.name : tag;
   }
 
+  function enemyMoveOptions(enemy) {
+    const options = [];
+    for (let stepY = -1; stepY <= 1; stepY += 1) {
+      for (let stepX = -1; stepX <= 1; stepX += 1) {
+        if (!stepX && !stepY) continue;
+        const pos = { x: enemy.x + stepX, y: enemy.y + stepY };
+        if (canEnemyMove(enemy, pos.x, pos.y)) options.push(pos);
+      }
+    }
+    return options;
+  }
+
+  function moveCriticalFleeingEnemy(enemy) {
+    const currentDistance = chebyshevDistance(enemy, state.dungeon.player);
+    const options = enemyMoveOptions(enemy);
+    if (!options.length) return false;
+    const farther = options.filter((pos) => chebyshevDistance(pos, state.dungeon.player) > currentDistance);
+    const noCloser = options.filter((pos) => chebyshevDistance(pos, state.dungeon.player) === currentDistance);
+    const candidates = farther.length ? farther : noCloser.length ? noCloser : options;
+    const next = pick(candidates);
+    enemy.x = next.x;
+    enemy.y = next.y;
+    if (enemy.dialogueState?.stages?.encounter) uniqueSpeak(enemy, "move", { chance: 0.32 });
+    return true;
+  }
+
+  function performCriticalFleeAction(enemy, worldStatuses, announceStun) {
+    enemy.turns = Math.max(0, Math.floor(Number(enemy.turns || 0))) + 1;
+    if (worldStatuses.stunned) {
+      enemy.criticalRetaliationPending = false;
+      if (announceStun) {
+        log(`${enemy.name}は雷術の痺れで逃げることも反撃することもできない。`);
+        playSfx("debuff");
+      }
+      return "stunned";
+    }
+    const distance = chebyshevDistance(enemy, state.dungeon.player);
+    if (enemy.criticalRetaliationPending && distance <= 1) {
+      enemy.criticalRetaliationPending = false;
+      uniqueSpeak(enemy, "attack", { chance: 0.56 });
+      enemyAttack(enemy, "瀕死の反撃", chooseEnemyAttackAttribute(enemy, enemy.attackAttribute), enemy.attack);
+      return "retaliated";
+    }
+    enemy.criticalRetaliationPending = false;
+    if (worldStatuses.bound) return "bound";
+    return moveCriticalFleeingEnemy(enemy) ? "fled" : "trapped";
+  }
+
   function enemiesWander() {
     maybeSpawnMonster();
     const activeEnemies = state.dungeon.enemies.filter((enemy) => enemy.alive);
@@ -6860,6 +6966,7 @@
           enemy.specialRoomGraceTurns = Math.max(0, Number(enemy.specialRoomGraceTurns || 0) - 1);
           continue;
         }
+        enterEnemyCriticalFleeState(enemy);
         if (enemy.asleep) {
           const sleepDistance = chebyshevDistance(enemy, state.dungeon.player);
           const wakeChance = sleepDistance <= 1 ? 0.28 : 0.01;
@@ -6871,6 +6978,10 @@
         const actions = 1 + Math.floor(Math.max(0, effectiveAcceleration) / 12);
         for (let action = 0; action < actions; action += 1) {
           if (!state.dungeon || !state.adventurer.inDungeon || !enemy.alive || state.adventurer.hp <= 0) break;
+          if (enemy.criticalFleeing) {
+            performCriticalFleeAction(enemy, worldStatuses, action === 0);
+            continue;
+          }
           const dx = Math.abs(enemy.x - state.dungeon.player.x);
           const dy = Math.abs(enemy.y - state.dungeon.player.y);
           const dist = Math.max(dx, dy);
@@ -6924,6 +7035,7 @@
         }
       } finally {
         tickEnemyWorldStatuses(enemy);
+        enemy.criticalScreamTurns = Math.max(0, Number(enemy.criticalScreamTurns || 0) - 1);
       }
     }
     applyEnemyRapidRegeneration(activeEnemies);
@@ -7251,10 +7363,17 @@
     }
   }
 
-  function playCombatSfx(attribute, impact) {
-    const sound = DATA.attributes.includes(attribute) ? attribute : "hit";
-    playSfx(sound);
-    if (impact) playSfx(attribute === "fire" ? "fireHit" : "hit");
+  function queueCombatSfx(type) {
+    if (!audio || !audio.enabled || !audio.started || !audio.context || !sfxPlayer) return;
+    const now = Number(audio.context.currentTime || 0);
+    const startAt = Math.max(now, combatSfxAvailableAt);
+    sfxPlayer.play(type, Math.max(0, startAt - now));
+    combatSfxAvailableAt = startAt + Number(COMBAT_SFX_DURATIONS[type] || 0.4) + COMBAT_SFX_GAP_SECONDS;
+  }
+
+  function playCombatSfx(attribute, received) {
+    const sound = received ? "playerHurt" : DATA.attributes.includes(attribute) ? attribute : "hit";
+    queueCombatSfx(sound);
   }
 
   function playSfx(type) {

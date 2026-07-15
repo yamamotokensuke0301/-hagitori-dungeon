@@ -869,6 +869,48 @@ strong {
   transform: translateY(-1px);
 }
 
+.cell.tile-critical-fleeing {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 86, 72, 0.76),
+    0 0 8px rgba(190, 37, 29, 0.46);
+}
+
+.tile-critical-fleeing .monster-marker {
+  animation: monster-panic-shiver 0.34s steps(2, end) infinite;
+}
+
+.cell.has-monster-scream {
+  z-index: 12;
+}
+
+.monster-scream {
+  position: absolute;
+  z-index: 20;
+  bottom: 74%;
+  left: 50%;
+  width: max-content;
+  pointer-events: none;
+  color: #fff2d0;
+  font-size: max(9px, calc(var(--tile) * 0.34));
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
+  text-shadow: 0 1px 2px #000, 0 0 7px rgba(255, 65, 52, 0.94);
+  animation: monster-scream-burst 0.9s ease-out both;
+}
+
+@keyframes monster-panic-shiver {
+  0% { transform: translate(-1px, -1px) rotate(-3deg); }
+  50% { transform: translate(1px, 0) rotate(3deg); }
+  100% { transform: translate(-1px, -1px) rotate(-3deg); }
+}
+
+@keyframes monster-scream-burst {
+  0% { opacity: 0; transform: translate(-50%, 5px) scale(0.55); }
+  22% { opacity: 1; transform: translate(-50%, -3px) scale(1.18); }
+  100% { opacity: 0; transform: translate(-50%, -12px) scale(0.94); }
+}
+
 .mini-hp-bar {
   position: absolute;
   right: 2px;

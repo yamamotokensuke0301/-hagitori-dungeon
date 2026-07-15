@@ -43,6 +43,7 @@ scriptFiles.forEach((path) => new Function(read(path)));
 
 const styleSource = read("css/style.css");
 const mainSource = read("js/main.js");
+const audioEffectsSource = read("js/audio-effects.js");
 const innContentSource = read("js/inn-content.js");
 const jobsSource = read("data/jobs.js");
 const dungeonGeneratorSource = read("js/dungeon-generator.js");
@@ -247,7 +248,20 @@ assert(mainSource.includes("const MUSIC_VOLUME = 0.252") && mainSource.includes(
 assert(mainSource.includes("BGM_SCENE_VOLUME_MULTIPLIERS = Object.freeze({ town: 0.55 })")
   && mainSource.includes("track.targetVolume = MUSIC_VOLUME * (BGM_SCENE_VOLUME_MULTIPLIERS[scene] ?? 1)"),
 "town-only BGM volume reduction is missing");
-assert(indexSource.includes("./js/main.js?v=20260713-release101"), "1.0.1 release did not refresh the main script cache key");
+assert(indexSource.includes("./js/main.js?v=20260716-critical-flee1")
+  && indexSource.includes("./css/style.css?v=20260716-critical-flee1"), "critical-flee assets did not refresh their cache keys");
+assert(mainSource.includes("const CRITICAL_HP_PERCENT = 25")
+  && mainSource.includes("function enterEnemyCriticalFleeState")
+  && mainSource.includes("function performCriticalFleeAction")
+  && mainSource.includes('enemyAttack(enemy, "瀕死の反撃"')
+  && mainSource.includes('queueCombatSfx("deathCrySharp")'), "critical-HP flee and retaliation AI is missing");
+assert(styleSource.includes(".tile-critical-fleeing")
+  && styleSource.includes(".monster-scream")
+  && styleSource.includes("@keyframes monster-scream-burst"), "critical-HP scream visuals are missing");
+assert(mainSource.includes("function queueCombatSfx")
+  && mainSource.includes('received ? "playerHurt"')
+  && mainSource.includes("combatSfxAvailableAt")
+  && audioEffectsSource.includes("delaySeconds = 0"), "outgoing and received combat sounds are not separated or sequenced");
 assert(styleSource.includes("min(32px, calc((100vw - 42px) / 13)") && styleSource.includes("min(29px, calc((100vw - 42px) / 13)"), "dungeon map tiles do not use the reclaimed phone viewport space");
 assert(mainSource.includes("const overlayOpen") && mainSource.includes("const dungeonMovement"), "global movement keys are not gated to active combat");
 assert(mainSource.includes("function trapModalFocus") && mainSource.includes("focusEscapesForward"), "modal keyboard focus can escape into the background");
@@ -963,6 +977,7 @@ FakeAudioParam.prototype.exponentialRampToValueAtTime = function (value) { this.
 FakeAudioParam.prototype.linearRampToValueAtTime = function (value) { this.value = value; };
 
 let audioVoiceStarts = 0;
+const audioVoiceStartTimes = [];
 
 function FakeAudioNode() {
   this.gain = new FakeAudioParam();
@@ -977,7 +992,10 @@ function FakeAudioNode() {
   this.release = new FakeAudioParam();
 }
 FakeAudioNode.prototype.connect = function () {};
-FakeAudioNode.prototype.start = function () { audioVoiceStarts += 1; };
+FakeAudioNode.prototype.start = function (when) {
+  audioVoiceStarts += 1;
+  if (Number.isFinite(when)) audioVoiceStartTimes.push(when);
+};
 FakeAudioNode.prototype.stop = function () {};
 
 function FakeAudioContext() {
@@ -998,8 +1016,14 @@ FakeAudioContext.prototype.createBuffer = function (channels, length) {
 
 const fakeAudioContext = new FakeAudioContext();
 const sfxPlayer = window.HD_SFX.create(fakeAudioContext, new FakeAudioNode());
-assert(sfxPlayer.types.length === 90, "sound effect recipe count changed");
+assert(sfxPlayer.types.length === 91, "sound effect recipe count changed");
 assert(["uiTab", "uiConfirm", "uiCancel", "drink", "heartEquip", "trapDiscover", "trapDisarm", "summon", "invulnerable", "regenerate", "knockback", "selfDestruct", "debuff", "devour", "jobChange", "tutorial", "shopRefresh", "corpseDrop", "corpseDropUnique"].every((type) => sfxPlayer.types.includes(type)), "expanded sound-effect recipes are missing");
+assert(sfxPlayer.types.includes("playerHurt"), "dedicated player-damage sound is missing");
+const delayedHurtStartIndex = audioVoiceStartTimes.length;
+sfxPlayer.play("playerHurt", 0.75);
+const delayedHurtStarts = audioVoiceStartTimes.slice(delayedHurtStartIndex);
+assert(delayedHurtStarts.length > 0 && Math.min.apply(null, delayedHurtStarts) >= fakeAudioContext.currentTime + 0.75,
+  "sound-effect player ignored the scheduled non-overlap delay");
 const voicesBeforeLevelUp = audioVoiceStarts;
 sfxPlayer.play("levelUp");
 assert(audioVoiceStarts - voicesBeforeLevelUp >= 18, "level-up fanfare is not sufficiently layered");
@@ -2269,6 +2293,73 @@ const sleepingAmbushDamage = 1000 - persistedSleepingTargetSave.dungeon.enemies[
 assert(sleepingAmbushDamage >= awakeDamage * 2.5, "thief sleeping-target ambush did not deal major bonus damage");
 assert(!persistedSleepingTargetSave.dungeon.enemies[0].asleep && persistedSleepingTargetSave.adventurer.lastAttack.sleepAmbush, "sleeping target did not wake or ambush state was not recorded");
 assert(persistedSleepingTargetSave.log.some((line) => line.includes("寝込み襲撃")), "thief sleeping ambush log is missing");
+
+const criticalFleeSave = clone(corpseSave);
+const criticalFleeEnemy = clone(window.HD_DATA.monsters.find((monster) => monster.id === "cave_rat"));
+Object.assign(criticalFleeEnemy, {
+  x: 11, y: 10, maxHp: 1000, hp: 251, defense: 99999, attack: 1,
+  alive: true, asleep: false, turns: 0, acceleration: 0, specialAttack: null, dangerous: null,
+  criticalFleeing: false, criticalRetaliationPending: false, criticalScreamTurns: 0,
+});
+criticalFleeSave.adventurer.equipment = {
+  weapon: "rusty_knife", upper: "cloth", lower: null, feet: null, accessory1: null, accessory2: null,
+};
+criticalFleeSave.dungeon.enemies = [criticalFleeEnemy];
+criticalFleeSave.dungeon.traps = [];
+criticalFleeSave.dungeon.turnsElapsed = 0;
+criticalFleeSave.dungeon.actionProgress = 0;
+criticalFleeSave.dungeon.enemySpawnCap = 1;
+let persistedCriticalFleeSave = null;
+localStorage.getItem = function (key) {
+  return key === "hagitori-dungeon-save-v1" ? JSON.stringify(criticalFleeSave) : null;
+};
+localStorage.setItem = function (key, value) {
+  if (key === "hagitori-dungeon-save-v1") persistedCriticalFleeSave = JSON.parse(value);
+};
+const criticalFleeOriginalRandom = Math.random;
+Math.random = function () { return 0; };
+eval(read("js/main.js"));
+const criticalFleeHpBefore = criticalFleeSave.adventurer.hp;
+document.listeners.keydown({ key: "ArrowRight", preventDefault() {} });
+Math.random = criticalFleeOriginalRandom;
+const panickedEnemy = persistedCriticalFleeSave.dungeon.enemies[0];
+assert(panickedEnemy.alive && panickedEnemy.hp > 0 && panickedEnemy.hp <= 250 && panickedEnemy.criticalFleeing,
+  "a surviving monster did not enter persistent flee state at the 25-percent red zone");
+assert(persistedCriticalFleeSave.log.some((line) => line.includes("悲鳴") && line.includes("逃げ始めた")),
+  "critical-HP monster scream log is missing");
+assert(persistedCriticalFleeSave.log.some((line) => line.includes("瀕死の反撃"))
+  && persistedCriticalFleeSave.adventurer.hp < criticalFleeHpBefore,
+  "an adjacent critical monster did not retaliate after being hit");
+assert(!panickedEnemy.criticalRetaliationPending && panickedEnemy.criticalScreamTurns >= 1,
+  "critical retaliation was not consumed or its visible scream ended too early");
+
+const criticalEscapeSave = clone(persistedCriticalFleeSave);
+criticalEscapeSave.adventurer.hp = criticalFleeHpBefore;
+Object.assign(criticalEscapeSave.dungeon.enemies[0], {
+  x: 11, y: 10, hp: 900, criticalFleeing: true, criticalRetaliationPending: false, criticalScreamTurns: 0,
+});
+criticalEscapeSave.dungeon.actionProgress = 0;
+const retaliationLogsBeforeEscape = criticalEscapeSave.log.filter((line) => line.includes("瀕死の反撃")).length;
+let persistedCriticalEscapeSave = null;
+localStorage.getItem = function (key) {
+  return key === "hagitori-dungeon-save-v1" ? JSON.stringify(criticalEscapeSave) : null;
+};
+localStorage.setItem = function (key, value) {
+  if (key === "hagitori-dungeon-save-v1") persistedCriticalEscapeSave = JSON.parse(value);
+};
+Math.random = function () { return 0; };
+eval(read("js/main.js"));
+const passiveHpBefore = criticalEscapeSave.adventurer.hp;
+elements.get("#waitButton").listeners.click();
+Math.random = criticalFleeOriginalRandom;
+const escapedEnemy = persistedCriticalEscapeSave.dungeon.enemies[0];
+const escapedPlayer = persistedCriticalEscapeSave.dungeon.player;
+const escapedDistance = Math.max(Math.abs(escapedEnemy.x - escapedPlayer.x), Math.abs(escapedEnemy.y - escapedPlayer.y));
+assert(escapedDistance > 1 && escapedEnemy.criticalFleeing && escapedEnemy.hp === 900,
+  "critical monster did not keep fleeing away after healing above the red zone");
+assert(persistedCriticalEscapeSave.adventurer.hp === passiveHpBefore
+  && persistedCriticalEscapeSave.log.filter((line) => line.includes("瀕死の反撃")).length === retaliationLogsBeforeEscape,
+  "critical monster attacked without first receiving an adjacent hit");
 
 const handymanDigSave = clone(corpseSave);
 handymanDigSave.adventurer.jobId = "handyman";
